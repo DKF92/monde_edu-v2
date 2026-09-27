@@ -1,0 +1,29 @@
+<ion-content class="page-choix-periode" [fullscreen]="true">
+  <div class="conteneur">
+    <div class="entete">
+      <ion-icon name="book-outline"></ion-icon>
+      <h1>Trimestre</h1>
+      <p>Sur quelle période souhaitez-vous travailler ?</p>
+    </div>
+
+    @if (chargement()) {
+      <div class="chargement">
+        <ion-spinner name="dots"></ion-spinner>
+      </div>
+    } @else {
+      <ion-list class="liste" lines="none">
+        @for (periode of periodes(); track periode.id) {
+          <ion-item button (click)="choisir(periode)" class="carte-periode">
+            <ion-label>{{ periode.libelle }}</ion-label>
+            @if (periode.is_active) {
+              <ion-badge color="success">en cours</ion-badge>
+            }
+            <ion-icon slot="end" name="chevron-forward-outline"></ion-icon>
+          </ion-item>
+        } @empty {
+          <div class="etat-vide">Aucun trimestre configuré pour cette année.</div>
+        }
+      </ion-list>
+    }
+  </div>
+</ion-content>

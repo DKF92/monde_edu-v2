@@ -1,0 +1,65 @@
+<ion-modal
+  class="modale-annee"
+  [isOpen]="isOpen"
+  [backdropDismiss]="!obligatoire"
+  [canDismiss]="peutFermer"
+  [keyboardClose]="!obligatoire"
+  (didDismiss)="annuler()"
+>
+  <ng-template>
+    <div class="contenu-modale">
+      <div class="entete">
+        <ion-icon name="calendar-outline"></ion-icon>
+        <h1>Année scolaire</h1>
+        <p>
+          @if (obligatoire) {
+            Choisissez l'année scolaire sur laquelle vous allez travailler pour continuer.
+          } @else {
+            Changer l'année scolaire active.
+          }
+        </p>
+      </div>
+
+      @if (chargement()) {
+        <div class="chargement">
+          <ion-spinner name="dots"></ion-spinner>
+        </div>
+      } @else {
+        <ion-select
+          label="Année scolaire"
+          label-placement="stacked"
+          fill="outline"
+          interface="popover"
+          placeholder="Sélectionner..."
+          [value]="selectionId()"
+          (ionChange)="selectionId.set($event.detail.value)"
+        >
+          @for (annee of annees(); track annee.id) {
+            <ion-select-option [value]="annee.id">
+              {{ annee.libelle }}{{ annee.is_active ? ' (en cours)' : '' }}
+            </ion-select-option>
+          }
+        </ion-select>
+
+        @if (annees().length === 0) {
+          <ion-text color="danger">
+            <p class="message-vide">Aucune année scolaire configurée pour cet établissement.</p>
+          </ion-text>
+        }
+      }
+
+      <div class="actions">
+        @if (!obligatoire) {
+          <ion-button fill="clear" (click)="annuler()" [disabled]="enregistrement()">Annuler</ion-button>
+        }
+        <ion-button (click)="confirmer()" [disabled]="!selectionId() || enregistrement()">
+          @if (enregistrement()) {
+            <ion-spinner name="dots"></ion-spinner>
+          } @else {
+            Confirmer
+          }
+        </ion-button>
+      </div>
+    </div>
+  </ng-template>
+</ion-modal>

@@ -1,0 +1,49 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>{{ etablissement()?.nom }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="page-dashboard">
+  <ion-refresher slot="fixed" (ionRefresh)="charger($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  @if (stats(); as s) {
+    <p class="annee-active">Année scolaire {{ s.annee_scolaire_active }}</p>
+
+    <div class="grille-kpi">
+      <div class="carte-kpi">
+        <ion-icon name="people-outline" color="primary"></ion-icon>
+        <div>
+          <span class="valeur">{{ s.effectif_eleves }}</span>
+          <span class="libelle">Élèves</span>
+        </div>
+      </div>
+
+      <div class="carte-kpi">
+        <ion-icon name="school-outline" color="secondary"></ion-icon>
+        <div>
+          <span class="valeur">{{ s.nombre_classes }}</span>
+          <span class="libelle">Classes</span>
+        </div>
+      </div>
+
+      <div class="carte-kpi">
+        <ion-icon name="cash-outline" color="success"></ion-icon>
+        <div>
+          <span class="valeur">{{ formaterMontant(s.encaissements_du_jour) }}</span>
+          <span class="libelle">Encaissé aujourd'hui</span>
+        </div>
+      </div>
+
+      <div class="carte-kpi">
+        <ion-icon name="wallet-outline" color="tertiary"></ion-icon>
+        <div>
+          <span class="valeur">{{ formaterMontant(s.encaissements_du_mois) }}</span>
+          <span class="libelle">Encaissé ce mois</span>
+        </div>
+      </div>
+    </div>
+  }
+</ion-content>

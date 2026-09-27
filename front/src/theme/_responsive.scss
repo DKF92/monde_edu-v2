@@ -1,0 +1,43 @@
+// Deux logiques bien distinctes :
+//
+// 1) contenu-formulaire : pour les ecrans "formulaire/carte" (connexion...).
+//    Sur mobile, AUCUNE contrainte n'est appliquee (comportement d'origine :
+//    le formulaire prend sa largeur naturelle, comme une vraie app mobile).
+//    A partir du seuil $depuis seulement, la largeur devient fluide (clamp)
+//    et grandit avec l'ecran jusqu'a un plafond $max, pour eviter qu'une
+//    carte de connexion ne reste minuscule au milieu d'un grand ecran.
+//
+// 2) pleine-largeur : pour les pages de contenu (listes, tableau de bord,
+//    profil...). Ces pages ne sont JAMAIS centrees dans un ilot flottant :
+//    elles vont jusqu'aux bords de l'ecran, a toutes les tailles, avec juste
+//    une marge de lecture qui s'ajuste legerement sur tres grand ecran.
+
+@mixin contenu-formulaire($fluide: 34vw, $max: 460px, $depuis: 600px) {
+  @media (min-width: #{$depuis}) {
+    width: min(100%, clamp(#{$depuis * 0.7}, #{$fluide}, #{$max}));
+    margin-left: auto;
+    margin-right: auto;
+  }
+  box-sizing: border-box;
+}
+
+@mixin pleine-largeur($marge: 16px, $marge-large: 32px, $depuis-large: 1400px) {
+  padding-left: $marge;
+  padding-right: $marge;
+  box-sizing: border-box;
+
+  @media (min-width: #{$depuis-large}) {
+    padding-left: $marge-large;
+    padding-right: $marge-large;
+  }
+}
+
+$fond-bureau-couleur: #eef0f5;
+
+// Fond gris clair derriere le contenu, pour qu'il se detache legerement du
+// blanc en version bureau (n'implique aucun centrage/retrecissement).
+@mixin fond-bureau {
+  @media (min-width: 768px) {
+    --background: #{$fond-bureau-couleur};
+  }
+}

@@ -1,0 +1,22 @@
+<ion-tabs>
+  <ion-tab-bar slot="bottom">
+    <ion-tab-button tab="dashboard" href="/tabs/dashboard">
+      <ion-icon name="home-outline"></ion-icon>
+      <ion-label>Accueil</ion-label>
+    </ion-tab-button>
+
+    @if (peutVoirEleves()) {
+      <ion-tab-button tab="eleves" href="/tabs/eleves">
+        <ion-icon name="people-outline"></ion-icon>
+        <ion-label>Élèves</ion-label>
+      </ion-tab-button>
+    }
+
+    <ion-tab-button tab="profil" href="/tabs/profil">
+      <ion-icon name="person-circle-outline"></ion-icon>
+      <ion-label>Profil</ion-label>
+    </ion-tab-button>
+  </ion-tab-bar>
+</ion-tabs>
+
+<app-choisir-annee-modal [isOpen]="anneeScolaireManquante()" [obligatoire]="true"></app-choisir-annee-modal>

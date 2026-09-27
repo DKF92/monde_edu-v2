@@ -1,0 +1,53 @@
+@import '../../../theme/responsive';
+
+.page-profil {
+  @include fond-bureau;
+}
+
+.conteneur {
+  @include pleine-largeur;
+}
+
+.carte-utilisateur {
+  text-align: center;
+  padding: 32px 16px 16px;
+
+  ion-avatar {
+    width: 84px;
+    height: 84px;
+    margin: 0 auto 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--ion-color-light);
+
+    ion-icon {
+      font-size: 60px;
+      color: var(--ion-color-medium);
+    }
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  p {
+    margin: 2px 0 0;
+    color: var(--ion-color-medium);
+    font-size: 14px;
+  }
+}
+
+.roles {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.deconnexion {
+  padding: 24px 16px;
+}

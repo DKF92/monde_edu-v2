@@ -1,0 +1,40 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>Élèves</ion-title>
+  </ion-toolbar>
+  <ion-toolbar>
+    <ion-searchbar
+      placeholder="Rechercher un élève..."
+      (ionInput)="rechercher($any($event.target).value)"
+    ></ion-searchbar>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="page-eleves">
+  <ion-list lines="full" class="liste">
+    @for (eleve of eleves(); track eleve.id) {
+      <ion-item button>
+        <ion-avatar slot="start">
+          @if (eleve.photo_path) {
+            <img [src]="eleve.photo_path" alt="" />
+          } @else {
+            <div class="avatar-initiales">{{ eleve.nom.charAt(0) }}{{ eleve.prenoms.charAt(0) }}</div>
+          }
+        </ion-avatar>
+        <ion-label>
+          <h2>{{ eleve.nom }} {{ eleve.prenoms }}</h2>
+          <p>Matricule : {{ eleve.matricule }}</p>
+        </ion-label>
+        <ion-badge slot="end" [color]="eleve.statut === 'actif' ? 'success' : 'medium'">
+          {{ eleve.statut }}
+        </ion-badge>
+      </ion-item>
+    } @empty {
+      <div class="etat-vide">Aucun élève trouvé.</div>
+    }
+  </ion-list>
+
+  <ion-infinite-scroll (ionInfinite)="chargerPageSuivante($event)">
+    <ion-infinite-scroll-content></ion-infinite-scroll-content>
+  </ion-infinite-scroll>
+</ion-content>

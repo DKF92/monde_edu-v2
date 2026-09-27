@@ -1,0 +1,58 @@
+<ion-content class="page-login" [fullscreen]="true">
+  <div class="conteneur">
+    @if (etablissement(); as etab) {
+      <div class="entete">
+        <ion-avatar>
+          @if (etab.logo_path) {
+            <img [src]="etab.logo_path" alt="" />
+          } @else {
+            <ion-icon name="school-outline"></ion-icon>
+          }
+        </ion-avatar>
+        <h1>{{ etab.nom }}</h1>
+        <p>{{ etab.ville }}</p>
+        <button type="button" class="lien-changer" (click)="changerEtablissement()">
+          Ce n'est pas mon établissement · Changer
+        </button>
+      </div>
+
+      <form [formGroup]="formulaire" (ngSubmit)="seConnecter()" class="formulaire">
+        <ion-item fill="outline" shape="round">
+          <ion-icon slot="start" name="mail-outline"></ion-icon>
+          <ion-input
+            label="Email"
+            labelPlacement="floating"
+            type="email"
+            formControlName="email"
+            autocomplete="email"
+          ></ion-input>
+        </ion-item>
+
+        <ion-item fill="outline" shape="round">
+          <ion-icon slot="start" name="lock-closed-outline"></ion-icon>
+          <ion-input
+            label="Mot de passe"
+            labelPlacement="floating"
+            type="password"
+            formControlName="password"
+            autocomplete="current-password"
+          ></ion-input>
+        </ion-item>
+
+        @if (erreur()) {
+          <ion-text color="danger">
+            <p class="message-erreur">{{ erreur() }}</p>
+          </ion-text>
+        }
+
+        <ion-button expand="block" shape="round" type="submit" [disabled]="chargement()">
+          @if (chargement()) {
+            <ion-spinner name="dots"></ion-spinner>
+          } @else {
+            Se connecter
+          }
+        </ion-button>
+      </form>
+    }
+  </div>
+</ion-content>
