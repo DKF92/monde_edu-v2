@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'etablissement_id', 'matricule', 'nom', 'prenoms', 'date_naissance',
-    'lieu_naissance', 'sexe', 'nationalite', 'photo_path',
+    'lieu_naissance', 'sexe', 'telephone', 'nationalite', 'photo_path',
     'particularites_medicales', 'orphelin_pere', 'orphelin_mere', 'quartier', 'statut',
 ])]
 class Eleve extends Model

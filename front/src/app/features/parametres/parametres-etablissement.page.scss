@@ -1,0 +1,120 @@
+.logo-zone {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px dashed var(--me-bordure);
+  border-radius: 14px;
+}
+
+.logo-apercu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 88px;
+  height: 88px;
+  border-radius: 16px;
+  background: var(--me-surface);
+  border: 1px solid var(--me-bordure);
+  overflow: hidden;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  &.vide {
+    background: var(--me-fond);
+
+    ion-icon {
+      font-size: 32px;
+      color: var(--me-texte-leger);
+    }
+  }
+}
+
+.logo-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+
+  strong {
+    font-size: 14px;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+
+  > div {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+}
+
+.bouton-fichier {
+  position: relative;
+  height: 40px;
+  overflow: hidden;
+
+  input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  &.occupe {
+    pointer-events: none;
+  }
+}
+
+.me-bouton-texte ion-icon {
+  vertical-align: -2px;
+}
+
+.abonnement {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  div {
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--me-fond);
+  }
+
+  dt {
+    font-size: 12px;
+    color: var(--me-texte-leger);
+  }
+
+  dd {
+    margin: 4px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo-zone {
+    align-items: flex-start;
+  }
+
+  .logo-apercu {
+    width: 64px;
+    height: 64px;
+  }
+}

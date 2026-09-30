@@ -1,0 +1,46 @@
+@if (resultat().donnees; as recu) {
+  <dl class="infos">
+    <div><dt>Élève</dt><dd>{{ recu.nom }} {{ recu.prenoms }}</dd></div>
+    <div><dt>Naissance</dt><dd>{{ dateFr(recu.date_naissance) }}{{ recu.lieu_naissance ? ' à ' + recu.lieu_naissance : '' }}</dd></div>
+    <div><dt>Statut</dt><dd>{{ recu.statut || '—' }}</dd></div>
+    <div><dt>Niveau précédent</dt><dd>{{ recu.niveau_precedent || '—' }}{{ recu.moyenne ? ' · MGA ' + recu.moyenne : '' }}</dd></div>
+    <div><dt>Décision</dt><dd>{{ recu.decision ? libellesDecision[recu.decision] || recu.decision : '—' }}</dd></div>
+    <div><dt>Niveau {{ recu.annee }}</dt><dd>{{ recu.niveau_suivant || '—' }}</dd></div>
+    <div><dt>Payé en ligne</dt><dd>{{ recu.somme_payee ? montant(recu.somme_payee) : '—' }}</dd></div>
+    <div><dt>Contact parent</dt><dd>{{ recu.contact_parent || '—' }}</dd></div>
+  </dl>
+  @if (resultat().autre_etablissement) {
+    <p class="me-note attention">
+      <ion-icon name="warning-outline"></ion-icon>
+      <span>Préinscrit(e) dans un autre établissement : {{ recu.etablissement }} (code {{ recu.code_etablissement }}).</span>
+    </p>
+  }
+
+  @if (ecarts(); as liste) {
+    @if (liste.length) {
+      <div class="ecarts">
+        <h3>Différences avec notre fiche</h3>
+        <p class="aide">Cochez les valeurs du site de l'État à reprendre.</p>
+        <div class="tableau-ecarts" role="table">
+          <div class="ligne-ecart entete" role="row">
+            <span></span><span>Information</span><span>Notre fiche</span><span>Site de l'État</span>
+          </div>
+          @for (e of liste; track e.cle; let impaire = $odd) {
+            <button type="button" class="ligne-ecart" role="row" [class.me-ligne-alternee]="impaire" [class.choisi]="choisis().has(e.cle)" (click)="basculer.emit(e.cle)">
+              <ion-icon [name]="choisis().has(e.cle) ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+              <span class="libelle">{{ e.libelle }}</span>
+              <span class="notre">{{ e.notre }}</span>
+              <span class="etat">{{ e.etat }}</span>
+            </button>
+          }
+        </div>
+        <ng-content></ng-content>
+      </div>
+    } @else {
+      <p class="me-note">
+        <ion-icon name="checkmark-circle-outline"></ion-icon>
+        <span>Notre fiche correspond aux informations du site de l'État.</span>
+      </p>
+    }
+  }
+}

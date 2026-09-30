@@ -1,0 +1,290 @@
+$tableau: 620px;
+
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--me-texte);
+
+  ion-icon {
+    color: var(--me-texte-leger);
+  }
+}
+
+// ============================ Barre : criteres + boutons ============================
+
+.barre-caisse {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  padding: 14px 16px;
+}
+
+.resume {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.puce {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--me-bleu-fond);
+  color: var(--me-marine);
+  font-size: 13px;
+  font-weight: 600;
+
+  ion-icon {
+    font-size: 15px;
+  }
+}
+
+.boutons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  button {
+    height: 42px;
+    white-space: nowrap;
+  }
+
+  .bouton-filtres .me-badge {
+    margin-left: 4px;
+  }
+
+  @media (max-width: 719px) {
+    width: 100%;
+
+    button {
+      flex: 1 1 calc(50% - 8px);
+      justify-content: center;
+    }
+  }
+}
+
+// Modale des filtres : ligne 1 = periode, ligne 2 = criteres eleve.
+.ligne-filtres {
+  display: grid;
+  gap: 10px;
+  align-items: end;
+
+  button {
+    height: 44px;
+    justify-content: center;
+  }
+
+  .actif {
+    border-color: var(--ion-color-primary);
+    color: var(--me-marine);
+  }
+
+  &.periode {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    @media (min-width: 900px) {
+      grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) auto minmax(180px, 1.3fr) auto;
+    }
+  }
+
+  &.criteres {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    @media (min-width: 900px) {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
+}
+
+// ============================ Bilan ============================
+
+.bilan {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  container-type: inline-size;
+
+  &.attenue {
+    opacity: 0.55;
+  }
+}
+
+.titre-bilan {
+  h2 {
+    font-size: 17px;
+  }
+
+  p {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--me-texte-doux);
+  }
+}
+
+.tableau-bilan {
+  border: 1px solid var(--me-bordure);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ligne {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--me-bordure);
+
+  .libelle {
+    grid-column: 1 / -1;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--me-texte);
+  }
+
+  &.inactif .libelle {
+    color: var(--me-texte-doux);
+  }
+
+  &.entete {
+    display: none;
+  }
+
+  @container (min-width: #{$tableau}) {
+    grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(110px, 1fr));
+    align-items: center;
+    padding: 6px 12px;
+
+    .libelle {
+      grid-column: auto;
+      font-weight: 600;
+    }
+
+    &.entete {
+      display: grid;
+      padding: 10px 12px;
+      border-top: none;
+      background: var(--me-fond);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--me-texte-leger);
+
+      span:not(:first-child) {
+        text-align: right;
+      }
+    }
+  }
+}
+
+.groupe {
+  padding: 6px 12px;
+  border-top: 1px solid var(--me-bordure);
+  background: #fafbfd;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--me-texte-leger);
+}
+
+// Chaque montant a son bouton oeil : il ouvre la liste des paiements concernes.
+.cellule {
+  // Mobile : libelle, puis montant et oeil (l'oeil passe a la ligne s'il manque de place).
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 4px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--me-texte);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+
+  &::before {
+    content: attr(data-libelle);
+    flex-basis: 100%;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--me-texte-leger);
+  }
+
+  .montant {
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .oeil {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    font-size: 17px;
+    color: var(--me-texte-leger);
+
+    &:hover {
+      color: var(--me-marine);
+    }
+  }
+
+  &.vide {
+    color: var(--me-texte-leger);
+    font-weight: 500;
+  }
+
+  &.total {
+    background: #f7f9fd;
+  }
+
+  &.na {
+    color: var(--me-texte-leger);
+    font-weight: 400;
+  }
+
+  @container (min-width: #{$tableau}) {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    text-align: right;
+
+    &::before {
+      content: none;
+    }
+  }
+}
+
+.ligne-total {
+  background: var(--me-bleu-fond);
+  border-top: 2px solid var(--me-marine);
+
+  .libelle,
+  .cellule {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--me-marine);
+  }
+
+  .cellule.total {
+    background: none;
+  }
+}
+
+.aide {
+  margin: 0;
+  font-size: 12px;
+  color: var(--me-texte-leger);
+}

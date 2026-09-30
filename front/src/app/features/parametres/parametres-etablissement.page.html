@@ -1,0 +1,189 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/parametres')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Paramètres
+        </button>
+        <h1>Établissement</h1>
+        <p>Identité et coordonnées imprimées sur les bulletins, reçus et documents.</p>
+      </div>
+    </header>
+
+    @if (chargement()) {
+      <section class="me-carte">
+        <ion-skeleton-text [animated]="true" style="width: 40%; height: 18px"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 140px; margin-top: 12px"></ion-skeleton-text>
+      </section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les informations</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (infos()) {
+      @let i = infos()!;
+
+      <!-- Champ de saisie standard -->
+      <ng-template #champ let-c let-libelle="libelle" let-requis="requis" let-type="type" let-exemple="exemple">
+        <div class="me-champ">
+          <label [for]="'e-' + c">{{ libelle }} @if (requis) { <span class="me-requis">*</span> }</label>
+          <input
+            [id]="'e-' + c"
+            class="me-saisie"
+            [type]="type || 'text'"
+            autocomplete="off"
+            [placeholder]="exemple || ''"
+            [value]="valeur(c)"
+            [class.invalide]="erreurs()[c]"
+            (input)="saisir(c, $any($event.target).value)"
+          />
+          @if (erreurs()[c]; as e) { <p class="me-erreur-champ">{{ e }}</p> }
+        </div>
+      </ng-template>
+
+      <!-- ================= Identite ================= -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-bleu"><ion-icon name="business-outline"></ion-icon></span>
+          <div>
+            <h2>Identité</h2>
+            <p>Nom officiel, sigle et logo de l'établissement.</p>
+          </div>
+        </div>
+
+        <div class="logo-zone">
+          <div class="logo-apercu" [class.vide]="!i.logo_url">
+            @if (i.logo_url) {
+              <img [src]="i.logo_url" alt="Logo de l'établissement" />
+            } @else {
+              <ion-icon name="image-outline"></ion-icon>
+            }
+          </div>
+          <div class="logo-actions">
+            <strong>Logo</strong>
+            <small>PNG, JPG ou WEBP, 2 Mo maximum. Apparaît sur les documents imprimés.</small>
+            <div>
+              <label class="me-bouton-secondaire bouton-fichier" [class.occupe]="envoiLogo()">
+                @if (envoiLogo()) {
+                  <ion-spinner name="dots"></ion-spinner>
+                } @else {
+                  <ion-icon name="cloud-upload-outline"></ion-icon> {{ i.logo_url ? 'Remplacer' : 'Choisir une image' }}
+                }
+                <input type="file" accept="image/png,image/jpeg,image/webp" (change)="choisirLogo($event)" [disabled]="envoiLogo()" />
+              </label>
+              @if (i.logo_url && !envoiLogo()) {
+                <button type="button" class="me-bouton-texte" (click)="supprimerLogo()">
+                  <ion-icon name="trash-outline"></ion-icon> Retirer
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="me-grille">
+          <div class="large">
+            <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'nom', libelle: 'Nom de l\'établissement', requis: true }"></ng-container>
+          </div>
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'sigle', libelle: 'Sigle', exemple: 'GSD' }"></ng-container>
+          <div class="me-champ">
+            <label for="e-type">Type d'établissement <span class="me-requis">*</span></label>
+            <app-selecteur idChamp="e-type" icone="business-outline" [options]="optionsTypes" [valeur]="indexType()" (valeurChange)="choisirType($event)"></app-selecteur>
+          </div>
+          <div class="large">
+            <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'slogan', libelle: 'Slogan / devise', exemple: 'Discipline - Travail - Succès' }"></ng-container>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= Coordonnees ================= -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-vert"><ion-icon name="call-outline"></ion-icon></span>
+          <div>
+            <h2>Coordonnées</h2>
+            <p>Pour joindre l'établissement.</p>
+          </div>
+        </div>
+        <div class="me-grille">
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'telephone1', libelle: 'Téléphone principal', type: 'tel', exemple: '27 22 00 00 00' }"></ng-container>
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'telephone2', libelle: 'Autre téléphone', type: 'tel' }"></ng-container>
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'email', libelle: 'Adresse e-mail', type: 'email', exemple: 'contact@ecole.ci' }"></ng-container>
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'site_web', libelle: 'Site web', exemple: 'www.ecole.ci' }"></ng-container>
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'boite_postale', libelle: 'Boîte postale', exemple: '01 BP 1234 Abidjan 01' }"></ng-container>
+        </div>
+      </section>
+
+      <!-- ================= Adresse ================= -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-orange"><ion-icon name="location-outline"></ion-icon></span>
+          <div>
+            <h2>Adresse</h2>
+            <p>L'indicatif sert aussi à l'envoi des SMS aux parents.</p>
+          </div>
+        </div>
+        <div class="me-grille">
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'quartier', libelle: 'Quartier', exemple: 'Cocody Angré' }"></ng-container>
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'ville', libelle: 'Ville', exemple: 'Abidjan' }"></ng-container>
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'region', libelle: 'Région' }"></ng-container>
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'pays', libelle: 'Pays', requis: true }"></ng-container>
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'indicatif_telephonique', libelle: 'Indicatif téléphonique', requis: true, exemple: '225' }"></ng-container>
+        </div>
+      </section>
+
+      <!-- ================= En-tete des documents ================= -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-cyan"><ion-icon name="document-text-outline"></ion-icon></span>
+          <div>
+            <h2>En-tête des documents</h2>
+            <p>Imprimé à gauche sur tous les PDF (listes, reçus, bulletins, rapports…). À droite : le logo, le nom de l'école et l'année scolaire.</p>
+          </div>
+        </div>
+        <div class="me-grille">
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'entete_ministere', libelle: 'Ministère de tutelle', exemple: 'MINISTÈRE DE L’ÉDUCATION NATIONALE…' }"></ng-container>
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'entete_direction', libelle: 'Direction régionale', exemple: 'DRENA Abidjan 1' }"></ng-container>
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'entete_adresse', libelle: 'Adresse postale', exemple: adresseParDefaut() }"></ng-container>
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'entete_telephone', libelle: 'Téléphone', exemple: telephoneParDefaut() }"></ng-container>
+        </div>
+        <p class="me-aide-champ">Adresse et téléphone laissés vides : ceux de l'établissement (Coordonnées).</p>
+      </section>
+
+      <!-- ================= Abonnement (lecture seule) ================= -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-violet"><ion-icon name="shield-checkmark-outline"></ion-icon></span>
+          <div>
+            <h2>Abonnement</h2>
+            <p>Géré par Monde Éducatif : contactez-nous pour toute modification.</p>
+          </div>
+        </div>
+        <dl class="abonnement">
+          <div><dt>Code établissement</dt><dd>{{ i.code }}</dd></div>
+          <div>
+            <dt>Statut</dt>
+            <dd><span class="me-badge" [class.succes]="i.statut === 'actif'" [class.attention]="i.statut !== 'actif'">{{ libelleStatut(i.statut) }}</span></dd>
+          </div>
+          <div><dt>Fin d'abonnement</dt><dd>{{ dateLisible(i.date_expiration_abonnement) }}</dd></div>
+        </dl>
+      </section>
+
+      <div class="me-barre-enregistrer">
+        <span class="etat" [class.modifie]="modifie()">{{ modifie() ? 'Modifications non enregistrées' : 'Tout est enregistré' }}</span>
+        @if (modifie()) {
+          <button type="button" class="me-bouton-texte" (click)="annuler()" [disabled]="enregistrement()">Annuler</button>
+        }
+        <button type="button" class="me-bouton-principal" (click)="enregistrer()" [disabled]="!modifie() || enregistrement()">
+          @if (enregistrement()) {
+            <ion-spinner name="dots"></ion-spinner>
+          } @else {
+            Enregistrer
+          }
+        </button>
+      </div>
+    }
+  </div>
+</ion-content>

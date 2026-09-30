@@ -1,40 +1,212 @@
-<ion-header>
-  <ion-toolbar color="primary">
-    <ion-title>Élèves</ion-title>
-  </ion-toolbar>
-  <ion-toolbar>
-    <ion-searchbar
-      placeholder="Rechercher un élève..."
-      (ionInput)="rechercher($any($event.target).value)"
-    ></ion-searchbar>
-  </ion-toolbar>
-</ion-header>
+<ion-content class="me-page-admin">
+  <ion-refresher slot="fixed" (ionRefresh)="charger($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
 
-<ion-content class="page-eleves">
-  <ion-list lines="full" class="liste">
-    @for (eleve of eleves(); track eleve.id) {
-      <ion-item button>
-        <ion-avatar slot="start">
-          @if (eleve.photo_path) {
-            <img [src]="eleve.photo_path" alt="" />
-          } @else {
-            <div class="avatar-initiales">{{ eleve.nom.charAt(0) }}{{ eleve.prenoms.charAt(0) }}</div>
+  <div class="me-page">
+    <!-- ================= En-tete ================= -->
+    <header class="me-entete-page">
+      <div>
+        <h1>Élèves</h1>
+        <p>Tous les élèves passés par l'établissement, inscrits ou non cette année.</p>
+      </div>
+      @if (peutImporter()) {
+        <button type="button" class="me-bouton-secondaire" (click)="importOuvert.set(true)">
+          <ion-icon name="cloud-upload-outline"></ion-icon>
+          <span>Importer des élèves</span>
+        </button>
+      }
+    </header>
+
+    <!-- ================= Chiffres ================= -->
+    <section class="compteurs" aria-label="Élèves">
+      <button type="button" class="me-carte compteur" [class.actif]="!inscription()" (click)="filtrerInscription(null)">
+        <span class="me-pastille teinte-bleu"><ion-icon name="people-outline"></ion-icon></span>
+        <span><strong>{{ compteurs().total }}</strong><small>Élèves</small></span>
+      </button>
+      <button type="button" class="me-carte compteur" [class.actif]="inscription() === 'inscrits'" (click)="filtrerInscription('inscrits')">
+        <span class="me-pastille teinte-vert"><ion-icon name="checkmark-circle-outline"></ion-icon></span>
+        <span><strong>{{ compteurs().inscrits }}</strong><small>Inscrits {{ annee() }}</small></span>
+      </button>
+      <button type="button" class="me-carte compteur" [class.actif]="inscription() === 'non_inscrits'" (click)="filtrerInscription('non_inscrits')">
+        <span class="me-pastille teinte-orange"><ion-icon name="close-circle-outline"></ion-icon></span>
+        <span><strong>{{ compteurs().non_inscrits }}</strong><small>Non inscrits {{ annee() }}</small></span>
+      </button>
+    </section>
+
+    <!-- ================= Liste ================= -->
+    <section class="me-carte liste">
+      <div class="filtres">
+        <label class="me-recherche">
+          <ion-icon name="search-outline"></ion-icon>
+          <input
+            type="search"
+            placeholder="Rechercher (nom, prénoms, matricule…)"
+            aria-label="Rechercher un élève"
+            [value]="recherche()"
+            (input)="rechercher($any($event.target).value)"
+          />
+          @if (liste.actualisation() && !liste.chargementInitial()) {
+            <ion-spinner name="crescent" class="attente-recherche"></ion-spinner>
           }
-        </ion-avatar>
-        <ion-label>
-          <h2>{{ eleve.nom }} {{ eleve.prenoms }}</h2>
-          <p>Matricule : {{ eleve.matricule }}</p>
-        </ion-label>
-        <ion-badge slot="end" [color]="eleve.statut === 'actif' ? 'success' : 'medium'">
-          {{ eleve.statut }}
-        </ion-badge>
-      </ion-item>
-    } @empty {
-      <div class="etat-vide">Aucun élève trouvé.</div>
-    }
-  </ion-list>
+        </label>
+        <app-selecteur idChamp="filtre-sexe" icone="male-female-outline" [options]="optionsSexe" [valeur]="sexe()" (valeurChange)="filtrerSexe($event)"></app-selecteur>
+      </div>
 
-  <ion-infinite-scroll (ionInfinite)="chargerPageSuivante($event)">
-    <ion-infinite-scroll-content></ion-infinite-scroll-content>
-  </ion-infinite-scroll>
+      @if (liste.chargementInitial()) {
+        @for (i of [1, 2, 3, 4]; track i) {
+          <div class="squelette">
+            <ion-skeleton-text [animated]="true" class="squelette-avatar"></ion-skeleton-text>
+            <ion-skeleton-text [animated]="true" style="width: 40%"></ion-skeleton-text>
+          </div>
+        }
+      } @else if (liste.erreur()) {
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les élèves</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      } @else {
+        <div class="titre-tableau">
+          <h2>{{ titre() }}</h2>
+          <span class="etat-chargement">
+            @if (liste.chargementFond()) {
+              <ion-spinner name="dots"></ion-spinner> {{ liste.charges() }} / {{ liste.total() }} chargés
+            }
+            @if (filtresActifs()) {
+              <button type="button" class="me-lien" (click)="reinitialiserFiltres()">Effacer les filtres</button>
+            }
+          </span>
+        </div>
+
+        <div class="tableau" role="table" aria-label="Élèves" [class.attenue]="liste.actualisation()">
+          <div class="ligne entete-tableau" role="row">
+            <span role="columnheader">Élève</span>
+            <span role="columnheader">Naissance</span>
+            <span role="columnheader">{{ annee() || 'Cette année' }}</span>
+            <span role="columnheader">Dernière année</span>
+            <span role="columnheader" class="a-droite">Dossier</span>
+          </div>
+
+          @if (pageEnAttente() && !lignesPage().length) {
+            @for (i of [1, 2, 3]; track i) {
+              <div class="squelette">
+                <ion-skeleton-text [animated]="true" class="squelette-avatar"></ion-skeleton-text>
+                <ion-skeleton-text [animated]="true" style="width: 40%"></ion-skeleton-text>
+              </div>
+            }
+          }
+
+          @for (e of lignesPage(); track e.id; let impaire = $odd) {
+            <div class="ligne cliquable" role="row" [class.me-ligne-alternee]="impaire" (click)="ouvrirDossier(e)">
+              <div class="cellule-eleve" role="cell">
+                @if (e.photo_url) {
+                  <img class="avatar" [src]="e.photo_url" alt="" />
+                } @else {
+                  <span class="avatar" [class.feminin]="e.sexe === 'F'">{{ initiales(e) }}</span>
+                }
+                <span class="identite">
+                  <strong>{{ e.nom }} {{ e.prenoms }}</strong>
+                  <small><span class="matricule">{{ e.matricule }}</span> · {{ e.sexe === 'F' ? 'Fille' : e.sexe === 'M' ? 'Garçon' : '—' }}</small>
+                </span>
+              </div>
+              <span class="cellule" role="cell" data-libelle="Naissance">{{ dateFr(e.date_naissance) }}</span>
+              <span class="cellule" role="cell" [attr.data-libelle]="annee() || 'Cette année'">
+                @if (e.inscription; as i) {
+                  <strong>{{ i.classe || i.niveau }}</strong>
+                  <span [class]="'me-badge ' + ton(i.statut)">{{ libellesStatut[i.statut] || i.statut }}</span>
+                } @else {
+                  <span class="me-badge">Non inscrit(e)</span>
+                }
+              </span>
+              <span class="cellule" role="cell" data-libelle="Dernière année">
+                @if (e.derniere_annee; as d) {
+                  {{ d.annee }} · {{ d.classe || '—' }}
+                  @if (e.nombre_annees > 1) {
+                    <small class="texte-leger">({{ e.nombre_annees }} ans)</small>
+                  }
+                } @else {
+                  <span class="texte-leger">Jamais inscrit(e)</span>
+                }
+              </span>
+              <span class="cellule actions" role="cell">
+                <button type="button" class="me-bouton-secondaire bouton-dossier" (click)="$event.stopPropagation(); ouvrirDossier(e)">
+                  <ion-icon name="folder-open-outline"></ion-icon> Consulter le dossier
+                </button>
+              </span>
+            </div>
+          } @empty {
+            @if (!pageEnAttente()) {
+              <div class="me-etat-vide">
+                <ion-icon name="people-outline"></ion-icon>
+                @if (filtresActifs()) {
+                  <strong>Aucun élève ne correspond</strong>
+                  <button type="button" class="me-lien" (click)="reinitialiserFiltres()">Effacer les filtres</button>
+                } @else {
+                  <strong>Aucun élève pour le moment</strong>
+                  <span>Les élèves apparaissent ici dès leur première inscription.</span>
+                }
+              </div>
+            }
+          }
+        </div>
+        <app-pagination
+          [total]="liste.total()"
+          [page]="page()"
+          [taille]="taille()"
+          (pageChange)="page.set($event)"
+          (tailleChange)="changerTaille($event)"
+        ></app-pagination>
+      }
+    </section>
+  </div>
 </ion-content>
+
+<!-- ================= Import (formulaire pret, traitement a venir) ================= -->
+<ion-modal class="me-modale-formulaire auto" [isOpen]="importOuvert()" (didDismiss)="fermerImport()">
+  <ng-template>
+    <div class="me-modale">
+      <header>
+        <span class="me-pastille teinte-violet"><ion-icon name="cloud-upload-outline"></ion-icon></span>
+        <div>
+          <h1>Importer des élèves</h1>
+          <p>Ajouter en une fois une liste d'élèves (fichier Excel ou CSV).</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="fermerImport()" aria-label="Fermer">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </header>
+      <div class="corps">
+        <section>
+          <h2>Fichier</h2>
+          <label class="zone-fichier" [class.rempli]="fichierImport()">
+            <input type="file" accept=".xlsx,.xls,.csv" hidden (change)="choisirFichier($event)" />
+            <ion-icon name="document-attach-outline"></ion-icon>
+            @if (fichierImport(); as f) {
+              <strong>{{ f.name }}</strong>
+              <small>{{ taille_fichier(f.size) }} · cliquez pour changer</small>
+            } @else {
+              <strong>Choisir un fichier</strong>
+              <small>.xlsx, .xls ou .csv</small>
+            }
+          </label>
+        </section>
+        <section>
+          <h2>Colonnes attendues</h2>
+          <p class="colonnes">Matricule · Nom · Prénoms · Sexe · Date de naissance · Lieu de naissance · Niveau · Classe · Affecté (oui/non) · Redoublant (oui/non) · Contact parent</p>
+          <p class="me-note">
+            <ion-icon name="information-circle-outline"></ion-icon>
+            <span>Le traitement de l'import sera branché prochainement : les colonnes et les règles (matricule, doublons, classes pleines…) seront validées avec vous.</span>
+          </p>
+        </section>
+      </div>
+      <footer>
+        <button type="button" class="me-bouton-texte" disabled title="Bientôt disponible">
+          <ion-icon name="download-outline"></ion-icon> Modèle de fichier
+        </button>
+        <button type="button" class="me-bouton-texte" (click)="fermerImport()">Fermer</button>
+        <button type="button" class="me-bouton-principal" disabled title="Bientôt disponible">Importer</button>
+      </footer>
+    </div>
+  </ng-template>
+</ion-modal>

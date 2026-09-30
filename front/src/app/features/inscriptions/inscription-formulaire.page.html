@@ -1,0 +1,613 @@
+<ion-content class="me-page-admin page-inscription">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl(modification() ? '/tabs/inscriptions/' + inscriptionId() : '/tabs/inscriptions')">
+          <ion-icon name="chevron-back-outline"></ion-icon> {{ modification() ? 'Inscription' : 'Inscriptions' }}
+        </button>
+        <h1>{{ modification() ? 'Modifier l\'inscription' : 'Nouvelle inscription' }}</h1>
+        <p>Année scolaire {{ options()?.annee || '…' }}</p>
+      </div>
+    </header>
+
+    @if (chargement()) {
+      <section class="me-carte">
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 44px"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 60%; height: 44px; margin-top: 12px"></ion-skeleton-text>
+      </section>
+    } @else if (erreurChargement()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger le formulaire</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else {
+      <!-- ================= Etapes ================= -->
+      <nav class="etapes" aria-label="Étapes de l'inscription">
+        @for (e of etapes; track e.numero) {
+          @if (!(modification() && e.numero === 1)) {
+            <button
+              type="button"
+              class="etape"
+              [class.active]="etape() === e.numero"
+              [class.faite]="etape() > e.numero"
+              [disabled]="e.numero > 1 && !etapeAccessible()"
+              (click)="allerA(e.numero)"
+            >
+              <span class="numero">
+                @if (etape() > e.numero) {
+                  <ion-icon name="checkmark-outline"></ion-icon>
+                } @else {
+                  {{ modification() ? e.numero - 1 : e.numero }}
+                }
+              </span>
+              <span class="libelle">{{ e.libelle }}</span>
+            </button>
+          }
+        }
+      </nav>
+
+      <!-- ============================================================ 1. Matricule -->
+      @if (etape() === 1) {
+        <section class="me-carte bloc">
+          <h2>Matricule de l'élève</h2>
+          <p class="aide">Matricule national de l'élève : {{ exemplesFormats() }}.</p>
+          <form class="recherche-matricule" (submit)="$event.preventDefault(); rechercherMatricule()">
+            <input
+              class="me-saisie matricule"
+              [class.invalide]="erreurMatricule()"
+              [value]="matricule()"
+              (input)="matricule.set(valeurTexte($event).toUpperCase()); erreurMatricule.set(null)"
+              placeholder="Ex : 18583394P"
+              autocomplete="off"
+              autocapitalize="characters"
+              spellcheck="false"
+              maxlength="20"
+              aria-label="Matricule"
+            />
+            <button type="submit" class="me-bouton-principal" [disabled]="recherche()">
+              @if (recherche()) {
+                <ion-spinner name="dots"></ion-spinner>
+              } @else {
+                <ion-icon name="search-outline"></ion-icon> Rechercher
+              }
+            </button>
+          </form>
+          @if (erreurMatricule()) {
+            <p class="me-erreur-champ">{{ erreurMatricule() }}</p>
+          }
+        </section>
+
+        @if (resultat(); as r) {
+          <!-- Situation dans notre base -->
+          <section class="me-carte bloc resultat">
+            @switch (r.cas) {
+              @case ('nouveau') {
+                <div class="resultat-entete">
+                  <span class="me-pastille teinte-vert"><ion-icon name="person-add-outline"></ion-icon></span>
+                  <div>
+                    <h2>Nouvel élève</h2>
+                    <p>Le matricule {{ r.matricule }} n'est pas encore dans l'établissement : sa fiche sera créée.</p>
+                  </div>
+                </div>
+              }
+              @case ('reinscription') {
+                <div class="resultat-entete">
+                  <span class="me-pastille teinte-bleu"><ion-icon name="refresh-outline"></ion-icon></span>
+                  <div>
+                    <h2>{{ r.precedente ? 'Réinscription' : 'Élève déjà connu' }} : {{ r.eleve.nom }} {{ r.eleve.prenoms }}</h2>
+                    <p>{{ r.precedente ? 'Élève déjà connu de l\'établissement.' : 'Sa fiche et ses parents sont repris (inscription annulée ou sans année précédente).' }}</p>
+                  </div>
+                </div>
+                @if (r.precedente; as p) {
+                  <dl class="infos">
+                    <div><dt>Année {{ p.annee }}</dt><dd>{{ p.classe || p.niveau || '—' }}</dd></div>
+                    <div><dt>Décision</dt><dd>{{ p.decision_finale ? libellesDecision[p.decision_finale] || p.decision_finale : 'Non saisie' }}</dd></div>
+                    <div><dt>Moyenne</dt><dd>{{ p.moyenne_annuelle ?? '—' }}</dd></div>
+                    <div><dt>Statut</dt><dd>{{ p.affecte ? 'Affecté(e)' : 'Non affecté(e)' }}</dd></div>
+                  </dl>
+                  @if (!p.decision_finale) {
+                    <p class="me-note attention">
+                      <ion-icon name="alert-circle-outline"></ion-icon>
+                      <span>La décision de fin d'année {{ p.annee }} n'est pas saisie : vous la renseignerez à l'étape « Scolarité ».</span>
+                    </p>
+                  }
+                }
+                @for (d of r.dettes; track d.annee) {
+                  <p class="me-note attention">
+                    <ion-icon name="warning-outline"></ion-icon>
+                    <span>
+                      Reste à payer de {{ d.annee }} : <strong>{{ montant(d.reste) }}</strong>.
+                      {{ d.a_creer ? 'Il deviendra une dette à régler en caisse.' : 'Dette à régler en caisse.' }}
+                    </span>
+                  </p>
+                }
+              }
+              @case ('deja_inscrit') {
+                <div class="resultat-entete">
+                  <span class="me-pastille teinte-orange"><ion-icon name="alert-circle-outline"></ion-icon></span>
+                  <div>
+                    <h2>Déjà inscrit(e) cette année</h2>
+                    <p>{{ r.eleve.nom }} {{ r.eleve.prenoms }} · {{ r.inscription.classe?.libelle || (r.inscription.niveau?.libelle + ' (sans classe)') }}</p>
+                  </div>
+                </div>
+                <div class="actions-resultat">
+                  <button type="button" class="me-bouton-secondaire" (click)="recommencer()">Autre matricule</button>
+                  <button type="button" class="me-bouton-principal" (click)="router.navigate(['/tabs/inscriptions', r.inscription.id])">
+                    <ion-icon name="eye-outline"></ion-icon> Voir son inscription
+                  </button>
+                </div>
+              }
+            }
+          </section>
+
+          <!-- Inscription en ligne (site de l'Etat) -->
+          @if (r.cas !== 'deja_inscrit' && options()?.verification_en_ligne) {
+            <section class="me-carte bloc en-ligne">
+              <div class="resultat-entete">
+                <span class="me-pastille teinte-cyan"><ion-icon name="globe-outline"></ion-icon></span>
+                <div>
+                  <h2>Inscription en ligne</h2>
+                  @if (rechercheEnLigne()) {
+                    <p><ion-spinner name="dots"></ion-spinner> Consultation du site de l'État…</p>
+                  } @else if (enLigne()?.trouve) {
+                    <p>Préinscrit(e) en ligne pour {{ enLigne()?.donnees?.annee }} · reçu n° {{ enLigne()?.donnees?.numero_recu }}</p>
+                  } @else if (enLigne()?.erreur) {
+                    <p>{{ enLigne()?.erreur }}</p>
+                  } @else if (enLigne()) {
+                    <p>Aucune inscription en ligne trouvée pour ce matricule.</p>
+                  }
+                </div>
+                @if (!rechercheEnLigne() && enLigne()?.erreur) {
+                  <button type="button" class="me-bouton-texte" (click)="verifierEnLigne()">Réessayer</button>
+                }
+              </div>
+
+              @if (enLigne()?.trouve) {
+                <app-recu-en-ligne [resultat]="enLigne()!" [ecarts]="r.cas === 'nouveau' ? null : ecarts()" [choisis]="ecartsChoisis()" (basculer)="basculerEcart($event)">
+                  <button type="button" class="me-bouton-secondaire" [disabled]="!ecartsChoisis().size" (click)="appliquerEcarts()">
+                    <ion-icon name="swap-horizontal-outline"></ion-icon> Reprendre la sélection
+                  </button>
+                </app-recu-en-ligne>
+                @if (r.cas === 'nouveau') {
+                  <p class="me-note">
+                    <ion-icon name="checkmark-circle-outline"></ion-icon>
+                    <span>La fiche a été pré-remplie avec ces informations : vérifiez-les à l'étape suivante.</span>
+                  </p>
+                }
+              }
+            </section>
+          }
+        }
+      }
+
+      <!-- ============================================================ 2. Fiche eleve -->
+      @if (etape() === 2) {
+        @let e = eleve();
+        @if (depuisEnLigne()) {
+          <p class="me-note">
+            <ion-icon name="globe-outline"></ion-icon>
+            <span>Informations de l'inscription en ligne reprises (reçu n° {{ enLigne()?.donnees?.numero_recu }}) : vérifiez-les puis enregistrez.</span>
+          </p>
+        }
+        <section class="me-carte bloc">
+          <h2>Identité</h2>
+          <div class="identite-photo">
+            <div class="photo">
+              <div class="cadre-photo">
+                @if (photoAffichee()) {
+                  <img [src]="photoAffichee()" alt="Photo de l'élève" (error)="photoEnLigne() === photoAffichee() && photoEnLigneIndisponible.set(true)" />
+                } @else {
+                  <ion-icon name="camera-outline"></ion-icon>
+                }
+              </div>
+              @if (sourcePhoto()) {
+                <small class="source-photo">{{ sourcePhoto() }}</small>
+              }
+              <label class="me-bouton-texte bouton-photo">
+                <input type="file" accept="image/*" capture="user" (change)="choisirPhoto($event)" hidden />
+                {{ photoAffichee() ? 'Changer' : 'Ajouter une photo' }}
+              </label>
+              @if (apercuPhoto()) {
+                <button type="button" class="me-bouton-texte" (click)="retirerPhoto()">Retirer</button>
+              }
+            </div>
+
+            <div class="me-grille">
+              <div class="me-champ">
+                <label for="i-matricule">Matricule <span class="me-requis">*</span></label>
+                <input id="i-matricule" class="me-saisie matricule" [value]="e.matricule" [readOnly]="!modification()" [class.invalide]="erreur('eleve.matricule')" (input)="majEleve('matricule', valeurTexte($event).toUpperCase())" />
+                @if (erreur('eleve.matricule')) {
+                  <span class="me-erreur-champ">{{ erreur('eleve.matricule') }}</span>
+                }
+              </div>
+              <div class="me-champ">
+                <span class="libelle">Sexe <span class="me-requis">*</span></span>
+                <div class="me-segments" role="radiogroup" aria-label="Sexe">
+                  <button type="button" [class.actif]="e.sexe === 'M'" (click)="majEleve('sexe', 'M')">Masculin</button>
+                  <button type="button" [class.actif]="e.sexe === 'F'" (click)="majEleve('sexe', 'F')">Féminin</button>
+                </div>
+                @if (erreur('eleve.sexe')) {
+                  <span class="me-erreur-champ">{{ erreur('eleve.sexe') }}</span>
+                }
+              </div>
+              <div class="me-champ">
+                <label for="i-nom">Nom <span class="me-requis">*</span></label>
+                <input id="i-nom" class="me-saisie majuscules" [value]="e.nom" [class.invalide]="erreur('eleve.nom')" (input)="majEleve('nom', valeurTexte($event))" autocomplete="off" />
+                @if (erreur('eleve.nom')) {
+                  <span class="me-erreur-champ">{{ erreur('eleve.nom') }}</span>
+                }
+              </div>
+              <div class="me-champ">
+                <label for="i-prenoms">Prénoms <span class="me-requis">*</span></label>
+                <input id="i-prenoms" class="me-saisie majuscules" [value]="e.prenoms" [class.invalide]="erreur('eleve.prenoms')" (input)="majEleve('prenoms', valeurTexte($event))" autocomplete="off" />
+                @if (erreur('eleve.prenoms')) {
+                  <span class="me-erreur-champ">{{ erreur('eleve.prenoms') }}</span>
+                }
+              </div>
+              <div class="me-champ">
+                <label for="i-naissance">Date de naissance</label>
+                <input id="i-naissance" class="me-saisie" type="date" [value]="e.date_naissance ?? ''" [class.invalide]="erreur('eleve.date_naissance')" (input)="majEleve('date_naissance', valeurTexte($event) || null)" />
+                @if (erreur('eleve.date_naissance')) {
+                  <span class="me-erreur-champ">{{ erreur('eleve.date_naissance') }}</span>
+                }
+              </div>
+              <div class="me-champ">
+                <label for="i-lieu">Lieu de naissance</label>
+                <input id="i-lieu" class="me-saisie" [value]="e.lieu_naissance ?? ''" (input)="majEleve('lieu_naissance', valeurTexte($event) || null)" autocomplete="off" />
+              </div>
+              <div class="me-champ">
+                <label for="i-nationalite">Nationalité</label>
+                <input id="i-nationalite" class="me-saisie" [value]="e.nationalite ?? ''" (input)="majEleve('nationalite', valeurTexte($event) || null)" autocomplete="off" />
+              </div>
+              <div class="me-champ">
+                <label for="i-telephone">Téléphone de l'élève</label>
+                <input id="i-telephone" class="me-saisie" type="tel" inputmode="tel" [value]="e.telephone ?? ''" (input)="majEleve('telephone', valeurTexte($event) || null)" autocomplete="off" />
+              </div>
+              <div class="me-champ large">
+                <label for="i-quartier">Quartier (lieu d'habitation)</label>
+                <input id="i-quartier" class="me-saisie" [value]="e.quartier ?? ''" (input)="majEleve('quartier', valeurTexte($event) || null)" autocomplete="off" />
+              </div>
+              <div class="me-champ large">
+                <label for="i-sante">Handicap / particularités médicales</label>
+                <textarea id="i-sante" class="me-saisie zone" rows="2" [value]="e.particularites_medicales ?? ''" (input)="majEleve('particularites_medicales', valeurTexte($event) || null)" placeholder="Allergie, handicap, traitement…"></textarea>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="me-carte bloc">
+          <h2>Parents et tuteur</h2>
+          <div class="orphelin">
+            <button type="button" class="me-option" [class.choisi]="e.orphelin_pere" (click)="majEleve('orphelin_pere', !e.orphelin_pere)">
+              <ion-icon [name]="e.orphelin_pere ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+              <span><strong>Orphelin(e) de père</strong></span>
+            </button>
+            <button type="button" class="me-option" [class.choisi]="e.orphelin_mere" (click)="majEleve('orphelin_mere', !e.orphelin_mere)">
+              <ion-icon [name]="e.orphelin_mere ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+              <span><strong>Orphelin(e) de mère</strong></span>
+            </button>
+          </div>
+
+          <div class="parents">
+            @for (l of liens; track l.lien) {
+              @let p = parent(l.lien);
+              <fieldset class="parent" [disabled]="parentIndisponible(l.lien)" [class.indisponible]="parentIndisponible(l.lien)">
+                <legend>{{ l.libelle }}</legend>
+                <div class="me-champ">
+                  <label [for]="'p-nom-' + l.lien">Nom et prénoms</label>
+                  <input [id]="'p-nom-' + l.lien" class="me-saisie majuscules" [value]="p.nom_complet" (input)="majParent(l.lien, 'nom_complet', valeurTexte($event))" autocomplete="off" />
+                </div>
+                <div class="me-champ">
+                  <label [for]="'p-tel-' + l.lien">Téléphone</label>
+                  <input [id]="'p-tel-' + l.lien" class="me-saisie" type="tel" inputmode="tel" [value]="p.telephone ?? ''" (input)="majParent(l.lien, 'telephone', valeurTexte($event))" autocomplete="off" />
+                </div>
+                <div class="me-champ">
+                  <label [for]="'p-pro-' + l.lien">Profession</label>
+                  <input [id]="'p-pro-' + l.lien" class="me-saisie" [value]="p.profession ?? ''" (input)="majParent(l.lien, 'profession', valeurTexte($event))" autocomplete="off" />
+                </div>
+              </fieldset>
+            }
+          </div>
+
+          <div class="me-grille roles-parents">
+            <div class="me-champ">
+              <span class="libelle">Contact principal (appels, SMS)</span>
+              <div class="me-segments">
+                @for (l of liens; track l.lien) {
+                  <button type="button" [class.actif]="contactPrincipal() === l.lien" [disabled]="parentIndisponible(l.lien)" (click)="choisirContact(l.lien)">{{ l.libelle }}</button>
+                }
+              </div>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Paie les frais</span>
+              <div class="me-segments">
+                @for (l of liens; track l.lien) {
+                  <button type="button" [class.actif]="payeur() === l.lien" [disabled]="parentIndisponible(l.lien)" (click)="choisirPayeur(l.lien)">{{ l.libelle }}</button>
+                }
+              </div>
+            </div>
+          </div>
+        </section>
+      }
+
+      <!-- ============================================================ 3. Scolarite -->
+      @if (etape() === 3) {
+        @let i = inscription();
+        <section class="me-carte bloc">
+          <h2>Statut de l'élève</h2>
+          <div class="me-grille">
+            <div class="me-champ">
+              <span class="libelle">Affectation</span>
+              <div class="me-segments">
+                <button type="button" [class.actif]="!i.affecte" [disabled]="!modifiableTarif()" (click)="majInscription('affecte', false)">Non affecté(e)</button>
+                <button type="button" [class.actif]="i.affecte" [disabled]="!modifiableTarif()" (click)="majInscription('affecte', true)">Affecté(e) par l'État</button>
+              </div>
+              @if (!modifiableTarif()) {
+                <span class="me-aide-champ"><ion-icon name="lock-closed-outline"></ion-icon> Des paiements sont enregistrés : l'affectation ne peut plus changer.</span>
+              }
+              @if (erreur('inscription.affecte')) {
+                <span class="me-erreur-champ">{{ erreur('inscription.affecte') }}</span>
+              }
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Situation</span>
+              <div class="cases">
+                <button type="button" class="me-option" [class.choisi]="i.redoublant" (click)="majInscription('redoublant', !i.redoublant)">
+                  <ion-icon [name]="i.redoublant ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+                  <span><strong>Redoublant(e)</strong></span>
+                </button>
+                <button type="button" class="me-option" [class.choisi]="i.boursier" (click)="majInscription('boursier', !i.boursier)">
+                  <ion-icon [name]="i.boursier ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+                  <span><strong>Boursier(ère)</strong></span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Resultat de l'annee precedente -->
+        @if (precedente(); as p) {
+          <section class="me-carte bloc">
+            <h2>Résultat {{ p.annee }} · {{ p.classe || p.niveau }}</h2>
+            @if (p.decision_finale) {
+              <p class="aide">Décision enregistrée : vous pouvez la corriger.</p>
+            } @else {
+              <p class="aide">Décision de fin d'année non saisie : renseignez-la (bulletin, reçu en ligne…).</p>
+            }
+            <div class="me-grille">
+              <div class="me-champ large">
+                <span class="libelle">Décision de fin d'année</span>
+                <div class="me-segments">
+                  @for (d of options()?.decisions ?? []; track d) {
+                    <button type="button" [class.actif]="decision().decision_finale === d" (click)="choisirDecision(d)">{{ libellesDecision[d] || d }}</button>
+                  }
+                </div>
+              </div>
+              <div class="me-champ">
+                <label for="i-moyenne">Moyenne annuelle</label>
+                <div class="me-montant" data-unite="/ 20">
+                  <input id="i-moyenne" class="me-saisie" inputmode="decimal" [value]="decision().moyenne_annuelle ?? ''" (input)="majDecision('moyenne_annuelle', valeurNombre($event))" />
+                </div>
+                @if (erreur('precedente.moyenne_annuelle')) {
+                  <span class="me-erreur-champ">{{ erreur('precedente.moyenne_annuelle') }}</span>
+                }
+              </div>
+              <div class="me-champ">
+                <span class="libelle">Niveau à suivre</span>
+                <app-selecteur idChamp="i-niveau-suivre" icone="school-outline" placeholder="Choisir…" [options]="optionsTousNiveaux()" [valeur]="decision().niveau_a_suivre_id" (valeurChange)="majDecision('niveau_a_suivre_id', $event)"></app-selecteur>
+              </div>
+            </div>
+          </section>
+        } @else {
+          <section class="me-carte bloc">
+            <h2>Provenance</h2>
+            <div class="me-grille">
+              <div class="me-champ large">
+                <label for="i-etab-origine">Établissement d'origine</label>
+                <input id="i-etab-origine" class="me-saisie" [value]="i.etablissement_origine ?? ''" (input)="majInscription('etablissement_origine', valeurTexte($event) || null)" autocomplete="off" />
+              </div>
+              <div class="me-champ">
+                <label for="i-classe-origine">Classe d'origine</label>
+                <input id="i-classe-origine" class="me-saisie" [value]="i.classe_origine ?? ''" (input)="majInscription('classe_origine', valeurTexte($event) || null)" autocomplete="off" placeholder="Ex : CM2, 3EME B" />
+              </div>
+              <div class="me-champ">
+                <label for="i-moyenne-origine">Moyenne annuelle</label>
+                <div class="me-montant" data-unite="/ 20">
+                  <input id="i-moyenne-origine" class="me-saisie" inputmode="decimal" [value]="i.moyenne_origine ?? ''" (input)="majInscription('moyenne_origine', valeurNombre($event))" />
+                </div>
+                @if (erreur('inscription.moyenne_origine')) {
+                  <span class="me-erreur-champ">{{ erreur('inscription.moyenne_origine') }}</span>
+                }
+              </div>
+              <div class="me-champ large">
+                <span class="libelle">Décision de fin d'année</span>
+                <div class="me-segments">
+                  @for (d of options()?.decisions ?? []; track d) {
+                    <button type="button" [class.actif]="i.decision_origine === d" (click)="majInscription('decision_origine', i.decision_origine === d ? null : d); majInscription('redoublant', i.decision_origine !== d && d === 'REDOUBLE')">{{ libellesDecision[d] || d }}</button>
+                  }
+                </div>
+              </div>
+            </div>
+          </section>
+        }
+
+        <!-- Niveau et classe -->
+        <section class="me-carte bloc">
+          <h2>Niveau et classe</h2>
+          @if (options()?.niveaux_restreints) {
+            <p class="aide">Seuls vos niveaux sont proposés.</p>
+          }
+          <div class="me-grille">
+            <div class="me-champ">
+              <span class="libelle">Niveau <span class="me-requis">*</span></span>
+              <app-selecteur idChamp="i-niveau" icone="school-outline" placeholder="Choisir le niveau…" [options]="optionsNiveaux()" [valeur]="i.niveau_id" [desactive]="!modifiableTarif() && !!classeInitiale()" (valeurChange)="choisirNiveau($event)"></app-selecteur>
+              @if (erreur('inscription.niveau_id')) {
+                <span class="me-erreur-champ">{{ erreur('inscription.niveau_id') }}</span>
+              } @else if (tarifManquant() && tarifAVerifier()) {
+                <span class="me-erreur-champ">{{ messageTarif() }}</span>
+              }
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Langue vivante 2</span>
+              <div class="me-segments">
+                <button type="button" [class.actif]="!i.langue_vivante_2" (click)="majInscription('langue_vivante_2', null)">Aucune</button>
+                @for (l of options()?.langues ?? []; track l) {
+                  <button type="button" [class.actif]="i.langue_vivante_2 === l" (click)="majInscription('langue_vivante_2', l)">{{ l }}</button>
+                }
+              </div>
+            </div>
+          </div>
+
+          @if (i.niveau_id) {
+            <div class="choix-classe">
+              <div class="me-champ">
+                <span class="libelle">Classe ({{ niveauChoisi()?.libelle }})</span>
+                <app-selecteur idChamp="i-classe" icone="school-outline" [options]="optionsClasses()" [valeur]="i.classe_id ?? 0" (valeurChange)="choisirClasseParId($event)"></app-selecteur>
+              </div>
+              @if (classeChoisie(); as c) {
+                <div class="effectif-classe" aria-live="polite">
+                  <div class="chiffre"><strong>{{ c.effectif }}</strong><small>élève{{ c.effectif > 1 ? 's' : '' }}{{ c.limite ? ' / ' + c.limite : '' }}</small></div>
+                  <div class="chiffre"><strong>{{ c.filles }}</strong><small>fille{{ c.filles > 1 ? 's' : '' }}</small></div>
+                  <div class="chiffre"><strong>{{ c.garcons }}</strong><small>garçon{{ c.garcons > 1 ? 's' : '' }}</small></div>
+                  @if (c.limite) {
+                    <span class="jauge"><span [style.width.%]="remplissage(c)" [class.pleine]="remplissage(c) >= 100"></span></span>
+                    <small class="places">{{ c.limite - c.effectif > 0 ? (c.limite - c.effectif) + ' place' + (c.limite - c.effectif > 1 ? 's' : '') + ' restante' + (c.limite - c.effectif > 1 ? 's' : '') : 'Complète' }}{{ c.langue_vivante_2 ? ' · LV2 ' + c.langue_vivante_2 : '' }}</small>
+                  }
+                </div>
+              } @else {
+                <p class="me-note">
+                  <ion-icon name="information-circle-outline"></ion-icon>
+                  <span>L'élève sera inscrit sans classe ; les frais seront fixés au choix de la classe.</span>
+                </p>
+              }
+            </div>
+            @if (erreur('inscription.classe_id')) {
+              <p class="me-erreur-champ">{{ erreur('inscription.classe_id') }}</p>
+            }
+          }
+        </section>
+      }
+
+      <!-- ============================================================ 4. Recapitulatif -->
+      @if (etape() === 4) {
+        @let e = eleve();
+        @let i = inscription();
+        <section class="me-carte bloc recap">
+          <div class="recap-eleve">
+            @if (photoAffichee()) {
+              <img class="photo-recap" [src]="photoAffichee()" alt="" />
+            } @else {
+              <span class="photo-recap vide"><ion-icon name="camera-outline"></ion-icon></span>
+            }
+            <div>
+              <h2 class="nom">{{ e.nom.toUpperCase() }} {{ e.prenoms.toUpperCase() }}</h2>
+              <p>
+                <span class="matricule">{{ e.matricule }}</span> · {{ libelleSexe(e.sexe) }}
+                @if (e.date_naissance) { · né(e) le {{ dateFr(e.date_naissance) }}{{ e.lieu_naissance ? ' à ' + e.lieu_naissance : '' }} }
+              </p>
+              <div class="etiquettes">
+                <span class="me-badge" [class.info]="i.affecte">{{ i.affecte ? 'Affecté(e)' : 'Non affecté(e)' }}</span>
+                @if (i.redoublant) { <span class="me-badge attention">Redoublant(e)</span> }
+                @if (i.boursier) { <span class="me-badge violet">Boursier(ère)</span> }
+                @if (i.inscrit_en_ligne) { <span class="me-badge succes"><ion-icon name="globe-outline"></ion-icon> Préinscrit(e) en ligne</span> }
+              </div>
+            </div>
+          </div>
+
+          <dl class="infos">
+            <div><dt>Niveau</dt><dd>{{ niveauChoisi()?.libelle || '—' }}</dd></div>
+            <div><dt>Classe</dt><dd>{{ classeChoisie()?.libelle || 'À choisir plus tard' }}</dd></div>
+            <div><dt>LV2</dt><dd>{{ i.langue_vivante_2 || 'Aucune' }}</dd></div>
+            @if (precedente(); as p) {
+              <div><dt>Décision {{ p.annee }}</dt><dd>{{ decision().decision_finale ? libellesDecision[decision().decision_finale!] : 'Non saisie' }}</dd></div>
+            } @else {
+              <div><dt>Provenance</dt><dd>{{ i.etablissement_origine || '—' }}{{ i.classe_origine ? ' (' + i.classe_origine + ')' : '' }}</dd></div>
+            }
+            <div><dt>Contact principal</dt><dd>{{ libelleLien(contactPrincipal()) }}{{ contactPrincipal() ? ' · ' + (parent(contactPrincipal()!).telephone || 'sans numéro') : '' }}</dd></div>
+            <div><dt>Paie les frais</dt><dd>{{ libelleLien(payeur()) }}</dd></div>
+          </dl>
+        </section>
+
+        <section class="me-carte bloc">
+          <h2>Frais {{ i.affecte ? 'élève affecté' : 'élève non affecté' }} · {{ niveauChoisi()?.libelle }}</h2>
+          @if (chargementApercu()) {
+            <ion-skeleton-text [animated]="true" style="width: 100%; height: 120px"></ion-skeleton-text>
+          } @else if (apercu()) {
+            @let a = apercu()!;
+            @if (!a.grille_definie) {
+              <p class="me-note attention">
+                <ion-icon name="alert-circle-outline"></ion-icon>
+                <span>Aucun montant n'est encore défini pour ce niveau (Paramètres › Paiements). L'inscription sera enregistrée sans frais.</span>
+              </p>
+            } @else {
+              @if (!i.classe_id) {
+                <p class="me-note">
+                  <ion-icon name="information-circle-outline"></ion-icon>
+                  <span>Ces frais seront appliqués quand l'élève sera placé dans une classe.</span>
+                </p>
+              }
+              <div class="frais">
+                @for (f of a.frais; track f.libelle; let impaire = $odd) {
+                  <div class="ligne-frais" [class.me-ligne-alternee]="impaire">
+                    <span>{{ f.libelle }}</span>
+                    <strong>{{ montant(f.montant) }}</strong>
+                  </div>
+                }
+                @for (d of dettes(); track d.annee) {
+                  <div class="ligne-frais dette">
+                    <span>Dette {{ d.annee }}</span>
+                    <strong>{{ montant(d.reste) }}</strong>
+                  </div>
+                }
+                <div class="ligne-frais total">
+                  <span>Total à payer</span>
+                  <strong>{{ montant(a.total + totalDettes()) }}</strong>
+                </div>
+                <div class="ligne-frais minimum">
+                  <span>Minimum à verser pour valider l'inscription</span>
+                  <strong>{{ montant(a.minimum) }}</strong>
+                </div>
+              </div>
+              @if (a.fournitures.length) {
+                <h3 class="sous-titre"><ion-icon name="cube-outline"></ion-icon> Fournitures à apporter</h3>
+                <ul class="fournitures">
+                  @for (f of a.fournitures; track f.libelle) {
+                    <li>{{ f.libelle }} <strong>× {{ f.quantite }}</strong></li>
+                  }
+                </ul>
+              }
+            }
+          }
+        </section>
+      }
+
+      <!-- ================= Navigation ================= -->
+      @if (etape() > 1 || etapeAccessible()) {
+        <div class="me-barre-enregistrer">
+          <span class="etat">Étape {{ modification() ? etape() - 1 : etape() }} sur {{ modification() ? 3 : 4 }}</span>
+          @if (etape() > (modification() ? 2 : 1)) {
+            <button type="button" class="me-bouton-texte" (click)="precedent()" [disabled]="enregistrement()">
+              <ion-icon name="chevron-back-outline"></ion-icon> Précédent
+            </button>
+          }
+          @if (etape() < 4) {
+            <button type="button" class="me-bouton-principal" (click)="suivant()">
+              Continuer <ion-icon name="chevron-forward-outline"></ion-icon>
+            </button>
+          } @else {
+            <button type="button" class="me-bouton-principal" (click)="enregistrer()" [disabled]="enregistrement()">
+              @if (enregistrement()) {
+                <ion-spinner name="dots"></ion-spinner>
+              } @else {
+                <ion-icon name="checkmark-outline"></ion-icon> {{ modification() ? 'Enregistrer les modifications' : 'Valider l\'inscription' }}
+              }
+            </button>
+          }
+        </div>
+      }
+    }
+  </div>
+</ion-content>

@@ -1,0 +1,255 @@
+<ion-content class="me-page-admin">
+  <ion-refresher slot="fixed" (ionRefresh)="charger($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <h1>Classes</h1>
+        <p>
+          Classes de l'année {{ donnees()?.annee ?? '' }} et leurs effectifs.
+          @if (donnees()?.niveaux_restreints) { <span class="me-badge info">Vos niveaux</span> }
+        </p>
+      </div>
+      <div class="boutons-entete">
+        <button type="button" class="me-bouton-secondaire" (click)="imprimer()" [disabled]="impression() || !donnees()">
+          @if (impression() === 'classes') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer }
+        </button>
+        <button type="button" class="me-bouton-secondaire" (click)="imprimerListes()" [disabled]="impression() || !classes().length">
+          @if (impression() === 'listes') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="documents-outline"></ion-icon> Imprimer toutes les classes }
+        </button>
+        @if (peutGerer() && !donnees()?.annee_cloturee) {
+          <button type="button" class="me-bouton-secondaire" (click)="nouvellesClasses()" [disabled]="!donnees()">
+            <ion-icon name="duplicate-outline"></ion-icon> Créer plusieurs classes
+          </button>
+          <button type="button" class="me-bouton-principal" (click)="nouvelle()" [disabled]="!donnees()">
+            <ion-icon name="add-outline"></ion-icon> Nouvelle classe
+          </button>
+        }
+      </div>
+    </header>
+
+    @if (chargement()) {
+      <section class="me-carte liste">
+        @for (i of [1, 2, 3]; track i) {
+          <div class="squelette"><ion-skeleton-text [animated]="true" style="width: 60%"></ion-skeleton-text></div>
+        }
+      </section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les classes</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (donnees()) {
+      @let t = donnees()!.totaux;
+      <!-- ================= Compteurs ================= -->
+      <section class="compteurs" aria-label="Effectifs">
+        <div class="me-carte compteur"><span class="me-pastille teinte-cyan"><ion-icon name="school-outline"></ion-icon></span><span><strong>{{ t.classes }}</strong><small>Classe{{ t.classes > 1 ? 's' : '' }}</small></span></div>
+        <div class="me-carte compteur"><span class="me-pastille teinte-bleu"><ion-icon name="people-outline"></ion-icon></span><span><strong>{{ t.effectif }}</strong><small>Élèves en classe</small></span></div>
+        <div class="me-carte compteur"><span class="me-pastille teinte-violet"><ion-icon name="male-outline"></ion-icon></span><span><strong>{{ t.garcons }}</strong><small>Garçons</small></span></div>
+        <div class="me-carte compteur"><span class="me-pastille teinte-rose"><ion-icon name="female-outline"></ion-icon></span><span><strong>{{ t.filles }}</strong><small>Filles</small></span></div>
+        <div class="me-carte compteur"><span class="me-pastille teinte-orange"><ion-icon name="alert-circle-outline"></ion-icon></span><span><strong>{{ t.completes }}</strong><small>Classe{{ t.completes > 1 ? 's' : '' }} complète{{ t.completes > 1 ? 's' : '' }}</small></span></div>
+      </section>
+
+      <!-- ================= Liste ================= -->
+      <section class="me-carte liste">
+        <div class="filtres">
+          <label class="me-recherche">
+            <ion-icon name="search-outline"></ion-icon>
+            <input type="search" placeholder="Rechercher (classe, salle, professeur principal…)" aria-label="Rechercher une classe" [value]="recherche()" (input)="rechercher(valeurTexte($event))" />
+          </label>
+          <app-selecteur idChamp="filtre-cycle" icone="business-outline" [options]="optionsFiltreCycle()" [valeur]="cycle()" (valeurChange)="choisirCycle($event)"></app-selecteur>
+          <app-selecteur idChamp="filtre-niveau" icone="layers-outline" [options]="optionsFiltreNiveau()" [valeur]="niveau()" (valeurChange)="choisirNiveau($event)"></app-selecteur>
+          <app-selecteur idChamp="filtre-langue" icone="language-outline" [options]="optionsFiltreLangue()" [valeur]="langue()" (valeurChange)="choisirFiltre('langue', $event)"></app-selecteur>
+          <app-selecteur idChamp="filtre-redoublants" icone="people-outline" [options]="optionsFiltreRedoublants" [valeur]="redoublants()" (valeurChange)="choisirFiltre('redoublants', $event)"></app-selecteur>
+        </div>
+
+        <div class="titre-tableau"><h2>{{ titre() }}</h2></div>
+        <div class="tableau" role="table" aria-label="Classes">
+          <div class="ligne entete-tableau" role="row">
+            <span role="columnheader">Classe</span>
+            <span role="columnheader">Effectif</span>
+            <span role="columnheader" class="centre">Garçons</span>
+            <span role="columnheader" class="centre">Filles</span>
+            <span role="columnheader" class="centre">Affectés</span>
+            <span role="columnheader" class="centre">Non aff.</span>
+            <span role="columnheader">Encadrement</span>
+            <span role="columnheader" class="a-droite">Actions</span>
+          </div>
+          @for (c of classesPage(); track c.id; let impaire = $odd) {
+            <div class="ligne cliquable" role="row" [class.me-ligne-alternee]="impaire" (click)="ouvrirListe(c)">
+              <span class="cellule-classe" role="cell">
+                <span class="me-pastille teinte-cyan"><ion-icon name="school-outline"></ion-icon></span>
+                <span>
+                  <strong>{{ c.libelle }}</strong>
+                  <small>{{ c.niveau ? libellesCycle[c.niveau.cycle] : '' }}{{ c.langue_vivante_2 ? ' · ' + c.langue_vivante_2 : '' }}</small>
+                </span>
+              </span>
+              <span class="cellule-effectif" role="cell">
+                <span class="chiffres"><strong>{{ c.effectif }}</strong>{{ c.limite ? ' / ' + c.limite : '' }} élève{{ c.effectif > 1 ? 's' : '' }}</span>
+                @if (c.limite) {
+                  <span class="jauge" [class.pleine]="c.complete" [attr.title]="libelleLimite(c)"><span [style.width.%]="remplissage(c)"></span></span>
+                } @else {
+                  <small>Pas de limite</small>
+                }
+              </span>
+              <span class="cellule centre" role="cell" data-libelle="Garçons">{{ c.garcons }}</span>
+              <span class="cellule centre" role="cell" data-libelle="Filles">{{ c.filles }}</span>
+              <span class="cellule centre" role="cell" data-libelle="Affectés">{{ c.affectes }}</span>
+              <span class="cellule centre" role="cell" data-libelle="Non affectés">{{ c.non_affectes }}</span>
+              <span class="cellule-encadrement" role="cell">
+                <small><ion-icon name="person-outline"></ion-icon> {{ c.professeur_principal?.nom ?? 'Prof. principal non désigné' }}</small>
+                <small><ion-icon name="business-outline"></ion-icon> {{ c.salle ? 'Salle ' + c.salle : 'Salle non renseignée' }}</small>
+              </span>
+              <span class="cellule actions" role="cell">
+                <button type="button" class="me-action" title="Liste de classe" aria-label="Liste de classe" (click)="$event.stopPropagation(); ouvrirListe(c)"><ion-icon name="list-outline"></ion-icon></button>
+                <button type="button" class="me-action" title="Imprimer la liste de la classe" aria-label="Imprimer la liste de la classe" [disabled]="impression() === c.id" (click)="imprimerClasse(c, $event)"><ion-icon name="print-outline"></ion-icon></button>
+                @if (peutGerer() && !donnees()!.annee_cloturee) {
+                  <button type="button" class="me-action" title="Modifier" aria-label="Modifier la classe" (click)="modifier(c, $event)"><ion-icon name="create-outline"></ion-icon></button>
+                  <!-- Une classe qui a au moins un eleve ne se supprime pas : bouton masque. -->
+                  @if (!c.effectif) {
+                    <button type="button" class="me-action danger" title="Supprimer" aria-label="Supprimer la classe" (click)="supprimer(c, $event)"><ion-icon name="trash-outline"></ion-icon></button>
+                  }
+                }
+              </span>
+            </div>
+          } @empty {
+            <div class="me-etat-vide">
+              <ion-icon name="school-outline"></ion-icon>
+              @if (donnees()!.data.length) {
+                <strong>Aucune classe ne correspond</strong>
+              } @else {
+                <strong>Aucune classe cette année</strong>
+                @if (peutGerer() && !donnees()!.annee_cloturee) {
+                  <button type="button" class="me-bouton-principal" (click)="nouvelle()"><ion-icon name="add-outline"></ion-icon> Nouvelle classe</button>
+                }
+              }
+            </div>
+          }
+        </div>
+        <app-pagination [total]="classes().length" [page]="page()" [taille]="taille()" (pageChange)="page.set($event)" (tailleChange)="changerTaille($event)"></app-pagination>
+      </section>
+    }
+  </div>
+</ion-content>
+
+<!-- ================= Formulaire (creation / modification) ================= -->
+<ion-modal class="me-modale-formulaire auto" [isOpen]="modale()" (didDismiss)="modale.set(false)">
+  <ng-template>
+    <div class="me-modale">
+      <header>
+        <span class="me-pastille teinte-cyan"><ion-icon name="school-outline"></ion-icon></span>
+        <div>
+          <h1>{{ edition() ? 'Modifier ' + edition()!.libelle : 'Nouvelle classe' }}</h1>
+          <p>Année scolaire {{ donnees()?.annee }}</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="modale.set(false)" aria-label="Fermer"><ion-icon name="close-outline"></ion-icon></button>
+      </header>
+      <div class="corps">
+        <section class="me-grille">
+          <div class="me-champ">
+            <label for="classe-niveau">Niveau <span class="me-requis">*</span></label>
+            <app-selecteur idChamp="classe-niveau" icone="layers-outline" placeholder="Choisir le niveau…" [options]="optionsNiveau()" [valeur]="saisie().niveau_id || null" [desactive]="niveauVerrouille()" (valeurChange)="choisirNiveauSaisie($event)"></app-selecteur>
+            @if (niveauVerrouille()) {
+              <p class="me-aide-champ">La classe a des élèves : son niveau ne peut plus changer.</p>
+            }
+            @if (erreurChamp('niveau_id'); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+          </div>
+          <div class="me-champ">
+            <label for="classe-nom">{{ donnees()?.numerotation === 'lettres' ? 'Lettre' : 'Numéro' }} de la classe <span class="me-requis">*</span></label>
+            <input id="classe-nom" class="me-saisie nom-classe" type="text" [attr.maxlength]="donnees()?.numerotation === 'lettres' ? 1 : 3" autocomplete="off" [placeholder]="donnees()?.numerotation === 'lettres' ? 'Ex : A, B, C' : 'Ex : 1, 2, 3'" [class.invalide]="!!erreurChamp('nom')" [value]="saisie().nom" (input)="majSaisie('nom', valeurTexte($event).toUpperCase())" />
+            @if (erreurChamp('nom'); as e) {
+              <p class="me-erreur-champ">{{ e }}</p>
+            } @else if (apercu()) {
+              <p class="me-aide-champ">La classe s'appellera <strong>{{ apercu() }}</strong>.</p>
+            }
+          </div>
+          <div class="me-champ">
+            <label for="classe-salle">Salle</label>
+            <input id="classe-salle" class="me-saisie" type="text" maxlength="30" placeholder="Ex : Bâtiment B, salle 12" [value]="saisie().salle ?? ''" (input)="majSaisie('salle', valeurTexte($event))" />
+            @if (erreurChamp('salle'); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+          </div>
+          <div class="me-champ">
+            <label for="classe-capacite">Effectif maximum</label>
+            <div class="me-montant" data-unite="élèves">
+              <input id="classe-capacite" class="me-saisie" type="number" inputmode="numeric" min="1" max="500" placeholder="Limite du niveau" [class.invalide]="!!erreurChamp('capacite')" [value]="saisie().capacite ?? ''" (input)="saisirCapacite(valeurTexte($event))" />
+            </div>
+            @if (erreurChamp('capacite'); as e) {
+              <p class="me-erreur-champ">{{ e }}</p>
+            } @else {
+              <p class="me-aide-champ">Vide : la limite du niveau ou de l'établissement s'applique.</p>
+            }
+          </div>
+          <div class="me-champ">
+            <label for="classe-lv2">Langue vivante 2</label>
+            <app-selecteur idChamp="classe-lv2" icone="language-outline" [options]="optionsLangue()" [valeur]="rangLangue()" (valeurChange)="choisirLangue($event)"></app-selecteur>
+          </div>
+          <div class="me-champ">
+            <label for="classe-pp">Professeur principal</label>
+            <app-selecteur idChamp="classe-pp" icone="person-outline" [options]="optionsPersonnel()" [valeur]="saisie().professeur_principal_id ?? 0" (valeurChange)="majSaisie('professeur_principal_id', $event || null)"></app-selecteur>
+            @if (erreurChamp('professeur_principal_id'); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+          </div>
+          <div class="me-champ">
+            <label for="classe-educateur">Éducateur</label>
+            <app-selecteur idChamp="classe-educateur" icone="person-outline" [options]="optionsPersonnel()" [valeur]="saisie().educateur_id ?? 0" (valeurChange)="majSaisie('educateur_id', $event || null)"></app-selecteur>
+            @if (erreurChamp('educateur_id'); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+          </div>
+        </section>
+      </div>
+      <footer>
+        <button type="button" class="me-bouton-texte" (click)="modale.set(false)" [disabled]="enregistrement()">Annuler</button>
+        <button type="button" class="me-bouton-principal" (click)="enregistrer()" [disabled]="enregistrement()">
+          @if (enregistrement()) { <ion-spinner name="dots"></ion-spinner> } @else { {{ edition() ? 'Enregistrer' : 'Créer la classe' }} }
+        </button>
+      </footer>
+    </div>
+  </ng-template>
+</ion-modal>
+
+<!-- ================= Plusieurs classes ================= -->
+<ion-modal class="me-modale-formulaire auto" [isOpen]="modaleLot()" (didDismiss)="modaleLot.set(false)">
+  <ng-template>
+    <div class="me-modale">
+      <header>
+        <span class="me-pastille teinte-cyan"><ion-icon name="duplicate-outline"></ion-icon></span>
+        <div>
+          <h1>Créer plusieurs classes</h1>
+          <p>Numérotées à la suite de la plus grande classe du niveau ({{ donnees()?.numerotation === 'lettres' ? 'lettres' : 'chiffres' }}).</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="modaleLot.set(false)" aria-label="Fermer"><ion-icon name="close-outline"></ion-icon></button>
+      </header>
+      <div class="corps">
+        <section class="me-grille">
+          <div class="me-champ">
+            <label for="lot-niveau">Niveau <span class="me-requis">*</span></label>
+            <app-selecteur idChamp="lot-niveau" icone="layers-outline" placeholder="Choisir le niveau…" [options]="optionsNiveau()" [valeur]="lotNiveau() || null" (valeurChange)="choisirLotNiveau($event)"></app-selecteur>
+            @if (erreurLot('niveau_id'); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+          </div>
+          <div class="me-champ">
+            <label for="lot-nombre">Nombre de classes à ajouter <span class="me-requis">*</span></label>
+            <input id="lot-nombre" class="me-saisie" type="number" inputmode="numeric" min="1" max="20" [class.invalide]="!!erreurLot('nombre')" [value]="lotNombre() ?? ''" (input)="saisirLotNombre(valeurTexte($event))" />
+            @if (erreurLot('nombre'); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+          </div>
+          @if (lotApercu().length) {
+            <div class="me-champ large">
+              <span class="libelle">Classes qui seront créées</span>
+              <div class="apercu-lot">
+                @for (l of lotApercu(); track l) { <span class="me-badge info">{{ l }}</span> }
+              </div>
+            </div>
+          }
+        </section>
+      </div>
+      <footer>
+        <button type="button" class="me-bouton-texte" (click)="modaleLot.set(false)" [disabled]="enregistrement()">Annuler</button>
+        <button type="button" class="me-bouton-principal" (click)="creerLot()" [disabled]="enregistrement()">
+          @if (enregistrement()) { <ion-spinner name="dots"></ion-spinner> } @else { Créer {{ lotApercu().length > 1 ? 'les ' + lotApercu().length + ' classes' : 'la classe' }} }
+        </button>
+      </footer>
+    </div>
+  </ng-template>
+</ion-modal>

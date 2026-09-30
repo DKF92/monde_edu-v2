@@ -1,0 +1,295 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/parametres')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Paramètres
+        </button>
+        <h1>SMS et notifications</h1>
+        <p>SMS envoyés aux parents : expéditeur, crédit, historique.</p>
+      </div>
+    </header>
+
+    @if (chargement()) {
+      <section class="me-carte">
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 90px"></ion-skeleton-text>
+      </section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les réglages SMS</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (sms()) {
+      @let s = sms()!;
+
+      @if (!s.fournisseur_configure) {
+        <p class="me-note attention">
+          <ion-icon name="warning-outline"></ion-icon>
+          <span>
+            Le fournisseur SMS de la plateforme n'est pas encore configuré : vos réglages sont enregistrés, mais aucun SMS
+            ne peut partir pour l'instant.
+          </span>
+        </p>
+      }
+
+      <!-- ================= Chiffres ================= -->
+      <section class="chiffres">
+        <div class="me-carte chiffre">
+          <span class="me-pastille teinte-vert"><ion-icon name="wallet-outline"></ion-icon></span>
+          <span><strong>{{ montant(s.sms_credit) }}</strong><small>SMS restants</small></span>
+        </div>
+        <div class="me-carte chiffre">
+          <span class="me-pastille teinte-bleu"><ion-icon name="send-outline"></ion-icon></span>
+          <span><strong>{{ montant(s.envoyes_ce_mois) }}</strong><small>Envoyés ce mois</small></span>
+        </div>
+        <div class="me-carte chiffre">
+          <span class="me-pastille" [class.teinte-vert]="s.sms_actif" [class.teinte-rose]="!s.sms_actif"><ion-icon name="chatbubbles-outline"></ion-icon></span>
+          <span><strong>{{ s.sms_actif ? 'Activés' : 'Désactivés' }}</strong><small>Envoi de SMS</small></span>
+        </div>
+      </section>
+
+      <!-- ================= Reglages ================= -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-violet"><ion-icon name="settings-outline"></ion-icon></span>
+          <div>
+            <h2>Réglages</h2>
+            <p>Nom affiché sur le téléphone des parents à la réception.</p>
+          </div>
+        </div>
+        <div class="reglage-actif">
+          <button type="button" role="switch" class="me-interrupteur" [class.actif]="actif()" [attr.aria-checked]="actif()" aria-label="Envoyer des SMS aux parents" (click)="actif.set(!actif()); erreurExpediteur.set(null)">
+            <span></span>
+          </button>
+          <span>
+            <strong>Envoyer des SMS aux parents</strong>
+            <small>Reçus de paiement, relances, absences… (chaque SMS est décompté du crédit)</small>
+          </span>
+        </div>
+        <div class="me-grille">
+          <div class="me-champ">
+            <label for="sms-expediteur">Expéditeur @if (actif()) { <span class="me-requis">*</span> }</label>
+            <input
+              id="sms-expediteur"
+              class="me-saisie"
+              maxlength="11"
+              autocomplete="off"
+              placeholder="GS DEMO"
+              [value]="expediteur()"
+              [class.invalide]="erreurExpediteur()"
+              (input)="expediteur.set($any($event.target).value); erreurExpediteur.set(null)"
+            />
+            @if (erreurExpediteur(); as e) {
+              <p class="me-erreur-champ">{{ e }}</p>
+            } @else {
+              <p class="me-aide-champ">{{ expediteur().length }}/11 caractères, sans accent (limite des opérateurs).</p>
+            }
+          </div>
+          <div class="me-champ">
+            <label for="sms-indicatif">Indicatif</label>
+            <input id="sms-indicatif" class="me-saisie" disabled [value]="'+' + s.indicatif_telephonique" />
+            <p class="me-aide-champ">Modifiable dans Paramètres › Établissement.</p>
+          </div>
+        </div>
+        <div class="bloc-actions">
+          @if (modifie()) {
+            <button type="button" class="me-bouton-texte" (click)="annuler()" [disabled]="enregistrement()">Annuler</button>
+          }
+          <button type="button" class="me-bouton-principal" (click)="enregistrer()" [disabled]="!modifie() || enregistrement()">
+            @if (enregistrement()) { <ion-spinner name="dots"></ion-spinner> } @else { Enregistrer }
+          </button>
+        </div>
+      </section>
+
+      <!-- ================= Test ================= -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-cyan"><ion-icon name="send-outline"></ion-icon></span>
+          <div>
+            <h2>Envoyer un SMS de test</h2>
+            <p>Vérifie l'expéditeur et le fournisseur. Le SMS est décompté du crédit.</p>
+          </div>
+        </div>
+        <div class="me-grille">
+          <div class="me-champ">
+            <label for="sms-numero">Numéro</label>
+            <input id="sms-numero" class="me-saisie" type="tel" inputmode="tel" placeholder="07 07 07 07 07" [value]="numeroTest()" (input)="numeroTest.set($any($event.target).value)" />
+          </div>
+          <div class="me-champ large">
+            <label for="sms-message">Message</label>
+            <textarea id="sms-message" class="me-saisie" maxlength="480" [value]="messageTest()" (input)="messageTest.set($any($event.target).value)"></textarea>
+            <p class="me-aide-champ">{{ messageTest().length }} caractères · {{ segmentsTest() }} SMS</p>
+          </div>
+        </div>
+        <div class="bloc-actions">
+          <button
+            type="button"
+            class="me-bouton-secondaire"
+            (click)="envoyerTest()"
+            [disabled]="envoiTest() || !numeroTest().trim() || !messageTest().trim() || !s.fournisseur_configure || !s.sms_actif"
+            [title]="!s.fournisseur_configure ? 'Fournisseur non configuré' : !s.sms_actif ? 'Activez d\'abord les SMS' : ''"
+          >
+            @if (envoiTest()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="send-outline"></ion-icon> Envoyer le test }
+          </button>
+        </div>
+      </section>
+
+      <!-- ================= Rechargements ================= -->
+      <section class="me-carte bloc tableau-bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-vert"><ion-icon name="wallet-outline"></ion-icon></span>
+          <div>
+            <h2>Rechargements</h2>
+            <p>Achats de crédit SMS.</p>
+          </div>
+          @if (s.peut_recharger) {
+            <button type="button" class="me-bouton-secondaire" (click)="ouvrirRecharge()">
+              <ion-icon name="add-outline"></ion-icon> Recharger
+            </button>
+          }
+        </div>
+        <div class="table" role="table" aria-label="Rechargements">
+          <div class="rangee entete" role="row">
+            <span role="columnheader">Date</span>
+            <span role="columnheader" class="droite">SMS</span>
+            <span role="columnheader" class="droite">Montant</span>
+            <span role="columnheader">Par</span>
+          </div>
+          @for (r of rechargements(); track r.id; let impaire = $odd) {
+            <div class="rangee" role="row" [class.me-ligne-alternee]="impaire">
+              <span role="cell">
+                {{ date(r.date) }}
+                @if (r.commentaire) { <small>{{ r.commentaire }}</small> }
+              </span>
+              <span role="cell" class="droite fort">+{{ montant(r.nombre_sms) }}</span>
+              <span role="cell" class="droite">{{ montant(r.montant) }} F</span>
+              <span role="cell" class="doux">{{ r.enregistre_par ?? '—' }}</span>
+            </div>
+          } @empty {
+            <div class="me-etat-vide">
+              <ion-icon name="wallet-outline"></ion-icon>
+              <strong>Aucun rechargement</strong>
+              @if (!s.peut_recharger) { <span>Le crédit est rechargé par le Super admin.</span> }
+            </div>
+          }
+        </div>
+        <app-pagination
+          class="pagination-bloc"
+          [total]="totalRecharges()"
+          [page]="pageRecharges()"
+          [taille]="tailleRecharges()"
+          (pageChange)="pageRechargesChange($event)"
+          (tailleChange)="tailleRechargesChange($event)"
+        ></app-pagination>
+      </section>
+
+      <!-- ================= Historique ================= -->
+      <section class="me-carte bloc tableau-bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-bleu"><ion-icon name="time-outline"></ion-icon></span>
+          <div>
+            <h2>Historique des envois</h2>
+            <p>{{ totalMessages() }} SMS</p>
+          </div>
+        </div>
+        <div class="filtres-sms">
+          <label class="me-recherche">
+            <ion-icon name="search-outline"></ion-icon>
+            <input type="search" placeholder="Numéro, message, campagne…" aria-label="Rechercher un SMS" [value]="recherche()" (input)="rechercher($any($event.target).value)" />
+          </label>
+          <app-selecteur idChamp="filtre-sms" icone="chatbubbles-outline" [options]="optionsStatut" [valeur]="filtreStatut()" (valeurChange)="filtrer($event)"></app-selecteur>
+        </div>
+        <div class="table historique" role="table" aria-label="Historique des SMS">
+          <div class="rangee entete" role="row">
+            <span role="columnheader">Date</span>
+            <span role="columnheader">Destinataire</span>
+            <span role="columnheader">Message</span>
+            <span role="columnheader">Statut</span>
+          </div>
+          @for (m of messages(); track m.id; let impaire = $odd) {
+            <div class="rangee" role="row" [class.me-ligne-alternee]="impaire">
+              <span role="cell" class="doux">{{ date(m.date) }}</span>
+              <span role="cell">
+                {{ m.numero }}
+                @if (m.eleve) { <small>{{ m.eleve }}</small> }
+              </span>
+              <span role="cell" class="message" [title]="m.message">
+                {{ m.message }}
+                <small>{{ m.campagne ?? 'Envoi direct' }} · {{ m.nombre_sms }} SMS</small>
+              </span>
+              <span role="cell">
+                @if (m.statut === 'envoye') {
+                  <span class="me-badge succes"><ion-icon name="checkmark-circle"></ion-icon> Envoyé</span>
+                } @else {
+                  <span class="me-badge attention" [title]="m.erreur ?? ''"><ion-icon name="close-circle"></ion-icon> Échec</span>
+                }
+              </span>
+            </div>
+          } @empty {
+            <div class="me-etat-vide">
+              <ion-icon name="chatbubbles-outline"></ion-icon>
+              <strong>{{ recherche() || filtreStatut() ? 'Aucun SMS ne correspond' : 'Aucun SMS envoyé' }}</strong>
+            </div>
+          }
+        </div>
+        <app-pagination
+          class="pagination-bloc"
+          [total]="totalMessages()"
+          [page]="pageMessages()"
+          [taille]="tailleMessages()"
+          (pageChange)="pageMessagesChange($event)"
+          (tailleChange)="tailleMessagesChange($event)"
+        ></app-pagination>
+      </section>
+    }
+  </div>
+</ion-content>
+
+<!-- ================= Rechargement ================= -->
+<ion-modal class="me-modale-formulaire auto" [isOpen]="rechargeOuverte()" [backdropDismiss]="!enregistrementRecharge()" (didDismiss)="rechargeOuverte.set(false)">
+  <ng-template>
+    <form class="me-modale" (submit)="$event.preventDefault(); enregistrerRecharge()" novalidate>
+      <header>
+        <span class="me-pastille teinte-vert"><ion-icon name="wallet-outline"></ion-icon></span>
+        <div>
+          <h1>Enregistrer un rechargement</h1>
+          <p>Le nombre de SMS est ajouté au crédit de l'établissement.</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="rechargeOuverte.set(false)" aria-label="Fermer">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </header>
+      <div class="corps">
+        <section>
+          <div class="me-grille">
+            <div class="me-champ">
+              <label for="r-nombre">Nombre de SMS <span class="me-requis">*</span></label>
+              <input id="r-nombre" class="me-saisie" type="number" inputmode="numeric" min="1" [value]="recharge().nombre_sms" [class.invalide]="erreursRecharge()['nombre_sms']" (input)="majRecharge({ nombre_sms: $any($event.target).value })" />
+              @if (erreursRecharge()['nombre_sms']; as e) { <p class="me-erreur-champ">{{ e }}</p> }
+            </div>
+            <div class="me-champ">
+              <label for="r-montant">Montant payé</label>
+              <div class="me-montant" data-unite="F">
+                <input id="r-montant" class="me-saisie" type="number" inputmode="numeric" min="0" placeholder="0" [value]="recharge().montant" [class.invalide]="erreursRecharge()['montant']" (input)="majRecharge({ montant: $any($event.target).value })" />
+              </div>
+              @if (erreursRecharge()['montant']; as e) { <p class="me-erreur-champ">{{ e }}</p> }
+            </div>
+            <div class="me-champ large">
+              <label for="r-commentaire">Commentaire</label>
+              <input id="r-commentaire" class="me-saisie" maxlength="200" placeholder="Référence du paiement, forfait…" [value]="recharge().commentaire" (input)="majRecharge({ commentaire: $any($event.target).value })" />
+            </div>
+          </div>
+        </section>
+      </div>
+      <footer>
+        <button type="button" class="me-bouton-texte" (click)="rechargeOuverte.set(false)" [disabled]="enregistrementRecharge()">Annuler</button>
+        <button type="submit" class="me-bouton-principal" [disabled]="enregistrementRecharge()">
+          @if (enregistrementRecharge()) { <ion-spinner name="dots"></ion-spinner> } @else { Recharger }
+        </button>
+      </footer>
+    </form>
+  </ng-template>
+</ion-modal>

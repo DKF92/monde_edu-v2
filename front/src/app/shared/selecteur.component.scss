@@ -1,0 +1,203 @@
+:host {
+  display: block;
+}
+
+.selecteur {
+  position: relative;
+}
+
+// Champ ferme : meme apparence que les champs de saisie de la charte.
+.declencheur {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 50px;
+  padding: 0 14px;
+  border: 1.5px solid var(--me-bordure);
+  border-radius: 12px;
+  background: var(--me-surface);
+  color: var(--me-texte);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover:not(:disabled) {
+    border-color: #b9c6ea;
+  }
+
+  &:focus-visible,
+  .ouvert & {
+    outline: none;
+    border-color: var(--ion-color-primary);
+    box-shadow: 0 0 0 4px rgba(var(--ion-color-primary-rgb), 0.12);
+
+    .icone {
+      color: var(--ion-color-primary);
+    }
+  }
+
+  .icone {
+    flex-shrink: 0;
+    font-size: 19px;
+    color: var(--me-texte-leger);
+  }
+
+  .chevron {
+    flex-shrink: 0;
+    font-size: 16px;
+    color: var(--me-texte-leger);
+    transition: transform 0.15s ease;
+  }
+
+  ion-spinner {
+    width: 18px;
+    height: 18px;
+    color: var(--me-texte-leger);
+  }
+}
+
+.ouvert .declencheur .chevron {
+  transform: rotate(180deg);
+}
+
+.valeur {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+
+  small {
+    font-weight: 400;
+    color: var(--me-texte-doux);
+    font-size: 13px;
+  }
+
+  &.vide {
+    font-weight: 400;
+    color: var(--me-texte-leger);
+  }
+}
+
+// Une seule valeur possible : affiche mais grise, non modifiable.
+.grise .declencheur {
+  cursor: default;
+  background: var(--me-fond);
+  color: var(--me-texte-doux);
+
+  .chevron {
+    display: none;
+  }
+}
+
+// Liste ouverte : exactement la largeur du champ.
+.liste {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--me-surface);
+  border: 1px solid var(--me-bordure);
+  border-radius: 14px;
+  box-shadow: var(--me-ombre-forte);
+  animation: apparition 0.12s ease-out;
+
+  .vers-le-haut & {
+    top: auto;
+    bottom: calc(100% + 6px);
+  }
+}
+
+@keyframes apparition {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.option {
+  &.desactivee {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+
+  &.active {
+    background: var(--me-survol);
+  }
+
+  &.choisie {
+    background: #f4f7ff;
+
+    .coche {
+      color: var(--ion-color-primary);
+    }
+
+    strong {
+      color: var(--me-marine);
+    }
+  }
+}
+
+.coche {
+  flex-shrink: 0;
+  font-size: 20px;
+  color: var(--me-bordure);
+}
+
+.option-texte {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+
+  strong {
+    font-size: 15px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--me-fond);
+  color: var(--me-texte-doux);
+  font-size: 11px;
+  font-weight: 700;
+
+  &.succes {
+    background: var(--me-vert-fond);
+    color: var(--me-vert);
+  }
+
+  &.attention {
+    background: var(--me-orange-fond);
+    color: #b35c00;
+  }
+}

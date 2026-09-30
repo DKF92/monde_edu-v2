@@ -1,0 +1,172 @@
+<ion-content class="me-page-admin">
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <h1>Évaluations</h1>
+        <p>Notes des évaluations, moyennes par matière et résultats de classe.</p>
+      </div>
+    </header>
+
+    @if (peutSaisir()) {
+      <nav class="onglets me-segments" aria-label="Évaluations">
+        <button type="button" (click)="router.navigateByUrl('/tabs/evaluations')">Saisie des notes</button>
+        <button type="button" class="actif">Résultats et bulletins</button>
+      </nav>
+    }
+
+    @if (erreurOptions()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les classes</strong>
+          <button type="button" class="me-lien" (click)="ionViewWillEnter()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (!options()) {
+      <section class="me-carte"><ion-skeleton-text [animated]="true" style="width: 100%; height: 44px"></ion-skeleton-text></section>
+    } @else if (!options()!.classes.length) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="school-outline"></ion-icon>
+          <strong>Aucune classe</strong>
+        </div>
+      </section>
+    } @else {
+      <section class="me-carte choix quatre">
+        <div class="me-champ">
+          <label for="r-classe">Classe</label>
+          <app-selecteur idChamp="r-classe" icone="school-outline" [options]="optionsClasse()" [valeur]="classeId() || null" (valeurChange)="choisirClasse($event)"></app-selecteur>
+        </div>
+        <div class="me-champ">
+          <label for="r-periode">Période</label>
+          <app-selecteur idChamp="r-periode" icone="calendar-outline" [options]="optionsPeriode()" [valeur]="periode() || null" (valeurChange)="choisirPeriode($event)"></app-selecteur>
+        </div>
+        <div class="boutons-choix">
+          <button type="button" class="me-bouton-secondaire" (click)="imprimerResultats()" [disabled]="!resultats() || !!action()">
+            @if (action() === 'resultats') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer les résultats }
+          </button>
+          @if (resultats()?.peut_bulletins) {
+            <button type="button" class="me-bouton-principal" (click)="imprimerBulletins()" [disabled]="!!action() || !resultats()?.eleves?.length">
+              @if (action() === 'bulletins') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="document-text-outline"></ion-icon> Bulletins de la classe }
+            </button>
+          }
+        </div>
+      </section>
+
+      @if (chargement() && !resultats()) {
+        <section class="me-carte"><ion-skeleton-text [animated]="true" style="width: 100%; height: 160px"></ion-skeleton-text></section>
+      } @else if (erreur()) {
+        <section class="me-carte">
+          <div class="me-etat-vide">
+            <ion-icon name="cloud-offline-outline"></ion-icon>
+            <strong>Impossible de charger les résultats</strong>
+            <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+          </div>
+        </section>
+      } @else if (resultats()) {
+        @let r = resultats()!;
+        @let s = r.statistiques;
+        <section class="chiffres" aria-label="Résultats de la classe">
+          <div class="me-carte"><small>Élèves classés</small><strong>{{ s.classes }} / {{ s.effectif }}</strong></div>
+          <div class="me-carte"><small>Moyenne de la classe</small><strong>{{ n(s.moyenne_classe) }}</strong></div>
+          <div class="me-carte"><small>Plus forte moyenne</small><strong>{{ n(s.maximum) }}</strong></div>
+          <div class="me-carte"><small>Plus faible moyenne</small><strong>{{ n(s.minimum) }}</strong></div>
+          <div class="me-carte"><small>Moyennes ≥ 10 (F {{ s.filles.admis }} · G {{ s.garcons.admis }})</small><strong>{{ s.moyenne_10 }} · {{ s.taux_reussite !== null ? n(s.taux_reussite) + ' %' : '—' }}</strong></div>
+        </section>
+
+        @if (provisoires().length && !r.annuel) {
+          <p class="me-note">
+            <ion-icon name="information-circle-outline"></ion-icon>
+            <span>Moyennes provisoires (non arrêtées) : {{ provisoires().length }} matière{{ provisoires().length > 1 ? 's' : '' }} ({{ libellesProvisoires() }}). Elles changent tant que des notes sont saisies.</span>
+          </p>
+        }
+
+        <section class="me-carte liste" [class.attenue]="chargement()">
+          <div class="titre-tableau">
+            <div>
+              <h2>{{ r.classe.libelle }} · {{ r.periode.libelle }}</h2>
+              <p>
+                {{ r.matieres.length }} matières · coefficients entre parenthèses
+                @if (r.enregistre_le) { · résultats enregistrés }
+              </p>
+            </div>
+            <div class="boutons">
+              <button type="button" class="me-bouton-texte" (click)="ordreMerite.set(!ordreMerite())"><ion-icon name="swap-vertical-outline"></ion-icon> {{ ordreMerite() ? 'Ordre alphabétique' : 'Ordre de mérite' }}</button>
+              @if (r.peut_gerer && !r.annuel && !r.periode.cloturee) {
+                <button type="button" class="me-bouton-secondaire" (click)="enregistrerResultats()" [disabled]="!!action()">
+                  @if (action() === 'enregistrer') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="save-outline"></ion-icon> Enregistrer les résultats }
+                </button>
+              }
+              @if (r.peut_gerer && r.annuel) {
+                <button type="button" class="me-bouton-secondaire" (click)="proposer()">Proposer les décisions</button>
+                <button type="button" class="me-bouton-principal" (click)="enregistrerDecisions()" [disabled]="!decisionsModifiees() || !!action()">
+                  @if (action() === 'decisions') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="save-outline"></ion-icon> Enregistrer les décisions }
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="defilant">
+            <table class="grille">
+              <thead>
+                <tr>
+                  <th class="num">N°</th>
+                  <th class="eleve eleve-fixe">Élève</th>
+                  @for (m of r.matieres; track m.id) {
+                    <th [title]="m.libelle + (m.arretee ? ' (arrêtée)' : '')">{{ m.code }}<small>({{ m.coefficient }})</small></th>
+                  }
+                  @if (r.annuel) {
+                    @for (p of r.periodes; track p.id) {<th>{{ p.libelle }}<small>poids {{ p.poids }}</small></th>}
+                  }
+                  <th class="moy">Moyenne</th>
+                  <th>Rang</th>
+                  <th class="appr">Distinction / sanctions</th>
+                  @if (r.annuel) {<th>Décision</th>}
+                  @if (r.peut_bulletins) {<th>Bulletin</th>}
+                </tr>
+              </thead>
+              <tbody>
+                @for (l of elevesPage(); track l.eleve_id; let i = $index) {
+                  <tr>
+                    <td class="num">{{ (page() - 1) * taille() + i + 1 }}</td>
+                    <td class="eleve eleve-fixe"><strong>{{ l.nom }}</strong> {{ l.prenoms }}<small>{{ l.matricule }}</small></td>
+                    @for (m of r.matieres; track m.id) {
+                      @let v = l.moyennes[m.id];
+                      <td [class.faible]="v && v.moyenne < 10" [class.matiere-provisoire]="v && !v.arretee && !m.conduite && !r.annuel">{{ v ? n(v.moyenne) : '' }}</td>
+                    }
+                    @if (r.annuel) {
+                      @for (p of r.periodes; track p.id) {<td>{{ n(l.periodes?.[p.id]) }}</td>}
+                    }
+                    <td class="moy" [class.faible]="l.moyenne !== null && l.moyenne < 10">{{ n(l.moyenne) }}</td>
+                    <td>{{ rang(l.rang, l.rang_ex_aequo) }}</td>
+                    <td class="appr">{{ l.distinction ?? l.sanctions.join(', ') }}</td>
+                    @if (r.annuel && r.peut_gerer) {
+                      <td>
+                        <select [attr.aria-label]="'Décision pour ' + l.nom" [value]="decisionDe(l)" (change)="choisirDecision(l, valeurSelect($event))">
+                          <option value="">—</option>
+                          @for (d of r.decisions; track d) {<option [value]="d" [selected]="decisionDe(l) === d">{{ libellesDecision[d] ?? d }}</option>}
+                        </select>
+                      </td>
+                    } @else if (r.annuel) {
+                      <td>{{ l.decision ? (libellesDecision[l.decision] ?? l.decision) : '—' }}</td>
+                    }
+                    @if (r.peut_bulletins) {
+                      <td>
+                        <button type="button" class="me-action" title="Bulletin" [attr.aria-label]="'Bulletin de ' + l.nom" (click)="imprimerBulletins(l)" [disabled]="!!action()">
+                          @if (action() === 'bulletin-' + l.eleve_id) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="document-text-outline"></ion-icon> }
+                        </button>
+                      </td>
+                    }
+                  </tr>
+                } @empty {
+                  <tr><td [attr.colspan]="6 + r.matieres.length" class="vide">Aucun élève dans cette classe.</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <app-pagination [total]="eleves().length" [page]="page()" [taille]="taille()" (pageChange)="page.set($event)" (tailleChange)="taille.set($event); page.set(1)"></app-pagination>
+        </section>
+      }
+    }
+  </div>
+</ion-content>

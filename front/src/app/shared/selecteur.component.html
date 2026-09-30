@@ -1,0 +1,69 @@
+<div class="selecteur" [class.ouvert]="ouvert()" [class.grise]="grise" [class.vers-le-haut]="versLeHaut()">
+  <button
+    type="button"
+    class="declencheur"
+    [id]="idChamp"
+    [disabled]="grise"
+    aria-haspopup="listbox"
+    [attr.aria-expanded]="ouvert()"
+    [attr.aria-controls]="idListe"
+    [attr.aria-activedescendant]="ouvert() && indexActif() >= 0 ? idChamp + '-option-' + indexActif() : null"
+    (click)="basculer()"
+    (keydown)="clavier($event)"
+  >
+    @if (icone) {
+      <ion-icon [name]="icone" class="icone"></ion-icon>
+    }
+    <span class="valeur" [class.vide]="!selection">
+      @if (chargement) {
+        Chargement…
+      } @else {
+        {{ selection?.libelle ?? placeholder }}
+        @if (selection?.detail) {
+          <small> · {{ selection?.detail }}</small>
+        }
+      }
+    </span>
+    @if (selection?.badge; as badge) {
+      <span class="badge" [class.succes]="badge.ton === 'succes'" [class.attention]="badge.ton === 'attention'">{{ badge.texte }}</span>
+    }
+    @if (chargement) {
+      <ion-spinner name="crescent"></ion-spinner>
+    } @else {
+      <ion-icon name="chevron-down-outline" class="chevron"></ion-icon>
+    }
+  </button>
+
+  @if (ouvert()) {
+    <ul class="liste" role="listbox" [id]="idListe" [attr.aria-labelledby]="idChamp">
+      @for (option of options; track option.valeur; let i = $index) {
+        <li
+          role="option"
+          [id]="idChamp + '-option-' + i"
+          class="option"
+          [class.choisie]="option.valeur === valeur"
+          [class.desactivee]="option.desactivee"
+          [attr.aria-disabled]="option.desactivee || null"
+          [class.active]="i === indexActif()"
+          [attr.aria-selected]="option.valeur === valeur"
+          (click)="choisir(option)"
+          (mouseenter)="indexActif.set(i)"
+        >
+          <ion-icon
+            class="coche"
+            [name]="option.valeur === valeur ? 'checkmark-circle' : 'ellipse-outline'"
+          ></ion-icon>
+          <span class="option-texte">
+            <strong>{{ option.libelle }}</strong>
+            @if (option.detail) {
+              <small>{{ option.detail }}</small>
+            }
+          </span>
+          @if (option.badge; as badge) {
+            <span class="badge" [class.succes]="badge.ton === 'succes'" [class.attention]="badge.ton === 'attention'">{{ badge.texte }}</span>
+          }
+        </li>
+      }
+    </ul>
+  }
+</div>

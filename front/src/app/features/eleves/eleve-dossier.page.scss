@@ -1,0 +1,375 @@
+.me-entete-page p {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.matricule {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.texte-doux {
+  margin: 0;
+  font-size: 13px;
+  color: var(--me-texte-doux);
+}
+
+.a-payer {
+  color: #b35c00 !important;
+}
+
+.grille-dossier {
+  display: grid;
+  gap: 18px;
+  align-items: start;
+
+  @media (min-width: 1000px) {
+    grid-template-columns: minmax(300px, 1fr) minmax(0, 1.7fr);
+  }
+}
+
+.colonne {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.bloc {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  h2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--me-texte);
+
+    ion-icon {
+      color: var(--me-texte-leger);
+    }
+  }
+}
+
+// ============================ Fiche ============================
+
+.identite {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.photo {
+  width: 110px;
+  height: 138px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--me-fond);
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .initiales {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    background: var(--me-bleu-fond);
+    color: var(--me-marine);
+    font-size: 32px;
+    font-weight: 800;
+
+    &.feminin {
+      background: var(--me-violet-fond);
+      color: var(--me-violet);
+    }
+  }
+}
+
+.infos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  width: 100%;
+  margin: 0;
+
+  div {
+    min-width: 0;
+  }
+
+  .large {
+    grid-column: 1 / -1;
+  }
+
+  dt {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--me-texte-leger);
+  }
+
+  dd {
+    margin: 2px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--me-texte);
+    overflow-wrap: anywhere;
+  }
+
+  &.compacte dd {
+    font-size: 13px;
+  }
+}
+
+.parents {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: 10px 0;
+
+    & + li {
+      border-top: 1px dashed var(--me-bordure);
+    }
+
+    > span {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    strong {
+      font-size: 14px;
+    }
+
+    small {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--me-texte-doux);
+    }
+
+    &.vide {
+      font-size: 13px;
+      color: var(--me-texte-leger);
+    }
+  }
+}
+
+.telephone {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ion-color-primary);
+  text-decoration: none;
+}
+
+// ============================ Parcours ============================
+
+.parcours {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  .vide {
+    font-size: 13px;
+    color: var(--me-texte-leger);
+  }
+}
+
+.annee {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--me-bordure);
+  border-left: 4px solid var(--me-bordure);
+  border-radius: 12px;
+
+  &.en-cours {
+    border-left-color: var(--ion-color-primary);
+    background: #f8faff;
+  }
+
+  &.annulee {
+    opacity: 0.6;
+  }
+}
+
+.entete-annee {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  strong {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--me-texte);
+  }
+}
+
+.etiquettes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.moyennes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.moyenne {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 90px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--me-fond);
+
+  small {
+    font-size: 11px;
+    color: var(--me-texte-doux);
+  }
+
+  strong {
+    font-size: 16px;
+    font-weight: 800;
+  }
+}
+
+.resume-finances {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--me-fond);
+  color: var(--me-texte-doux);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+
+  strong {
+    color: var(--me-texte);
+    font-variant-numeric: tabular-nums;
+  }
+
+  ion-icon {
+    margin-left: auto;
+  }
+}
+
+.detail-frais {
+  border: 1px solid var(--me-bordure);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.ligne-frais {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+
+  span:not(:first-child) {
+    min-width: 90px;
+    text-align: right;
+  }
+}
+
+// ============================ Paiements, documents ============================
+
+.paiements {
+  border: 1px solid var(--me-bordure);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ligne-paiement {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+
+  > span:first-child {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+
+    small {
+      font-size: 12px;
+      color: var(--me-texte-doux);
+    }
+  }
+
+  .mode {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+
+  .montant {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.documents {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 0;
+    font-size: 13px;
+
+    small {
+      color: var(--me-texte-leger);
+    }
+  }
+}

@@ -1,0 +1,486 @@
+// ============================ Etapes ============================
+
+.etapes {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.etape {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1.5px solid var(--me-bordure);
+  border-radius: 12px;
+  background: var(--me-surface);
+  color: var(--me-texte-doux);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+
+  .numero {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--me-fond);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .libelle {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &.active {
+    border-color: var(--ion-color-primary);
+    color: var(--me-marine);
+
+    .numero {
+      background: var(--ion-color-primary);
+      color: #fff;
+    }
+  }
+
+  &.faite .numero {
+    background: var(--me-vert-fond);
+    color: var(--me-vert);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  // Mobile : seul le libelle de l'etape en cours est affiche.
+  @media (max-width: 559px) {
+    flex: 0 0 auto;
+
+    &:not(.active) .libelle {
+      display: none;
+    }
+
+    &.active {
+      flex: 1;
+    }
+  }
+}
+
+// ============================ Blocs ============================
+
+.bloc {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--me-texte);
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--me-texte);
+  }
+
+  .aide {
+    margin: -8px 0 0;
+    font-size: 13px;
+    color: var(--me-texte-doux);
+  }
+}
+
+.matricule {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.me-saisie.majuscules {
+  text-transform: uppercase;
+}
+
+.me-saisie.zone {
+  height: auto;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.me-saisie[readonly] {
+  background: var(--me-fond);
+  color: var(--me-texte-doux);
+}
+
+// ============================ Etape 1 ============================
+
+.recherche-matricule {
+  display: flex;
+  gap: 10px;
+
+  .me-saisie {
+    flex: 1;
+    height: 50px;
+    font-size: 18px;
+    text-transform: uppercase;
+  }
+
+  .me-bouton-principal {
+    height: 50px;
+    min-width: 136px;
+  }
+
+  @media (max-width: 479px) {
+    flex-direction: column;
+  }
+}
+
+.resultat-entete {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  > div {
+    flex: 1;
+    min-width: 0;
+  }
+
+  p {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 2px 0 0;
+    font-size: 13px;
+    color: var(--me-texte-doux);
+  }
+}
+
+.infos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--me-fond);
+
+  div {
+    min-width: 0;
+  }
+
+  dt {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--me-texte-leger);
+  }
+
+  dd {
+    margin: 2px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--me-texte);
+    overflow-wrap: anywhere;
+  }
+}
+
+.actions-resultat {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+
+// ============================ Etape 2 ============================
+
+.identite-photo {
+  display: grid;
+  gap: 18px;
+
+  @media (min-width: 700px) {
+    grid-template-columns: 150px minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
+.photo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+
+  .bouton-photo {
+    cursor: pointer;
+  }
+}
+
+// Cadre fixe : la photo (ou l'icone) ne deborde jamais sur les champs.
+.cadre-photo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 120px;
+  height: 150px;
+  border: 1.5px dashed var(--me-bordure);
+  border-radius: 14px;
+  background: var(--me-fond);
+  overflow: hidden;
+  box-sizing: border-box;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  ion-icon {
+    width: 40px;
+    height: 40px;
+    color: var(--me-texte-leger);
+  }
+}
+
+.source-photo {
+  font-size: 11px;
+  color: var(--me-texte-leger);
+  text-align: center;
+}
+
+// ============================ Classe ============================
+
+.choix-classe {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+
+  @media (min-width: 700px) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.effectif-classe {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--me-fond);
+
+  .chiffre {
+    display: flex;
+    flex-direction: column;
+
+    strong {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--me-texte);
+    }
+
+    small {
+      font-size: 12px;
+      color: var(--me-texte-doux);
+    }
+  }
+
+  .jauge {
+    grid-column: 1 / -1;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--me-bordure);
+    overflow: hidden;
+
+    span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--me-vert);
+
+      &.pleine {
+        background: var(--ion-color-danger);
+      }
+    }
+  }
+
+  .places {
+    grid-column: 1 / -1;
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+}
+
+.orphelin {
+  display: grid;
+  gap: 10px;
+
+  @media (min-width: 560px) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.parents {
+  display: grid;
+  gap: 12px;
+
+  @media (min-width: 900px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.parent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--me-bordure);
+  border-radius: 14px;
+
+  legend {
+    padding: 0 6px;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--me-texte);
+  }
+
+  &.indisponible {
+    opacity: 0.45;
+  }
+}
+
+.roles-parents .me-segments button:disabled {
+  opacity: 0.4;
+}
+
+// ============================ Etape 3 ============================
+
+.cases {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+// ============================ Etape 4 ============================
+
+.recap-eleve {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+
+  .nom {
+    margin: 0 0 4px;
+    font-size: 18px;
+  }
+
+  p {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: var(--me-texte-doux);
+  }
+}
+
+.photo-recap {
+  flex-shrink: 0;
+  width: 72px;
+  height: 90px;
+  border-radius: 12px;
+  object-fit: cover;
+
+  &.vide {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--me-fond);
+    color: var(--me-texte-leger);
+    font-size: 26px;
+  }
+}
+
+.etiquettes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.frais {
+  border: 1px solid var(--me-bordure);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ligne-frais {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+
+  strong {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  &.dette {
+    color: #b35c00;
+  }
+
+  &.total {
+    border-top: 1px solid var(--me-bordure);
+    background: var(--me-fond);
+    font-weight: 800;
+  }
+
+  &.minimum {
+    background: var(--me-bleu-fond);
+    color: var(--me-marine);
+    font-size: 13px;
+  }
+}
+
+.sous-titre {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fournitures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--me-fond);
+    font-size: 13px;
+  }
+}
+
+.me-barre-enregistrer .me-bouton-principal ion-icon,
+.me-barre-enregistrer .me-bouton-texte ion-icon {
+  font-size: 16px;
+}

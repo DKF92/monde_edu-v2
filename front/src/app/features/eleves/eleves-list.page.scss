@@ -1,29 +1,375 @@
-@import '../../../theme/responsive';
+// Meme principe que les ecrans Utilisateurs / Roles : cartes sur mobile,
+// tableau des que la carte-liste est assez large.
+$tableau: 820px;
 
-.page-eleves {
-  @include fond-bureau;
+.me-entete-page p .me-badge {
+  margin-left: 6px;
+  vertical-align: middle;
 }
 
-.liste {
-  @include pleine-largeur;
+// ============================ Compteurs ============================
+
+.compteurs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+
+  > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  @media (min-width: 760px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+
+    > :first-child {
+      grid-column: auto;
+    }
+  }
 }
 
-.avatar-initiales {
-  width: 100%;
-  height: 100%;
+.compteur {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: var(--ion-color-primary-tint);
-  color: #fff;
-  font-weight: 600;
-  font-size: 13px;
-  text-transform: uppercase;
+  gap: 12px;
+  padding: 14px 16px;
+  font: inherit;
+  text-align: left;
+  color: var(--me-texte);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: #b9c6ea;
+  }
+
+  &.actif {
+    border-color: var(--ion-color-primary);
+  }
+
+  > span:last-child {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  strong {
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
 }
 
-.etat-vide {
+// ============================ Liste ============================
+
+.liste {
+  padding: 0;
+  container-type: inline-size;
+}
+
+.filtres {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--me-bordure);
+
+  @media (min-width: 760px) {
+    grid-template-columns: minmax(0, 1fr) 240px;
+  }
+}
+
+.me-recherche {
+  position: relative;
+
+  .attente-recherche {
+    position: absolute;
+    right: 12px;
+    width: 18px;
+    height: 18px;
+    color: var(--me-texte-leger);
+  }
+}
+
+// Titre du tableau : suit les filtres.
+.titre-tableau {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  padding: 14px 20px 4px;
+
+  h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--me-texte);
+  }
+}
+
+.etat-chargement {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--me-texte-leger);
+
+  ion-spinner {
+    width: 20px;
+    height: 14px;
+  }
+}
+
+.tableau.attenue {
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+.squelette {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+}
+
+.squelette-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tableau {
+  padding: 4px 8px 10px;
+}
+
+.ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 12px;
+  padding: 14px 12px;
+  border-radius: 12px;
+
+  &.cliquable {
+    cursor: pointer;
+  }
+
+  &.inactif {
+    .cellule-eleve,
+    .cellule:not(.actions) {
+      opacity: 0.5;
+    }
+  }
+
+  @container (min-width: #{$tableau}) {
+    grid-template-columns: minmax(240px, 2.2fr) 110px minmax(170px, 1.3fr) minmax(150px, 1.1fr) 200px;
+    align-items: center;
+    gap: 12px;
+    border-radius: 10px;
+
+    &:not(.entete-tableau):hover {
+      background: var(--me-survol);
+    }
+  }
+}
+
+.entete-tableau {
+  display: none;
+
+  @container (min-width: #{$tableau}) {
+    display: grid;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--me-texte-leger);
+  }
+}
+
+.a-droite {
+  text-align: right;
+}
+
+.cellule-eleve {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--me-bleu-fond);
+  color: var(--me-marine);
+  font-size: 13px;
+  font-weight: 800;
+  object-fit: cover;
+
+  &.feminin {
+    background: var(--me-violet-fond);
+    color: var(--me-violet);
+  }
+}
+
+.identite {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  strong {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--me-texte);
+  }
+
+  small {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--me-texte-doux);
+
+    ion-icon {
+      color: var(--me-vert);
+      font-size: 14px;
+    }
+  }
+}
+
+.matricule {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.texte-leger {
+  color: var(--me-texte-leger);
+}
+
+.cellule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--me-texte);
+
+  &::before {
+    content: attr(data-libelle);
+    flex: 0 0 110px;
+    font-size: 12px;
+    color: var(--me-texte-leger);
+  }
+
+  &.montant {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+
+  &.a-payer {
+    color: #b35c00;
+  }
+
+  @container (min-width: #{$tableau}) {
+    &::before {
+      content: none;
+    }
+
+    &.montant {
+      justify-content: flex-end;
+    }
+  }
+}
+
+.actions {
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--me-bordure);
+
+  &::before {
+    content: none;
+  }
+
+  .me-action {
+    border: 1px solid var(--me-bordure);
+    background: var(--me-surface);
+  }
+
+  @container (min-width: #{$tableau}) {
+    gap: 4px;
+    padding-top: 0;
+    border-top: none;
+
+    .me-action {
+      border-color: transparent;
+      background: none;
+    }
+  }
+}
+
+
+.bouton-dossier {
+  height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+// ============================ Import ============================
+
+.zone-fichier {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 22px 16px;
+  border: 1.5px dashed var(--me-bordure);
+  border-radius: 14px;
+  background: var(--me-fond);
   text-align: center;
-  color: var(--ion-color-medium);
-  padding: 48px 16px;
-  font-size: 14px;
+  cursor: pointer;
+
+  ion-icon {
+    font-size: 30px;
+    color: var(--me-texte-leger);
+  }
+
+  strong {
+    font-size: 14px;
+    color: var(--me-texte);
+    overflow-wrap: anywhere;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+
+  &.rempli {
+    border-color: var(--ion-color-primary);
+    background: #f4f7ff;
+  }
+}
+
+.colonnes {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--me-texte-doux);
 }

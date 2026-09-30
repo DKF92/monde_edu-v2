@@ -35,4 +35,40 @@ return [
         ],
     ],
 
+
+    /*
+     * Fournisseur SMS de la plateforme (V1 : table parametre_global), commun a
+     * tous les etablissements. Chaque etablissement a son expediteur et son
+     * credit (voir Parametres > SMS).
+     * fournisseur : letexto | bulksmsonline (vide = envoi desactive).
+     */
+    'sms' => [
+        'fournisseur' => env('SMS_FOURNISSEUR'),
+        'url' => env('SMS_URL'),
+        'token' => env('SMS_TOKEN'),
+        'dlr_url' => env('SMS_DLR_URL'),
+        'response_url' => env('SMS_RESPONSE_URL'),
+        // true en developpement : aucun SMS reel (journal seulement).
+        'simulation' => env('SMS_SIMULATION', false),
+    ],
+
+    /*
+     * Inscription en ligne sur le site de l'Etat (recu de preinscription SIGFNE),
+     * voir App\Services\InscriptionEnLigneService.
+     */
+    'inscription_en_ligne' => [
+        'url' => env('INSCRIPTION_EN_LIGNE_URL', 'https://agfne.sigfne.net/vas/interface-edition-documents-sigfne/'),
+        'timeout' => env('INSCRIPTION_EN_LIGNE_TIMEOUT', 20),
+    ],
+
+    /*
+     * Assistant de support (API Claude, AppHttpControllersApiAssistantController).
+     * Sans cle : mode guide (fiches d'aide et dossier d'un eleve par matricule).
+     */
+    'anthropic' => [
+        'cle' => env('ANTHROPIC_API_KEY'),
+        'modele' => env('ASSISTANT_MODELE', 'claude-sonnet-5'),
+        'url' => env('ANTHROPIC_URL', 'https://api.anthropic.com'),
+    ],
+
 ];

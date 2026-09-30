@@ -1,0 +1,123 @@
+<ion-content class="me-page-admin">
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <h1>Rapports</h1>
+        <p>Effectifs, pédagogie, vie scolaire et finances de l'année {{ accueil()?.annee ?? '' }}.</p>
+      </div>
+    </header>
+
+    @if (erreurAccueil()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les rapports</strong>
+          <button type="button" class="me-lien" (click)="ionViewWillEnter()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (!accueil()) {
+      <section class="me-carte"><ion-skeleton-text [animated]="true" style="width: 100%; height: 80px"></ion-skeleton-text></section>
+    } @else {
+      @let i = accueil()!.indicateurs;
+      <!-- ================= Chiffres cles ================= -->
+      <section class="indicateurs" aria-label="Chiffres clés">
+        <div class="me-carte indicateur"><span class="me-pastille teinte-bleu"><ion-icon name="people-outline"></ion-icon></span><span><strong>{{ i.eleves }}</strong><small>Élèves en classe</small></span></div>
+        <div class="me-carte indicateur"><span class="me-pastille teinte-rose"><ion-icon name="female-outline"></ion-icon></span><span><strong>{{ i.filles }}</strong><small>Filles</small></span></div>
+        <div class="me-carte indicateur"><span class="me-pastille teinte-vert"><ion-icon name="checkmark-circle-outline"></ion-icon></span><span><strong>{{ i.affectes }}</strong><small>Affectés</small></span></div>
+        <div class="me-carte indicateur"><span class="me-pastille teinte-cyan"><ion-icon name="school-outline"></ion-icon></span><span><strong>{{ i.classes }}</strong><small>Classes</small></span></div>
+        <div class="me-carte indicateur"><span class="me-pastille teinte-violet"><ion-icon name="create-outline"></ion-icon></span><span><strong>{{ i.notes }}</strong><small>Notes saisies</small></span></div>
+        <div class="me-carte indicateur"><span class="me-pastille teinte-orange"><ion-icon name="time-outline"></ion-icon></span><span><strong>{{ h(i.heures_absence) }} h</strong><small>Absences ({{ h(i.heures_non_justifiees) }} h non justifiées)</small></span></div>
+      </section>
+
+      <!-- ================= Rapports officiels (rentree, periode, annuel) ================= -->
+      <app-rapports-officiels></app-rapports-officiels>
+
+      <!-- ================= Catalogue, par rubrique ================= -->
+      @for (g of rubriques(); track g.titre) {
+        <h2 class="rubrique">{{ g.titre }}</h2>
+        <section class="catalogue" [attr.aria-label]="'Rapports : ' + g.titre">
+          @for (r of g.rapports; track r.code) {
+            <div class="me-carte rapport" [class.actif]="code() === r.code" [class.retire]="r.masque" role="button" tabindex="0" (click)="!r.masque && ouvrir(r.code)" (keydown.enter)="!r.masque && ouvrir(r.code)">
+              <span class="me-pastille" [class]="teintes[r.rubrique] ?? 'teinte-bleu'"><ion-icon [name]="icones[r.code] ?? 'list-outline'"></ion-icon></span>
+              <span class="texte"><strong>{{ r.titre }}</strong><small>{{ r.masque ? 'Retiré des rapports' : r.description }}</small></span>
+              @if (accueil()!.peut_masquer) {
+                <button type="button" class="me-action retirer" [disabled]="masquage() === r.code" [title]="r.masque ? 'Remettre ce rapport' : 'Retirer ce rapport'" [attr.aria-label]="(r.masque ? 'Remettre ' : 'Retirer ') + r.titre" (click)="basculerMasque(r.code, $event)">
+                  <ion-icon [name]="r.masque ? 'arrow-undo-outline' : 'eye-off-outline'"></ion-icon>
+                </button>
+              }
+              @if (!r.masque) { <ion-icon name="chevron-forward-outline" class="fleche"></ion-icon> }
+            </div>
+          }
+        </section>
+      }
+      @if (retires()) {
+        <button type="button" class="me-lien voir-retires" (click)="voirRetires.set(!voirRetires())">
+          <ion-icon [name]="voirRetires() ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+          {{ voirRetires() ? 'Cacher les rapports retirés' : retires() + ' rapport' + (retires() > 1 ? 's' : '') + ' retiré' + (retires() > 1 ? 's' : '') + ' : afficher pour les remettre' }}
+        </button>
+      }
+
+      <!-- ================= Rapports parametrables ================= -->
+      <app-rapports-personnalises></app-rapports-personnalises>
+
+      <!-- ================= Rapport choisi ================= -->
+      @if (choisi(); as c) {
+        <section class="me-carte liste" id="rapport-choisi">
+          <div class="titre-rapport">
+            <div>
+              <h2>{{ c.titre }}{{ rapport()?.periode ? ' · ' + rapport()!.periode : '' }}</h2>
+              <p>{{ rapport()?.sous_titre ?? c.description }}</p>
+            </div>
+            <button type="button" class="me-fermer" (click)="fermer()" aria-label="Fermer le rapport"><ion-icon name="close-outline"></ion-icon></button>
+          </div>
+          <div class="filtres">
+            @if (c.periode || c.code === 'absences' || c.code === 'absents') {
+              <app-selecteur idChamp="rp-periode" icone="calendar-outline" [options]="optionsPeriode()" [valeur]="periode()" (valeurChange)="choisirPeriode($event)"></app-selecteur>
+            }
+            @if (c.code === 'merite') {
+              <app-selecteur idChamp="rp-affecte" icone="people-outline" [options]="optionsAffecte" [valeur]="affecte()" (valeurChange)="choisirAffecte($event)"></app-selecteur>
+              <div class="me-segments" role="radiogroup" aria-label="Ordre">
+                <button type="button" role="radio" [attr.aria-checked]="!alphabetique()" [class.actif]="!alphabetique()" (click)="alphabetique() && basculerOrdre()">Mérite</button>
+                <button type="button" role="radio" [attr.aria-checked]="alphabetique()" [class.actif]="alphabetique()" (click)="!alphabetique() && basculerOrdre()">Alphabétique</button>
+              </div>
+            }
+            <button type="button" class="me-bouton-principal imprimer" (click)="imprimer()" [disabled]="!rapport() || impression()">
+              @if (impression()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer }
+            </button>
+          </div>
+
+          @if (chargement() && !rapport()) {
+            <div class="squelette"><ion-skeleton-text [animated]="true" style="width: 100%; height: 140px"></ion-skeleton-text></div>
+          } @else if (rapport()) {
+            @let r = rapport()!;
+            <div class="defilant" [class.attenue]="chargement()">
+              <table class="tab">
+                <thead>
+                  <tr>@for (col of r.colonnes; track col.cle) {<th [class]="alignement(col)">{{ col.libelle }}</th>}</tr>
+                </thead>
+                <tbody>
+                  @for (g of r.groupes; track $index) {
+                    @if (g.titre) {
+                      <tr class="groupe"><td [attr.colspan]="r.colonnes.length">{{ g.titre }}</td></tr>
+                    }
+                    @for (l of g.lignes; track $index) {
+                      <tr>@for (col of r.colonnes; track col.cle) {<td [class]="alignement(col)" [class.fort]="col.fort">{{ valeur(l, col) }}</td>}</tr>
+                    }
+                    @if (g.total) {
+                      <tr class="sous-total">@for (col of r.colonnes; track col.cle; let first = $first) {<td [class]="alignement(col)">{{ first ? 'Total ' + g.titre : valeur(g.total, col) }}</td>}</tr>
+                    }
+                  } @empty {
+                    <tr><td [attr.colspan]="r.colonnes.length" class="vide">Aucune donnée pour cette période.</td></tr>
+                  }
+                  @if (r.total) {
+                    <tr class="total">@for (col of r.colonnes; track col.cle; let first = $first) {<td [class]="alignement(col)">{{ first ? 'Total général' : valeur(r.total, col) }}</td>}</tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </section>
+      }
+    }
+  </div>
+</ion-content>

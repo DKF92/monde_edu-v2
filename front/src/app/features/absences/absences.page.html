@@ -1,0 +1,199 @@
+<ion-content class="me-page-admin">
+  <ion-refresher slot="fixed" (ionRefresh)="charger($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <h1>Absences</h1>
+        <p>Heures d'absence des élèves, justifications et notes de conduite.</p>
+      </div>
+      <div class="boutons-entete">
+        <button type="button" class="me-bouton-secondaire" (click)="router.navigateByUrl('/tabs/absences/conduite')">
+          <ion-icon name="ribbon-outline"></ion-icon> Conduite
+        </button>
+        <button type="button" class="me-bouton-secondaire" (click)="imprimer()" [disabled]="impression()">
+          @if (impression()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer }
+        </button>
+        <button type="button" class="me-bouton-principal" (click)="appel()" [disabled]="!infos()">
+          <ion-icon name="add-outline"></ion-icon> Faire l'appel
+        </button>
+      </div>
+    </header>
+
+    <!-- ================= Compteurs ================= -->
+    @if (infos(); as i) {
+      <section class="compteurs" aria-label="Totaux">
+        <div class="me-carte compteur"><span class="me-pastille teinte-cyan"><ion-icon name="document-text-outline"></ion-icon></span><span><strong>{{ i.totaux.nombre }}</strong><small>Absences</small></span></div>
+        <div class="me-carte compteur"><span class="me-pastille teinte-bleu"><ion-icon name="time-outline"></ion-icon></span><span><strong>{{ h(i.totaux.heures) }} h</strong><small>Heures d'absence</small></span></div>
+        <button type="button" class="me-carte compteur" [class.actif]="etat() === 'non'" (click)="choisirEtat(etat() === 'non' ? 'toutes' : 'non')"><span class="me-pastille teinte-orange"><ion-icon name="alert-circle-outline"></ion-icon></span><span><strong>{{ h(i.totaux.non_justifiees) }} h</strong><small>Non justifiées</small></span></button>
+        <button type="button" class="me-carte compteur" [class.actif]="etat() === 'oui'" (click)="choisirEtat(etat() === 'oui' ? 'toutes' : 'oui')"><span class="me-pastille teinte-vert"><ion-icon name="checkmark-circle-outline"></ion-icon></span><span><strong>{{ h(i.totaux.justifiees) }} h</strong><small>Justifiées</small></span></button>
+        <div class="me-carte compteur"><span class="me-pastille teinte-violet"><ion-icon name="people-outline"></ion-icon></span><span><strong>{{ i.totaux.eleves }}</strong><small>Élève{{ i.totaux.eleves > 1 ? 's' : '' }} concerné{{ i.totaux.eleves > 1 ? 's' : '' }}</small></span></div>
+      </section>
+    }
+
+    <!-- ================= Liste ================= -->
+    <section class="me-carte liste">
+      <div class="filtres">
+        <label class="me-recherche">
+          <ion-icon name="search-outline"></ion-icon>
+          <input type="search" placeholder="Rechercher (nom, prénoms, matricule…)" aria-label="Rechercher un élève" [value]="recherche()" (input)="rechercher(valeurTexte($event))" />
+        </label>
+        <app-selecteur idChamp="a-periode" icone="calendar-outline" [options]="optionsPeriode()" [valeur]="periodeId()" (valeurChange)="choisirPeriode($event)"></app-selecteur>
+        <app-selecteur idChamp="a-classe" icone="school-outline" [options]="optionsClasse()" [valeur]="classeId()" (valeurChange)="choisirClasse($event)"></app-selecteur>
+      </div>
+
+      @if (liste.chargementInitial()) {
+        @for (i of [1, 2, 3]; track i) {
+          <div class="squelette"><ion-skeleton-text [animated]="true" style="width: 60%"></ion-skeleton-text></div>
+        }
+      } @else if (liste.erreur()) {
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les absences</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      } @else {
+        <div class="titre-tableau"><h2>{{ titre() }}</h2></div>
+        <div class="tableau" role="table" aria-label="Absences" [class.attenue]="liste.actualisation()">
+          <div class="ligne entete-tableau" role="row">
+            <span role="columnheader">Date</span>
+            <span role="columnheader">Élève</span>
+            <span role="columnheader" class="a-droite">Heures</span>
+            <span role="columnheader">Justification</span>
+            <span role="columnheader" class="a-droite">Actions</span>
+          </div>
+          @for (a of lignesPage(); track a.id; let impaire = $odd) {
+            <div class="ligne" role="row" [class.me-ligne-alternee]="impaire">
+              <span class="cellule-date" role="cell">
+                <strong>{{ dateFr(a.date_debut) }}</strong>
+                <small>{{ a.date_fin && a.date_fin !== a.date_debut ? 'au ' + dateFr(a.date_fin) : a.periode }}</small>
+              </span>
+              <span class="cellule-eleve" role="cell">
+                <strong>{{ a.eleve?.nom }} {{ a.eleve?.prenoms }}</strong>
+                <small><span class="matricule">{{ a.eleve?.matricule }}</span> · {{ a.classe }}</small>
+              </span>
+              <span class="cellule heures" role="cell" data-libelle="Heures">{{ h(a.nombre_heures) }} h</span>
+              <span class="cellule" role="cell" data-libelle="Justification">
+                <span class="me-badge" [class.succes]="a.is_justifiee" [class.attention]="!a.is_justifiee">{{ a.is_justifiee ? 'Justifiée' : 'Non justifiée' }}</span>
+                @if (a.motif) { <small class="motif">{{ a.motif }}</small> }
+              </span>
+              <span class="cellule actions" role="cell">
+                <button type="button" class="me-action" [title]="a.is_justifiee ? 'Marquer non justifiée' : 'Justifier'" [attr.aria-label]="a.is_justifiee ? 'Marquer non justifiée' : 'Justifier'" (click)="justifier(a, $event)">
+                  <ion-icon [name]="a.is_justifiee ? 'close-outline' : 'checkmark-circle-outline'"></ion-icon>
+                </button>
+                <button type="button" class="me-action" title="Modifier" aria-label="Modifier l'absence" (click)="modifier(a, $event)"><ion-icon name="create-outline"></ion-icon></button>
+                <button type="button" class="me-action danger" title="Supprimer" aria-label="Supprimer l'absence" (click)="supprimer(a, $event)"><ion-icon name="trash-outline"></ion-icon></button>
+              </span>
+            </div>
+          } @empty {
+            @if (!pageEnAttente()) {
+              <div class="me-etat-vide">
+                <ion-icon name="time-outline"></ion-icon>
+                <strong>Aucune absence</strong>
+                <button type="button" class="me-bouton-principal" (click)="appel()"><ion-icon name="add-outline"></ion-icon> Faire l'appel</button>
+              </div>
+            }
+          }
+        </div>
+        <app-pagination [total]="liste.total()" [page]="page()" [taille]="taille()" (pageChange)="page.set($event)" (tailleChange)="changerTaille($event)"></app-pagination>
+      }
+    </section>
+  </div>
+</ion-content>
+
+<!-- ================= Appel / modification ================= -->
+<ion-modal class="me-modale-formulaire large" [isOpen]="modale()" (didDismiss)="modale.set(false)">
+  <ng-template>
+    <div class="me-modale">
+      <header>
+        <span class="me-pastille teinte-orange"><ion-icon name="time-outline"></ion-icon></span>
+        <div>
+          <h1>{{ edition() ? 'Modifier l\'absence' : 'Faire l\'appel' }}</h1>
+          <p>{{ edition() ? edition()!.eleve?.nom + ' ' + edition()!.eleve?.prenoms + ' · ' + edition()!.classe : 'Cochez les élèves absents de la classe.' }}</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="modale.set(false)" aria-label="Fermer"><ion-icon name="close-outline"></ion-icon></button>
+      </header>
+      <div class="corps">
+        <section class="me-grille">
+          <div class="me-champ">
+            <label for="s-periode">Période <span class="me-requis">*</span></label>
+            <app-selecteur idChamp="s-periode" icone="calendar-outline" [options]="optionsPeriodeSaisie()" [valeur]="sPeriode() || null" (valeurChange)="sPeriode.set($event)"></app-selecteur>
+            @if (erreur('periode'); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+          </div>
+          @if (!edition()) {
+            <div class="me-champ">
+              <label for="s-classe">Classe <span class="me-requis">*</span></label>
+              <app-selecteur idChamp="s-classe" icone="school-outline" [options]="optionsClasseSaisie()" [valeur]="sClasse() || null" (valeurChange)="choisirClasseAppel($event)"></app-selecteur>
+              @if (erreur('classe'); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+            </div>
+          }
+          <div class="me-champ">
+            <label for="s-debut">Date <span class="me-requis">*</span></label>
+            <input id="s-debut" class="me-saisie" type="date" [max]="sFin() || null" [class.invalide]="!!erreur('debut')" [value]="sDebut()" (change)="sDebut.set(valeurTexte($event))" />
+            @if (erreur('debut'); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+          </div>
+          <div class="me-champ">
+            <label for="s-fin">Jusqu'au (plusieurs jours)</label>
+            <input id="s-fin" class="me-saisie" type="date" [class.invalide]="!!erreur('fin')" [value]="sFin()" (change)="sFin.set(valeurTexte($event))" />
+            @if (erreur('fin'); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+          </div>
+          <div class="me-champ">
+            <label for="s-heures">Nombre d'heures <span class="me-requis">*</span></label>
+            <div class="me-montant" data-unite="h">
+              <input id="s-heures" class="me-saisie" type="text" inputmode="decimal" placeholder="Ex : 2" [class.invalide]="!!erreur('heures')" [value]="sHeures()" (input)="sHeures.set(valeurTexte($event))" />
+            </div>
+            @if (erreur('heures'); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+          </div>
+          <div class="me-champ">
+            <span class="libelle">Justification</span>
+            <div class="me-segments" role="radiogroup" aria-label="Justification">
+              <button type="button" role="radio" [attr.aria-checked]="!sJustifiee()" [class.actif]="!sJustifiee()" (click)="sJustifiee.set(false)">Non justifiée</button>
+              <button type="button" role="radio" [attr.aria-checked]="sJustifiee()" [class.actif]="sJustifiee()" (click)="sJustifiee.set(true)">Justifiée</button>
+            </div>
+          </div>
+          <div class="me-champ large">
+            <label for="s-motif">Motif</label>
+            <input id="s-motif" class="me-saisie" type="text" maxlength="200" placeholder="Ex : maladie, convocation…" [value]="sMotif()" (input)="sMotif.set(valeurTexte($event))" />
+          </div>
+        </section>
+
+        @if (!edition()) {
+          <section>
+            <h2>Élèves absents · {{ absents().size }} coché{{ absents().size > 1 ? 's' : '' }}</h2>
+            @if (erreur('eleves'); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+            @if (chargementAppel()) {
+              <ion-skeleton-text [animated]="true" style="width: 100%; height: 120px"></ion-skeleton-text>
+            } @else if (!sClasse()) {
+              <p class="texte-doux">Choisissez d'abord la classe.</p>
+            } @else {
+              <ul class="appel">
+                @for (e of elevesAppel(); track e.eleve_id; let i = $index) {
+                  <li>
+                    <button type="button" role="checkbox" [attr.aria-checked]="absents().has(e.eleve_id)" [class.coche]="absents().has(e.eleve_id)" (click)="basculerAbsent(e.eleve_id)">
+                      <ion-icon [name]="absents().has(e.eleve_id) ? 'checkbox-outline' : 'square-outline'"></ion-icon>
+                      <span class="nom"><strong>{{ e.nom }}</strong> {{ e.prenoms }}</span>
+                      <small>{{ e.heures ? h(e.heures) + ' h cette période' : '' }}</small>
+                    </button>
+                  </li>
+                } @empty {
+                  <li class="texte-doux">Aucun élève dans cette classe.</li>
+                }
+              </ul>
+            }
+          </section>
+        }
+        @for (m of erreursServeur(); track $index) {
+          <p class="me-erreur-champ">{{ m }}</p>
+        }
+      </div>
+      <footer>
+        <button type="button" class="me-bouton-texte" (click)="modale.set(false)" [disabled]="enregistrement()">Annuler</button>
+        <button type="button" class="me-bouton-principal" (click)="enregistrer()" [disabled]="enregistrement()">
+          @if (enregistrement()) { <ion-spinner name="dots"></ion-spinner> } @else { {{ edition() ? 'Enregistrer' : 'Enregistrer l\'appel' }} }
+        </button>
+      </footer>
+    </div>
+  </ng-template>
+</ion-modal>

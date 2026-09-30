@@ -1,0 +1,136 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/reductions')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Réductions
+        </button>
+        <h1>{{ cible() === 'dette' ? 'Réduction de dette' : 'Réduction d\'inscription' }}</h1>
+        <p>{{ cible() === 'dette' ? 'Réduire ou annuler une dette des années précédentes.' : 'Réduction ou cas social sur les frais de l\'année.' }}</p>
+      </div>
+    </header>
+
+    @if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="alert-circle-outline"></ion-icon>
+          <strong>{{ erreur() }}</strong>
+          <button type="button" class="me-lien" (click)="router.navigateByUrl('/tabs/reductions')">Retour aux réductions</button>
+        </div>
+      </section>
+    } @else if (!donnees()) {
+      <section class="me-carte">
+        <ion-skeleton-text [animated]="true" style="width: 60%; height: 22px"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 180px; margin-top: 14px"></ion-skeleton-text>
+      </section>
+    } @else {
+      @let d = donnees()!;
+      <!-- ================= Eleve ================= -->
+      <section class="me-carte eleve">
+        <span class="avatar">
+          @if (d.eleve.photo_url) { <img [src]="d.eleve.photo_url" alt="" /> } @else { {{ d.eleve.nom.charAt(0) }}{{ d.eleve.prenoms.charAt(0) }} }
+        </span>
+        <div class="identite">
+          <strong>{{ d.eleve.nom }} {{ d.eleve.prenoms }}</strong>
+          <small><span class="matricule">{{ d.eleve.matricule }}</span> · {{ d.inscription.classe ?? d.inscription.niveau }} · {{ d.inscription.affecte ? 'Affecté' : 'Non affecté' }}</small>
+        </div>
+        <div class="situation">
+          <span><small>Total dû</small><strong>{{ f(d.inscription.total_du) }}</strong></span>
+          <span><small>Réduit</small><strong>{{ f(d.inscription.total_reduit) }}</strong></span>
+          <span><small>Payé</small><strong>{{ f(d.inscription.total_paye) }}</strong></span>
+          <span class="reste"><small>Reste</small><strong>{{ f(d.inscription.reste) }}</strong></span>
+        </div>
+      </section>
+
+      <form class="me-carte formulaire" (submit)="$event.preventDefault(); enregistrer()" novalidate>
+        @if (cible() === 'inscription') {
+          <!-- ================= Type de reduction ================= -->
+          <div class="me-champ">
+            <span class="libelle">Type de réduction</span>
+            <div class="types" role="radiogroup" aria-label="Type de réduction">
+              @for (t of d.types; track t.id) {
+                <button type="button" role="radio" class="me-option" [class.choisi]="typeId() === t.id" [attr.aria-checked]="typeId() === t.id" (click)="choisirType(t)">
+                  <ion-icon [name]="typeId() === t.id ? 'radio-button-on' : 'radio-button-off-outline'"></ion-icon>
+                  <span>
+                    <strong>{{ t.libelle }}</strong>
+                    <small>
+                      @if (t.bornes.max > 0) { De {{ f(t.bornes.min) }} à {{ f(t.bornes.max) }} } @else { Plus rien à réduire }
+                      · {{ t.base === 'total' ? 'tous les frais' : 'frais d\'inscription et scolarité' }}
+                    </small>
+                  </span>
+                </button>
+              }
+            </div>
+          </div>
+
+          <!-- ================= Frais et apercu ================= -->
+          <div class="defilant">
+            <table class="tab">
+              <thead><tr><th>Frais</th><th class="d">Dû</th><th class="d">Réduit</th><th class="d">Payé</th><th class="d">Reste</th><th class="d">Cette réduction</th></tr></thead>
+              <tbody>
+                @for (fr of d.frais; track fr.id) {
+                  <tr [class.touche]="apercu()[fr.id]">
+                    <td>{{ fr.libelle }}@if (fr.principal) { <small> · principal</small> }</td>
+                    <td class="d">{{ f(fr.montant_du) }}</td>
+                    <td class="d">{{ f(fr.montant_reduit) }}</td>
+                    <td class="d">{{ f(fr.montant_paye) }}</td>
+                    <td class="d">{{ f(fr.reste) }}</td>
+                    <td class="d part">{{ apercu()[fr.id] ? '− ' + f(apercu()[fr.id]!) : '' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <!-- ================= Dettes ================= -->
+          <div class="me-champ">
+            <span class="libelle">Dette à réduire</span>
+            <div class="types" role="radiogroup" aria-label="Dette">
+              @for (x of d.dettes; track x.id) {
+                <button type="button" role="radio" class="me-option" [class.choisi]="detteId() === x.id" [attr.aria-checked]="detteId() === x.id" [disabled]="x.reste <= 0" (click)="detteId.set(x.id)">
+                  <ion-icon [name]="detteId() === x.id ? 'radio-button-on' : 'radio-button-off-outline'"></ion-icon>
+                  <span>
+                    <strong>Dette {{ x.annee }} · reste {{ f(x.reste) }}</strong>
+                    <small>Montant {{ f(x.montant) }} · réduit {{ f(x.reduit) }} · payé {{ f(x.paye) }}</small>
+                  </span>
+                </button>
+              }
+            </div>
+          </div>
+          <button type="button" role="checkbox" class="me-option annulation" [class.choisi]="annuler()" [attr.aria-checked]="annuler()" (click)="annuler.set(!annuler())">
+            <ion-icon [name]="annuler() ? 'checkbox-outline' : 'square-outline'"></ion-icon>
+            <span>
+              <strong>Annuler toute la dette</strong>
+              <small>Le reste ({{ f(dette()?.reste ?? 0) }}) est effacé et la dette marquée annulée.</small>
+            </span>
+          </button>
+        }
+
+        <div class="champs">
+          @if (cible() === 'inscription' || !annuler()) {
+            <div class="me-champ">
+              <label for="rd-montant">Montant de la réduction <span class="me-requis">*</span></label>
+              <div class="avec-bouton">
+                <span class="me-montant" data-unite="F"><input id="rd-montant" class="me-saisie" inputmode="numeric" [class.invalide]="erreurs().montant" [value]="montant()" (input)="montant.set(valeurTexte($event)); erreurs.set({ motif: erreurs().motif })" /></span>
+                <button type="button" class="me-bouton-secondaire" (click)="maximum()">Maximum</button>
+              </div>
+              @if (erreurs().montant; as e) { <p class="me-erreur-champ">{{ e }}</p> }
+            </div>
+          }
+          <div class="me-champ">
+            <label for="rd-motif">Accordée sur ordre de <span class="me-requis">*</span></label>
+            <input id="rd-motif" class="me-saisie" maxlength="200" placeholder="Ex : Fondateur" [class.invalide]="erreurs().motif" [value]="motif()" (input)="motif.set(valeurTexte($event)); erreurs.set({ montant: erreurs().montant })" />
+            @if (erreurs().motif; as e) { <p class="me-erreur-champ">{{ e }}</p> }
+          </div>
+        </div>
+
+        <footer>
+          <button type="button" class="me-bouton-texte" (click)="router.navigateByUrl('/tabs/reductions')" [disabled]="enregistrement()">Annuler</button>
+          <button type="submit" class="me-bouton-principal" [disabled]="enregistrement()">
+            @if (enregistrement()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="pricetag-outline"></ion-icon> {{ cible() === 'dette' && annuler() ? 'Annuler la dette' : 'Enregistrer la réduction' }} }
+          </button>
+        </footer>
+      </form>
+    }
+  </div>
+</ion-content>

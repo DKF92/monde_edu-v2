@@ -1,0 +1,193 @@
+<ion-content class="me-page-admin">
+  <ion-refresher slot="fixed" (ionRefresh)="charger($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <h1>{{ infos()?.mes_depenses ? 'Mes dépenses' : 'Dépenses' }}</h1>
+        <p>Sorties de caisse de l'année scolaire en cours.</p>
+      </div>
+      <div class="boutons-entete">
+        @if (peutVoirTout()) {
+          <button type="button" class="me-bouton-secondaire" (click)="router.navigateByUrl('/tabs/depenses/point')">
+            <ion-icon name="stats-chart-outline"></ion-icon> Point de caisse
+          </button>
+        }
+        <button type="button" class="me-bouton-secondaire" (click)="imprimer()" [disabled]="impression()">
+          @if (impression()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer }
+        </button>
+        @if (peutSaisir()) {
+          <button type="button" class="me-bouton-principal" (click)="router.navigateByUrl('/tabs/depenses/nouvelle')">
+            <ion-icon name="add-outline"></ion-icon> Nouvelle dépense
+          </button>
+        }
+      </div>
+    </header>
+
+    <!-- ================= Periode ================= -->
+    <div class="periodes me-segments" role="radiogroup" aria-label="Période">
+      @for (p of periodes; track p.valeur) {
+        <button type="button" [class.actif]="periode() === p.valeur" (click)="choisirPeriode(p.valeur)">{{ p.libelle }}</button>
+      }
+      @if (periode() === 'dates') {
+        <span class="dates">
+          <input class="me-saisie" type="date" aria-label="Du" [value]="du()" (change)="majDate('du', valeurTexte($event))" />
+          <span>au</span>
+          <input class="me-saisie" type="date" aria-label="Au" [value]="au()" (change)="majDate('au', valeurTexte($event))" />
+        </span>
+      }
+    </div>
+
+    <!-- ================= Totaux (V1 : salaires / autres depenses) ================= -->
+    <section class="totaux" aria-label="Totaux">
+      <div class="me-carte total"><span class="me-pastille teinte-rose"><ion-icon name="wallet-outline"></ion-icon></span><span><strong>{{ f(cartes().total) }}</strong><small>{{ cartes().nombre }} dépense{{ cartes().nombre > 1 ? 's' : '' }}</small></span></div>
+      <div class="me-carte total"><span class="me-pastille teinte-violet"><ion-icon name="briefcase-outline"></ion-icon></span><span><strong>{{ f(cartes().salaires) }}</strong><small>Salaires</small></span></div>
+      <div class="me-carte total"><span class="me-pastille teinte-orange"><ion-icon name="pricetag-outline"></ion-icon></span><span><strong>{{ f(cartes().autres) }}</strong><small>Autres dépenses</small></span></div>
+    </section>
+
+    <!-- ================= Liste ================= -->
+    <section class="me-carte liste">
+      <div class="filtres">
+        <label class="me-recherche">
+          <ion-icon name="search-outline"></ion-icon>
+          <input type="search" placeholder="Rechercher (objet, bénéficiaire, n°, pièce…)" aria-label="Rechercher une dépense" [value]="recherche()" (input)="rechercher(valeurTexte($event))" />
+          @if (liste.actualisation() && !liste.chargementInitial()) {
+            <ion-spinner name="crescent" class="attente-recherche"></ion-spinner>
+          }
+        </label>
+        <app-selecteur idChamp="filtre-categorie" icone="pricetag-outline" [options]="optionsCategorie()" [valeur]="rangCategorie()" (valeurChange)="choisirCategorie($event)"></app-selecteur>
+        @if (peutVoirTout()) {
+          <app-selecteur idChamp="filtre-payeur" icone="person-outline" [options]="optionsPayeur()" [valeur]="payeur()" (valeurChange)="choisirPayeur($event)"></app-selecteur>
+        }
+      </div>
+
+      @if (liste.chargementInitial()) {
+        @for (i of [1, 2, 3]; track i) {
+          <div class="squelette"><ion-skeleton-text [animated]="true" style="width: 60%"></ion-skeleton-text></div>
+        }
+      } @else if (liste.erreur()) {
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les dépenses</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      } @else {
+        <div class="titre-tableau">
+          <h2>{{ titre() }}</h2>
+          @if (liste.chargementFond()) {
+            <span class="etat-chargement"><ion-spinner name="dots"></ion-spinner> {{ liste.charges() }} / {{ liste.total() }} chargées</span>
+          }
+        </div>
+        <div class="tableau" role="table" aria-label="Dépenses" [class.attenue]="liste.actualisation()">
+          <div class="ligne entete-tableau" role="row">
+            <span role="columnheader">Date</span>
+            <span role="columnheader">Objet</span>
+            <span role="columnheader">Bénéficiaire</span>
+            <span role="columnheader">Mode</span>
+            <span role="columnheader" class="a-droite">Montant</span>
+            <span role="columnheader" class="a-droite">Actions</span>
+          </div>
+          @for (d of lignesPage(); track d.id; let impaire = $odd) {
+            <div class="ligne cliquable" role="row" [class.me-ligne-alternee]="impaire" (click)="ouvrir(d)">
+              <span class="cellule date" role="cell"><strong>{{ dateFr(d.date) }}</strong><small>{{ d.numero }}</small></span>
+              <span class="cellule-objet" role="cell">
+                <strong>{{ d.libelle }}</strong>
+                <small>
+                  <span class="me-badge">{{ d.categorie_libelle }}</span>
+                  @if (d.justificatif_url) { <ion-icon name="document-attach-outline" title="Justificatif joint"></ion-icon> }
+                  @if (!infos()?.mes_depenses && d.payeur) { · {{ d.payeur }} }
+                </small>
+              </span>
+              <span class="cellule" role="cell" data-libelle="Bénéficiaire">{{ d.beneficiaire || '—' }}</span>
+              <span class="cellule" role="cell" data-libelle="Mode">{{ libellesMode[d.mode] }}</span>
+              <span class="cellule montant" role="cell" data-libelle="Montant">{{ f(d.montant) }}</span>
+              <span class="cellule actions" role="cell">
+                <button type="button" class="me-action" title="Voir" aria-label="Voir la dépense" (click)="$event.stopPropagation(); ouvrir(d)"><ion-icon name="eye-outline"></ion-icon></button>
+                @if (peutModifier()) {
+                  <button type="button" class="me-action" title="Modifier" aria-label="Modifier la dépense" (click)="modifier(d, $event)"><ion-icon name="create-outline"></ion-icon></button>
+                  <button type="button" class="me-action danger" title="Supprimer" aria-label="Supprimer la dépense" (click)="supprimer(d, $event)"><ion-icon name="trash-outline"></ion-icon></button>
+                }
+              </span>
+            </div>
+          } @empty {
+            @if (!pageEnAttente()) {
+              <div class="me-etat-vide">
+                <ion-icon name="receipt-outline"></ion-icon>
+                <strong>Aucune dépense sur cette période</strong>
+                @if (peutSaisir()) {
+                  <button type="button" class="me-bouton-principal" (click)="router.navigateByUrl('/tabs/depenses/nouvelle')"><ion-icon name="add-outline"></ion-icon> Nouvelle dépense</button>
+                }
+              </div>
+            }
+          }
+        </div>
+        <app-pagination [total]="liste.total()" [page]="page()" [taille]="taille()" (pageChange)="page.set($event)" (tailleChange)="changerTaille($event)"></app-pagination>
+      }
+    </section>
+  </div>
+</ion-content>
+
+<!-- ================= Detail d'une depense ================= -->
+<ion-modal class="me-modale-formulaire large auto" [isOpen]="modaleDetail()" (didDismiss)="modaleDetail.set(false)">
+  <ng-template>
+    <div class="me-modale">
+      <header>
+        <span class="me-pastille teinte-rose"><ion-icon name="receipt-outline"></ion-icon></span>
+        <div>
+          <h1>{{ detail() ? 'Dépense n° ' + detail()!.numero : 'Dépense' }}</h1>
+          <p>{{ detail()?.libelle }}</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="modaleDetail.set(false)" aria-label="Fermer"><ion-icon name="close-outline"></ion-icon></button>
+      </header>
+      <div class="corps">
+        @if (!detail()) {
+          <ion-skeleton-text [animated]="true" style="width: 100%; height: 160px"></ion-skeleton-text>
+        } @else {
+          @let d = detail()!;
+          <dl class="infos">
+            <div><dt>Montant</dt><dd class="fort">{{ f(d.montant) }}</dd></div>
+            <div><dt>Date</dt><dd>{{ dateFr(d.date) }}</dd></div>
+            <div><dt>Catégorie</dt><dd>{{ d.categorie_libelle }}</dd></div>
+            <div><dt>Mode</dt><dd>{{ libellesMode[d.mode] }}</dd></div>
+            <div><dt>Bénéficiaire</dt><dd>{{ d.beneficiaire || '—' }}</dd></div>
+            <div><dt>Pièce comptable</dt><dd>{{ d.piece_comptable || '—' }}</dd></div>
+            <div><dt>Saisie par</dt><dd>{{ d.payeur || '—' }}</dd></div>
+            <div><dt>Saisie le</dt><dd>{{ dateFr(d.saisie_le) }}</dd></div>
+          </dl>
+          @if (d.justificatif_url) {
+            <div class="justificatif">
+              @if (d.justificatif_pdf) {
+                <a class="me-bouton-secondaire" [href]="d.justificatif_url" target="_blank" rel="noopener"><ion-icon name="document-attach-outline"></ion-icon> Ouvrir le justificatif (PDF)</a>
+              } @else {
+                <a [href]="d.justificatif_url" target="_blank" rel="noopener"><img [src]="d.justificatif_url" alt="Justificatif de la dépense" /></a>
+              }
+            </div>
+          } @else {
+            <p class="texte-doux">Aucun justificatif joint.</p>
+          }
+          @if (d.historique.length) {
+            <h2 class="sous-titre"><ion-icon name="time-outline"></ion-icon> Corrections</h2>
+            <ul class="historique">
+              @for (h of d.historique; track $index) {
+                <li>
+                  <strong>Modifiée le {{ dateFr(h.date) }}{{ h.par ? ' par ' + h.par : '' }}</strong>
+                  @if (h.apres) { <small>{{ f(h.avant.montant) }} → {{ f(h.apres.montant) }}</small> }
+                  <span class="motif">Motif : {{ h.motif }}</span>
+                </li>
+              }
+            </ul>
+          }
+        }
+      </div>
+      <footer>
+        @if (detail() && peutModifier()) {
+          <button type="button" class="me-bouton-texte danger" (click)="supprimer(detail()!)"><ion-icon name="trash-outline"></ion-icon> Supprimer</button>
+          <button type="button" class="me-bouton-secondaire" (click)="modifier(detail()!)"><ion-icon name="create-outline"></ion-icon> Modifier</button>
+        }
+        <button type="button" class="me-bouton-principal" (click)="modaleDetail.set(false)">Fermer</button>
+      </footer>
+    </div>
+  </ng-template>
+</ion-modal>

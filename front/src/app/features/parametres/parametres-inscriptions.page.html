@@ -1,0 +1,140 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/parametres')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Paramètres
+        </button>
+        <h1>Paramètres inscriptions</h1>
+        <p>Matricule, inscription en ligne et affichage des élèves dans les classes.</p>
+      </div>
+    </header>
+
+    @if (chargement()) {
+      <section class="me-carte">
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 70px"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 70px; margin-top: 10px"></ion-skeleton-text>
+      </section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les paramètres</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else {
+      <!-- ================= Matricule ================= -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-bleu"><ion-icon name="id-card-outline"></ion-icon></span>
+          <div>
+            <h2>Formats du matricule national</h2>
+            <p>Le matricule saisi à l'inscription doit respecter l'un de ces formats. <strong>9</strong> = un chiffre, <strong>A</strong> = une lettre majuscule.</p>
+          </div>
+        </div>
+
+        <ul class="formats">
+          @for (f of formats(); track f) {
+            <li>
+              <span class="format">{{ f }}</span>
+              <span class="detail">{{ description(f) }} · ex : <span class="exemple-matricule">{{ exemple(f) }}</span></span>
+              <button type="button" class="me-action" [disabled]="formats().length <= 1" [title]="formats().length <= 1 ? 'Gardez au moins un format' : 'Retirer ce format'" aria-label="Retirer ce format" (click)="retirerFormat(f)">
+                <ion-icon name="close-outline"></ion-icon>
+              </button>
+            </li>
+          }
+        </ul>
+
+        <form class="ajout-format" (submit)="$event.preventDefault(); ajouterFormat()">
+          <input class="me-saisie format-saisie" [class.invalide]="erreurFormat()" placeholder="Nouveau format, ex : AA999999" maxlength="20" [value]="nouveauFormat()" (input)="nouveauFormat.set(valeurTexte($event).toUpperCase()); erreurFormat.set(null)" aria-label="Nouveau format" />
+          <button type="submit" class="me-bouton-secondaire" [disabled]="!nouveauFormat().trim()">
+            <ion-icon name="add-outline"></ion-icon> Ajouter
+          </button>
+        </form>
+        @if (erreurFormat()) {
+          <p class="me-erreur-champ">{{ erreurFormat() }}</p>
+        } @else if (nouveauFormat().trim()) {
+          <p class="me-aide-champ">{{ description(nouveauFormat().trim()) }}</p>
+        }
+
+        <div class="essai">
+          <label for="essai-matricule">Tester un matricule</label>
+          <div class="essai-ligne">
+            <input id="essai-matricule" class="me-saisie format-saisie" placeholder="Ex : 18583394P" maxlength="20" [value]="essai()" (input)="essai.set(valeurTexte($event).toUpperCase())" />
+            @if (resultatEssai() === false) {
+              <span class="verdict ko"><ion-icon name="close-circle"></ion-icon> Refusé</span>
+            } @else if (resultatEssai()) {
+              <span class="verdict ok"><ion-icon name="checkmark-circle"></ion-icon> Accepté ({{ resultatEssai() }})</span>
+            }
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= Inscription en ligne ================= -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-cyan"><ion-icon name="globe-outline"></ion-icon></span>
+          <div>
+            <h2>Inscription en ligne (site de l'État)</h2>
+            <p>À la saisie du matricule, le reçu de préinscription est consulté sur le site du ministère : la fiche est pré-remplie et comparée à la nôtre.</p>
+          </div>
+          <button type="button" class="me-interrupteur" [class.actif]="verification()" role="switch" [attr.aria-checked]="verification()" aria-label="Consulter l'inscription en ligne" (click)="verification.set(!verification())">
+            <span></span>
+          </button>
+        </div>
+        <div class="me-champ code-mena">
+          <label for="code-mena">Code de l'établissement au MENA</label>
+          <input id="code-mena" class="me-saisie" maxlength="20" placeholder="Ex : 190251" [value]="codeMena()" (input)="codeMena.set(valeurTexte($event))" [disabled]="!verification()" />
+          <span class="me-aide-champ">Facultatif : signale les élèves préinscrits dans un autre établissement.</span>
+        </div>
+      </section>
+
+      <!-- ================= Affichage dans les classes ================= -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <div>
+            <h2>Affichage des élèves dans les classes</h2>
+            <p>L'élève est toujours inscrit dans sa classe ; ce réglage décide seulement quand il devient visible dans la liste (appel, notes, bulletins…).</p>
+          </div>
+        </div>
+
+        <div class="choix-statut" role="radiogroup" aria-label="Statut d'inscription visible dans la classe">
+          @for (c of choix; track c.valeur) {
+            <button type="button" role="radio" class="carte-choix" [class.choisi]="choisi() === c.valeur" [attr.aria-checked]="choisi() === c.valeur" (click)="choisi.set(c.valeur)">
+              <ion-icon [name]="choisi() === c.valeur ? 'radio-button-on' : 'radio-button-off-outline'"></ion-icon>
+              <span class="texte">
+                <strong>
+                  {{ c.titre }}
+                  @if (actuel()?.statut_visible_classe === c.valeur) {
+                    <span class="me-badge succes">Réglage actuel</span>
+                  }
+                </strong>
+                <small>{{ c.description }}</small>
+                <span class="exemple">{{ c.exemple }}</span>
+              </span>
+            </button>
+          }
+        </div>
+        <p class="me-note">
+          <ion-icon name="information-circle-outline"></ion-icon>
+          <span>Le changement s'applique immédiatement à toutes les classes de l'établissement (effectifs du tableau de bord compris).</span>
+        </p>
+      </section>
+
+      <div class="me-barre-enregistrer">
+        <span class="etat" [class.modifie]="modifie()">{{ modifie() ? 'Modifications non enregistrées' : 'Tout est enregistré' }}</span>
+        @if (modifie()) {
+          <button type="button" class="me-bouton-texte" (click)="annuler()" [disabled]="enregistrement()">Annuler</button>
+        }
+        <button type="button" class="me-bouton-principal" (click)="enregistrer()" [disabled]="!modifie() || enregistrement()">
+          @if (enregistrement()) {
+            <ion-spinner name="dots"></ion-spinner>
+          } @else {
+            Enregistrer
+          }
+        </button>
+      </div>
+    }
+  </div>
+</ion-content>

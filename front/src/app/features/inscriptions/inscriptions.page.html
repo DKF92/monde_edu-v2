@@ -1,0 +1,231 @@
+<ion-content class="me-page-admin">
+  <ion-refresher slot="fixed" (ionRefresh)="charger($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="me-page">
+    <!-- ================= En-tete ================= -->
+    <header class="me-entete-page">
+      <div>
+        <h1>Inscriptions {{ options()?.annee || '' }}</h1>
+        <p>
+          Élèves inscrits pour l'année scolaire en cours.
+          @if (options()?.niveaux_restreints) {
+            <span class="me-badge info"><ion-icon name="layers-outline"></ion-icon> Vos niveaux uniquement</span>
+          }
+        </p>
+      </div>
+      <div class="boutons-entete">
+        <button
+          type="button"
+          class="me-bouton-secondaire"
+          (click)="mettreAJourEnLigne()"
+          [disabled]="maj.enCours() || !sansEnLigne()"
+          [title]="sansEnLigne() ? sansEnLigne() + ' inscription(s) à vérifier sur le site de l\'État' : 'Toutes les inscriptions sont vérifiées en ligne'"
+        >
+          <ion-icon name="sync-outline"></ion-icon>
+          <span>Mettre à jour{{ sansEnLigne() ? ' (' + sansEnLigne() + ')' : '' }}</span>
+        </button>
+        <button type="button" class="me-bouton-principal" (click)="router.navigateByUrl('/tabs/inscriptions/nouvelle')">
+          <ion-icon name="person-add-outline"></ion-icon>
+          <span>Nouvelle inscription</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ================= Mise a jour en ligne (arriere-plan) ================= -->
+    @if (maj.enCours() || maj.termine()) {
+      <section class="me-carte mise-a-jour" aria-live="polite">
+        <div class="entete-maj">
+          <span class="me-pastille teinte-cyan">
+            @if (maj.enCours()) { <ion-spinner name="crescent"></ion-spinner> } @else { <ion-icon name="globe-outline"></ion-icon> }
+          </span>
+          <div>
+            <strong>{{ maj.enCours() ? 'Mise à jour depuis l\'inscription en ligne…' : 'Mise à jour en ligne terminée' }}</strong>
+            <small>{{ maj.traitees().length }} / {{ maj.total() }} vérifiée{{ maj.traitees().length > 1 ? 's' : '' }} · {{ maj.trouvees() }} trouvée{{ maj.trouvees() > 1 ? 's' : '' }} et mise{{ maj.trouvees() > 1 ? 's' : '' }} à jour</small>
+          </div>
+          @if (maj.enCours()) {
+            <button type="button" class="me-bouton-texte" (click)="maj.arreter()"><ion-icon name="stop-circle-outline"></ion-icon> Arrêter</button>
+          } @else {
+            <button type="button" class="me-action" (click)="maj.effacer()" aria-label="Fermer le bilan"><ion-icon name="close-outline"></ion-icon></button>
+          }
+        </div>
+        <span class="jauge"><span [style.width.%]="maj.progression()"></span></span>
+        @if (maj.erreur()) {
+          <p class="me-note attention"><ion-icon name="alert-circle-outline"></ion-icon><span>{{ maj.erreur() }}</span></p>
+        }
+        @if (maj.avecRemarques().length) {
+          <button type="button" class="me-lien" (click)="bilanDeplie.set(!bilanDeplie())">
+            {{ maj.avecRemarques().length }} inscription{{ maj.avecRemarques().length > 1 ? 's' : '' }} à regarder
+            <ion-icon [name]="bilanDeplie() ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+          </button>
+          @if (bilanDeplie()) {
+            <ul class="remarques">
+              @for (t of maj.avecRemarques(); track t.id) {
+                <li>
+                  <button type="button" class="me-lien" (click)="router.navigate(['/tabs/inscriptions', t.id])">{{ t.eleve }}</button>
+                  <span>{{ t.remarques.join(' · ') }}</span>
+                </li>
+              }
+            </ul>
+          }
+        }
+      </section>
+    }
+
+    <!-- ================= Chiffres (etapes V1) ================= -->
+    <section class="compteurs" aria-label="Inscriptions par étape">
+      <button type="button" class="me-carte compteur" [class.actif]="statut() === null" (click)="basculerStatut(null)">
+        <span class="me-pastille teinte-cyan"><ion-icon name="people-outline"></ion-icon></span>
+        <span><strong>{{ totalActives() }}</strong><small>Toutes</small></span>
+      </button>
+      @for (c of cartes; track c.statut) {
+        <button type="button" class="me-carte compteur" [class.actif]="statut() === c.statut" (click)="basculerStatut(c.statut)">
+          <span [class]="'me-pastille teinte-' + c.teinte"><ion-icon [name]="c.icone"></ion-icon></span>
+          <span><strong>{{ compteurs()[c.statut] }}</strong><small>{{ libellesStatut[c.statut] }}</small></span>
+        </button>
+      }
+    </section>
+
+    <!-- ================= Liste ================= -->
+    <section class="me-carte liste">
+      <div class="filtres">
+        <label class="me-recherche">
+          <ion-icon name="search-outline"></ion-icon>
+          <input
+            type="search"
+            placeholder="Rechercher (nom, prénoms, matricule…)"
+            aria-label="Rechercher une inscription"
+            [value]="recherche()"
+            (input)="rechercher($any($event.target).value)"
+          />
+          @if (liste.actualisation() && !liste.chargementInitial()) {
+            <ion-spinner name="crescent" class="attente-recherche"></ion-spinner>
+          }
+        </label>
+        <app-selecteur idChamp="filtre-niveau" icone="layers-outline" [options]="optionsNiveaux()" [valeur]="niveau()" (valeurChange)="appliquer('niveau', $event)"></app-selecteur>
+        <app-selecteur idChamp="filtre-affectation" icone="ribbon-outline" [options]="optionsAffectation" [valeur]="affectation()" (valeurChange)="appliquer('affectation', $event)"></app-selecteur>
+        <app-selecteur idChamp="filtre-redoublant" icone="repeat-outline" [options]="optionsRedoublement" [valeur]="redoublement()" (valeurChange)="appliquer('redoublement', $event)"></app-selecteur>
+        <app-selecteur idChamp="filtre-en-ligne" icone="globe-outline" [options]="optionsEnLigne" [valeur]="enLigne()" (valeurChange)="appliquer('enLigne', $event)"></app-selecteur>
+      </div>
+
+      @if (liste.chargementInitial()) {
+        @for (i of [1, 2, 3, 4]; track i) {
+          <div class="squelette">
+            <ion-skeleton-text [animated]="true" class="squelette-avatar"></ion-skeleton-text>
+            <ion-skeleton-text [animated]="true" style="width: 40%"></ion-skeleton-text>
+          </div>
+        }
+      } @else if (liste.erreur()) {
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les inscriptions</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      } @else {
+        <div class="titre-tableau">
+          <h2>{{ titre() }}</h2>
+          <span class="etat-chargement">
+            @if (liste.chargementFond()) {
+              <ion-spinner name="dots"></ion-spinner> {{ liste.charges() }} / {{ liste.total() }} chargées
+            }
+            @if (filtresActifs()) {
+              <button type="button" class="me-lien" (click)="reinitialiserFiltres()">Effacer les filtres</button>
+            }
+          </span>
+        </div>
+
+        <div class="tableau" role="table" aria-label="Inscriptions" [class.attenue]="liste.actualisation()">
+          <div class="ligne entete-tableau" role="row">
+            <span role="columnheader">Élève</span>
+            <span role="columnheader">Classe</span>
+            <span role="columnheader">Statut</span>
+            <span role="columnheader" class="a-droite">Total dû</span>
+            <span role="columnheader" class="a-droite">Reste à payer</span>
+            <span role="columnheader" class="a-droite">Actions</span>
+          </div>
+
+          @if (pageEnAttente() && !lignesPage().length) {
+            @for (i of [1, 2, 3]; track i) {
+              <div class="squelette">
+                <ion-skeleton-text [animated]="true" class="squelette-avatar"></ion-skeleton-text>
+                <ion-skeleton-text [animated]="true" style="width: 40%"></ion-skeleton-text>
+              </div>
+            }
+          }
+
+          @for (l of lignesPage(); track l.id; let impaire = $odd) {
+            <div class="ligne cliquable" role="row" [class.inactif]="annulation() === l.id" [class.me-ligne-alternee]="impaire" (click)="ouvrir(l)">
+              <div class="cellule-eleve" role="cell">
+                @if (l.eleve.photo_url) {
+                  <img class="avatar" [src]="l.eleve.photo_url" alt="" />
+                } @else {
+                  <span class="avatar" [class.feminin]="l.eleve.sexe === 'F'">{{ initiales(l) }}</span>
+                }
+                <span class="identite">
+                  <strong>{{ l.eleve.nom }} {{ l.eleve.prenoms }}</strong>
+                  <small>
+                    <span class="matricule">{{ l.eleve.matricule }}</span>
+                    @if (l.affecte) { · Affecté(e) }
+                    @if (l.redoublant) { · Redoublant(e) }
+                    @if (l.inscrit_en_ligne) {
+                      <ion-icon name="globe-outline" title="Préinscrit(e) en ligne"></ion-icon>
+                    }
+                  </small>
+                </span>
+              </div>
+              <span class="cellule" role="cell" data-libelle="Classe">
+                @if (l.classe) {
+                  <strong>{{ l.classe.libelle }}</strong>
+                } @else {
+                  <span class="texte-leger">{{ l.niveau?.libelle }} · à placer</span>
+                }
+              </span>
+              <span class="cellule" role="cell" data-libelle="Statut">
+                <span [class]="'me-badge ' + tons[l.statut]">{{ libellesStatut[l.statut] }}</span>
+              </span>
+              <span class="cellule montant" role="cell" data-libelle="Total dû">{{ l.classe ? montant(l.total_du) : '—' }}</span>
+              <span class="cellule montant" role="cell" data-libelle="Reste à payer" [class.a-payer]="l.reste > 0">{{ l.classe ? montant(l.reste) : '—' }}</span>
+              <span class="cellule actions" role="cell">
+                <button type="button" class="me-action" title="Voir l'inscription" aria-label="Voir l'inscription" (click)="$event.stopPropagation(); ouvrir(l)">
+                  <ion-icon name="eye-outline"></ion-icon>
+                </button>
+                <button type="button" class="me-action" title="Modifier" aria-label="Modifier" (click)="modifier(l, $event)">
+                  <ion-icon name="create-outline"></ion-icon>
+                </button>
+                @if (!l.total_paye) {
+                  <button type="button" class="me-action danger" title="Annuler l'inscription" aria-label="Annuler l'inscription" [disabled]="annulation() === l.id" (click)="annuler(l, $event)">
+                    <ion-icon name="close-circle-outline"></ion-icon>
+                  </button>
+                }
+              </span>
+            </div>
+          } @empty {
+            @if (!pageEnAttente()) {
+              <div class="me-etat-vide">
+                <ion-icon name="people-outline"></ion-icon>
+                @if (filtresActifs()) {
+                  <strong>Aucune inscription ne correspond</strong>
+                  <button type="button" class="me-lien" (click)="reinitialiserFiltres()">Effacer les filtres</button>
+                } @else {
+                  <strong>Aucune inscription pour le moment</strong>
+                  <span>Commencez par saisir le matricule d'un élève.</span>
+                  <button type="button" class="me-bouton-principal" (click)="router.navigateByUrl('/tabs/inscriptions/nouvelle')">
+                    <ion-icon name="person-add-outline"></ion-icon> Nouvelle inscription
+                  </button>
+                }
+              </div>
+            }
+          }
+        </div>
+        <app-pagination
+          [total]="liste.total()"
+          [page]="page()"
+          [taille]="taille()"
+          (pageChange)="page.set($event)"
+          (tailleChange)="changerTaille($event)"
+        ></app-pagination>
+      }
+    </section>
+  </div>
+</ion-content>

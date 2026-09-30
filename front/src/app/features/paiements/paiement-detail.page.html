@@ -1,0 +1,137 @@
+<ion-content class="me-page-admin">
+  <div class="me-page">
+    @if (chargement()) {
+      <section class="me-carte">
+        <ion-skeleton-text [animated]="true" style="width: 45%; height: 26px"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 160px; margin-top: 14px"></ion-skeleton-text>
+      </section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>{{ erreur() }}</strong>
+          <button type="button" class="me-lien" (click)="router.navigateByUrl('/tabs/paiements/liste')">Retour à la liste</button>
+        </div>
+      </section>
+    } @else if (detail()) {
+      @let d = detail()!;
+      @let r = d.reglement;
+      <header class="me-entete-page">
+        <div>
+          <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/paiements/liste')">
+            <ion-icon name="chevron-back-outline"></ion-icon> Paiements
+          </button>
+          <h1>Paiement n° {{ r.numero_recu }}</h1>
+          <p>{{ r.eleve?.nom }} {{ r.eleve?.prenoms }} · {{ versement(r.numero_versement) }} · {{ dateFr(r.date) }} à {{ heure(r.date) }}</p>
+        </div>
+        <div class="boutons-entete">
+          @if (peutModifier()) {
+            <button type="button" class="me-bouton-texte danger" (click)="supprimer()" [disabled]="!!action()">
+              @if (action() === 'supprimer') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="trash-outline"></ion-icon> Supprimer }
+            </button>
+            <button type="button" class="me-bouton-secondaire" (click)="modifier()" [disabled]="!!action()">
+              <ion-icon name="create-outline"></ion-icon> Modifier
+            </button>
+          }
+          @if (peutEncaisser()) {
+            <button type="button" class="me-bouton-secondaire" (click)="encaisser()">
+              <ion-icon name="cash-outline"></ion-icon> Encaisser
+            </button>
+          }
+          <button type="button" class="me-bouton-principal" (click)="imprimer()">
+            <ion-icon name="print-outline"></ion-icon> Imprimer le reçu
+          </button>
+        </div>
+      </header>
+
+      <div class="grille">
+        <div class="colonne">
+          <!-- ================= Paiement ================= -->
+          <section class="me-carte bloc">
+            <h2><ion-icon name="receipt-outline"></ion-icon> Paiement</h2>
+            <dl class="infos">
+              <div><dt>Montant</dt><dd class="fort">{{ f(r.montant) }}</dd></div>
+              <div><dt>Mode</dt><dd>{{ libellesMode[r.mode] }}</dd></div>
+              <div><dt>Date</dt><dd>{{ dateFr(r.date) }} à {{ heure(r.date) }}</dd></div>
+              <div><dt>Versement</dt><dd>{{ versement(r.numero_versement) }}</dd></div>
+              <div><dt>Encaissé par</dt><dd>{{ r.caissier || '—' }}</dd></div>
+              <div><dt>Valable jusqu'au</dt><dd>{{ r.date_expiration ? dateFr(r.date_expiration) : '—' }}</dd></div>
+            </dl>
+            <h3>Répartition</h3>
+            <ul class="repartition">
+              @for (l of r.lignes ?? []; track $index) {
+                <li><span>{{ l.libelle }}</span><strong>{{ f(l.montant) }}</strong></li>
+              }
+              <li class="total"><span>Total</span><strong>{{ f(r.montant) }}</strong></li>
+            </ul>
+          </section>
+
+          <!-- ================= Historique des corrections ================= -->
+          @if (d.historique.length) {
+            <section class="me-carte bloc">
+              <h2><ion-icon name="time-outline"></ion-icon> Corrections</h2>
+              <ul class="historique">
+                @for (h of d.historique; track $index) {
+                  <li>
+                    <strong>{{ h.action === 'modification' ? 'Modifié' : 'Supprimé' }} le {{ dateFr(h.date) }} à {{ heure(h.date) }}{{ h.par ? ' par ' + h.par : '' }}</strong>
+                    @if (h.avant && h.apres) {
+                      <small>{{ f(h.avant.montant_total) }} · {{ libellesMode[h.avant.mode_paiement] }} → {{ f(h.apres.montant_total) }} · {{ libellesMode[h.apres.mode_paiement] }}</small>
+                    }
+                    <span class="motif">Motif : {{ h.motif }}</span>
+                  </li>
+                }
+              </ul>
+            </section>
+          }
+        </div>
+
+        <!-- ================= Inscription ================= -->
+        <div class="colonne">
+          @if (d.situation; as s) {
+            <section class="me-carte bloc">
+              <div class="entete-eleve">
+                <h2><ion-icon name="person-outline"></ion-icon> {{ s.eleve.nom }} {{ s.eleve.prenoms }}</h2>
+                <button type="button" class="me-action" title="Voir l'inscription" aria-label="Voir l'inscription" (click)="router.navigate(['/tabs/inscriptions', s.id])">
+                  <ion-icon name="eye-outline"></ion-icon>
+                </button>
+              </div>
+              <p class="sous-titre">
+                <span class="matricule">{{ s.eleve.matricule }}</span> · {{ s.classe || s.niveau }} · {{ s.annee }}
+                <span [class]="'me-badge ' + tons[s.statut]">{{ libellesStatut[s.statut] }}</span>
+              </p>
+              <div class="chiffres">
+                <div><small>Total dû</small><strong>{{ f(s.total_du) }}</strong></div>
+                <div><small>Réduction</small><strong>{{ s.total_reduit ? f(s.total_reduit) : '—' }}</strong></div>
+                <div><small>Payé</small><strong>{{ f(s.total_paye) }}</strong></div>
+                <div class="reste"><small>Reste</small><strong>{{ s.reste ? f(s.reste) : 'Soldé' }}</strong></div>
+              </div>
+              <h3>Frais</h3>
+              <ul class="repartition">
+                @for (fr of s.frais; track fr.id) {
+                  <li><span>{{ fr.libelle }}</span><small>payé {{ f(fr.montant_paye) }} / {{ f(fr.montant_du - fr.montant_reduit) }}</small><strong [class.a-payer]="fr.reste > 0">{{ fr.reste ? f(fr.reste) : 'Soldé' }}</strong></li>
+                }
+              </ul>
+              @for (dt of s.dettes; track dt.id) {
+                <p class="me-note attention"><span>Dette {{ dt.annee || 'année précédente' }} : {{ f(dt.reste) }} restant.</span></p>
+              }
+            </section>
+
+            <section class="me-carte bloc">
+              <h2><ion-icon name="cash-outline"></ion-icon> Versements {{ s.annee }}</h2>
+              <ul class="versements">
+                @for (v of s.versements; track v.id) {
+                  <li [class.courant]="v.id === r.id">
+                    <button type="button" (click)="v.id !== r.id && router.navigate(['/tabs/paiements', v.id])">
+                      <span><strong>{{ versement(v.numero_versement) }} · {{ f(v.montant) }}</strong><small>{{ dateFr(v.date) }} · {{ libellesMode[v.mode] }} · n° {{ v.numero_recu }}</small></span>
+                      @if (v.id === r.id) { <span class="me-badge info">Ce paiement</span> }
+                    </button>
+                  </li>
+                }
+              </ul>
+            </section>
+          }
+        </div>
+      </div>
+    }
+  </div>
+</ion-content>

@@ -1,0 +1,270 @@
+<ion-content class="me-page-admin">
+  <ion-refresher slot="fixed" (ionRefresh)="charger($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="me-page">
+    <!-- ================= En-tete ================= -->
+    <header class="me-entete-page">
+      <div>
+        <h1>Rôles</h1>
+        <p>Postes de {{ etablissement()?.nom }} et droits de chacun.</p>
+      </div>
+      <button type="button" class="me-bouton-principal" (click)="nouveau()">
+        <ion-icon name="add-outline"></ion-icon>
+        <span>Nouveau poste</span>
+      </button>
+    </header>
+
+    <!-- ================= Chiffres ================= -->
+    <section class="compteurs" aria-label="Chiffres clés">
+      <button type="button" class="me-carte compteur" [class.actif]="!filtreStatut()" (click)="filtreStatut.set(0)">
+        <span class="me-pastille teinte-bleu"><ion-icon name="briefcase-outline"></ion-icon></span>
+        <span><strong>{{ compteurs().total }}</strong><small>Postes</small></span>
+      </button>
+      <button type="button" class="me-carte compteur" [class.actif]="filtreStatut() === 1" (click)="filtreStatut.set(filtreStatut() === 1 ? 0 : 1)">
+        <span class="me-pastille teinte-vert"><ion-icon name="checkmark-circle-outline"></ion-icon></span>
+        <span><strong>{{ compteurs().actifs }}</strong><small>Actifs</small></span>
+      </button>
+      <button type="button" class="me-carte compteur" [class.actif]="filtreStatut() === 2" (click)="filtreStatut.set(filtreStatut() === 2 ? 0 : 2)">
+        <span class="me-pastille teinte-rose"><ion-icon name="close-circle-outline"></ion-icon></span>
+        <span><strong>{{ compteurs().inactifs }}</strong><small>Désactivés</small></span>
+      </button>
+      <div class="me-carte compteur">
+        <span class="me-pastille teinte-orange"><ion-icon name="lock-closed-outline"></ion-icon></span>
+        <span><strong>{{ compteurs().proteges }}</strong><small>Postes protégés</small></span>
+      </div>
+    </section>
+
+    <!-- ================= Liste ================= -->
+    <section class="me-carte liste">
+      <div class="filtres">
+        <label class="me-recherche">
+          <ion-icon name="search-outline"></ion-icon>
+          <input
+            type="search"
+            placeholder="Rechercher un poste…"
+            aria-label="Rechercher un poste"
+            [value]="recherche()"
+            (input)="recherche.set($any($event.target).value)"
+          />
+        </label>
+        <app-selecteur
+          idChamp="filtre-statut-poste"
+          icone="ellipse-outline"
+          [options]="optionsStatuts"
+          [valeur]="filtreStatut()"
+          (valeurChange)="filtreStatut.set($event)"
+        ></app-selecteur>
+      </div>
+
+      @if (chargement()) {
+        @for (i of [1, 2, 3, 4]; track i) {
+          <div class="squelette">
+            <ion-skeleton-text [animated]="true" class="squelette-pastille"></ion-skeleton-text>
+            <ion-skeleton-text [animated]="true" style="width: 40%"></ion-skeleton-text>
+          </div>
+        }
+      } @else if (erreur()) {
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les postes</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      } @else {
+        <p class="resultat">
+          {{ postesFiltres().length }} poste{{ postesFiltres().length > 1 ? 's' : '' }}
+          @if (filtresActifs()) {
+            sur {{ compteurs().total }} ·
+            <button type="button" class="me-lien" (click)="reinitialiserFiltres()">Effacer les filtres</button>
+          }
+        </p>
+
+        <div class="tableau" role="table" aria-label="Postes">
+          <div class="ligne entete-tableau" role="row">
+            <span role="columnheader">Poste</span>
+            <span role="columnheader">Type</span>
+            <span role="columnheader">Utilisateurs</span>
+            <span role="columnheader">Droits</span>
+            <span role="columnheader">Statut</span>
+            <span role="columnheader" class="a-droite">Actions</span>
+          </div>
+
+          @for (p of postesPage(); track p.id; let impaire = $odd) {
+            <div class="ligne" role="row" [class.inactif]="!p.is_active" [class.me-ligne-alternee]="impaire">
+              <div class="cellule-poste" role="cell">
+                <span class="me-pastille" [class.teinte-orange]="p.est_sensible" [class.teinte-bleu]="!p.est_sensible">
+                  <ion-icon [name]="p.super_admin ? 'shield-checkmark-outline' : p.est_sensible ? 'lock-closed-outline' : 'briefcase-outline'"></ion-icon>
+                </span>
+                <span class="identite">
+                  <strong>{{ p.nom }}</strong>
+                  <small>{{ p.description || 'Aucune description' }}</small>
+                </span>
+              </div>
+              <span class="cellule" role="cell" data-libelle="Type">
+                <span class="me-badge" [class.info]="p.standard" [class.violet]="!p.standard">{{ p.standard ? 'Standard' : 'Personnalisé' }}</span>
+                @if (p.est_sensible) {
+                  <span class="me-badge attention" title="Attribué uniquement par le Super admin"><ion-icon name="lock-closed"></ion-icon> Protégé</span>
+                }
+              </span>
+              <span class="cellule" role="cell" data-libelle="Utilisateurs">
+                {{ p.nombre_utilisateurs }} compte{{ p.nombre_utilisateurs > 1 ? 's' : '' }}
+              </span>
+              <span class="cellule" role="cell" data-libelle="Droits">
+                {{ p.permissions.length }} droit{{ p.permissions.length > 1 ? 's' : '' }}
+              </span>
+              <span class="cellule" role="cell" data-libelle="Statut">
+                @if (p.is_active) {
+                  <span class="me-badge succes">Actif</span>
+                } @else {
+                  <span class="me-badge">Désactivé</span>
+                }
+              </span>
+              <span class="cellule actions" role="cell">
+                <button type="button" class="me-action" title="Voir le poste" aria-label="Voir le poste" (click)="voir(p)">
+                  <ion-icon name="eye-outline"></ion-icon>
+                </button>
+                @if (p.modifiable) {
+                  <button type="button" class="me-action" title="Modifier" aria-label="Modifier" (click)="modifier(p)" [disabled]="actionEnCours() === p.id">
+                    <ion-icon name="create-outline"></ion-icon>
+                  </button>
+                  @if (!p.super_admin) {
+                    <button
+                      type="button"
+                      class="me-action"
+                      [class.danger]="p.is_active"
+                      [title]="p.is_active ? 'Désactiver le poste' : 'Réactiver le poste'"
+                      [attr.aria-label]="p.is_active ? 'Désactiver le poste' : 'Réactiver le poste'"
+                      (click)="basculerStatut(p)"
+                      [disabled]="actionEnCours() === p.id"
+                    >
+                      <ion-icon [name]="p.is_active ? 'power-outline' : 'refresh-outline'"></ion-icon>
+                    </button>
+                  }
+                } @else {
+                  <span class="protege" title="Poste protégé : seul le Super admin peut le modifier">
+                    <ion-icon name="lock-closed-outline"></ion-icon> Protégé
+                  </span>
+                }
+              </span>
+            </div>
+          } @empty {
+            <div class="me-etat-vide">
+              <ion-icon name="briefcase-outline"></ion-icon>
+              <strong>Aucun poste ne correspond</strong>
+              <button type="button" class="me-lien" (click)="reinitialiserFiltres()">Effacer les filtres</button>
+            </div>
+          }
+        </div>
+        <app-pagination
+          [total]="postesFiltres().length"
+          [page]="page()"
+          [taille]="taille()"
+          (pageChange)="page.set($event)"
+          (tailleChange)="taille.set($event)"
+        ></app-pagination>
+      }
+    </section>
+  </div>
+</ion-content>
+
+<app-poste-formulaire
+  [isOpen]="formulaireOuvert()"
+  [poste]="posteEdite()"
+  [catalogue]="catalogue()"
+  (ferme)="formulaireOuvert.set(false)"
+  (enregistre)="surEnregistrement($event.poste, $event.creation)"
+></app-poste-formulaire>
+
+<!-- ================= Detail d'un poste ================= -->
+<ion-modal class="me-modale-formulaire" [isOpen]="detailOuvert()" (didDismiss)="detailOuvert.set(false)">
+  <ng-template>
+    @if (detail(); as d) {
+      <div class="me-modale">
+        <header>
+          <span class="me-pastille" [class.teinte-orange]="d.est_sensible" [class.teinte-bleu]="!d.est_sensible">
+            <ion-icon [name]="d.super_admin ? 'shield-checkmark-outline' : d.est_sensible ? 'lock-closed-outline' : 'briefcase-outline'"></ion-icon>
+          </span>
+          <div>
+            <h1>{{ d.nom }}</h1>
+            <p>{{ d.description || 'Aucune description' }}</p>
+          </div>
+          <button type="button" class="me-fermer" (click)="detailOuvert.set(false)" aria-label="Fermer">
+            <ion-icon name="close-outline"></ion-icon>
+          </button>
+        </header>
+
+        <div class="corps">
+          <section>
+            <h2>Informations</h2>
+            <div class="etiquettes">
+              <span class="me-badge" [class.info]="d.standard" [class.violet]="!d.standard">{{ d.standard ? 'Poste standard' : 'Poste personnalisé' }}</span>
+              @if (d.is_active) {
+                <span class="me-badge succes">Actif</span>
+              } @else {
+                <span class="me-badge">Désactivé</span>
+              }
+              @if (d.est_sensible) {
+                <span class="me-badge attention"><ion-icon name="lock-closed"></ion-icon> Protégé : attribué par le Super admin</span>
+              }
+              @if (d.lie_niveaux) {
+                <span class="me-badge"><ion-icon name="layers-outline"></ion-icon> Rattaché à des niveaux</span>
+              }
+              @if (d.lie_matieres) {
+                <span class="me-badge"><ion-icon name="book-outline"></ion-icon> Enseigne des matières</span>
+              }
+            </div>
+          </section>
+
+          <section>
+            <h2>Droits ({{ d.permissions.length }})</h2>
+            @for (g of droitsParGroupe(d); track g.groupe) {
+              <div class="groupe-droits">
+                <h3>{{ g.groupe }}</h3>
+                <ul>
+                  @for (droit of g.droits; track droit) {
+                    <li><ion-icon name="checkmark-outline"></ion-icon> {{ droit }}</li>
+                  }
+                </ul>
+              </div>
+            } @empty {
+              <p class="me-aide-champ">Ce poste n'a encore aucun droit.</p>
+            }
+          </section>
+
+          <section>
+            <h2>Comptes ayant ce poste ({{ d.nombre_utilisateurs }})</h2>
+            @if (chargementDetail()) {
+              <ion-spinner name="dots"></ion-spinner>
+            } @else {
+              <ul class="comptes">
+                @for (u of d.utilisateurs; track u.id; let impaire = $odd) {
+                  <li [class.me-ligne-alternee]="impaire" [class.inactif]="u.statut === 'inactif'">
+                    <span>
+                      <strong>{{ nomUtilisateur(u) }}</strong>
+                      <small>{{ u.email }}</small>
+                    </span>
+                    @if (u.statut === 'inactif') {
+                      <span class="me-badge">Désactivé</span>
+                    }
+                  </li>
+                } @empty {
+                  <li class="vide">Aucun compte n'a ce poste.</li>
+                }
+              </ul>
+            }
+          </section>
+        </div>
+
+        <footer>
+          <button type="button" class="me-bouton-texte" (click)="detailOuvert.set(false)">Fermer</button>
+          @if (d.modifiable) {
+            <button type="button" class="me-bouton-principal" (click)="modifierDepuisDetail()">
+              <ion-icon name="create-outline"></ion-icon> Modifier
+            </button>
+          }
+        </footer>
+      </div>
+    }
+  </ng-template>
+</ion-modal>

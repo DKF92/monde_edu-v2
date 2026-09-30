@@ -1,0 +1,711 @@
+// ---------------------------------------------------------------------------
+// Ecrans d'administration (Rôles, Paramètres...) : mise en page, en-tete,
+// boutons, champs, modales de formulaire, listes a lignes alternees.
+// Memes valeurs que l'ecran Utilisateurs, pour un rendu identique.
+// ---------------------------------------------------------------------------
+
+$me-bureau: 992px;
+
+.me-page-admin {
+  --background: var(--me-fond);
+}
+
+.me-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 18px 16px 32px;
+
+  @media (min-width: $me-bureau) {
+    gap: 22px;
+    padding: 28px 28px 40px;
+  }
+
+  &.etroite {
+    max-width: 980px;
+  }
+}
+
+.me-entete-page {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+
+  h1 {
+    margin: 0 0 4px;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--me-texte);
+  }
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--me-texte-doux);
+  }
+}
+
+// Fil d'Ariane "Paramètres ›"
+.me-retour {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--me-texte-doux);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--ion-color-primary);
+  }
+}
+
+.me-bouton-principal,
+.me-bouton-secondaire {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+
+  ion-icon {
+    font-size: 20px;
+  }
+
+  ion-spinner {
+    width: 20px;
+    height: 20px;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+
+.me-bouton-principal {
+  min-width: 130px;
+  border: none;
+  background: var(--me-marine);
+  color: #fff;
+
+  ion-spinner {
+    --color: #fff;
+    color: #fff;
+  }
+
+  &:hover:not(:disabled) {
+    background: var(--me-marine-fonce);
+  }
+}
+
+.me-bouton-secondaire {
+  border: 1.5px solid var(--me-bordure);
+  background: var(--me-surface);
+  color: var(--me-texte);
+
+  &:hover:not(:disabled) {
+    border-color: var(--ion-color-primary);
+    color: var(--ion-color-primary);
+  }
+}
+
+.me-bouton-texte {
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  color: var(--me-texte-doux);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    color: var(--me-texte);
+  }
+}
+
+// Boutons d'action d'une ligne (icone seule).
+.me-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--me-texte-doux);
+  font-size: 19px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--me-actif);
+    color: var(--me-marine);
+  }
+
+  &.danger:hover:not(:disabled) {
+    background: #fff0f0;
+    color: var(--ion-color-danger);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+}
+
+.me-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--me-fond);
+  color: var(--me-texte-doux);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+
+  ion-icon {
+    font-size: 12px;
+  }
+
+  &.succes {
+    background: var(--me-vert-fond);
+    color: var(--me-vert);
+  }
+
+  &.attention {
+    background: var(--me-orange-fond);
+    color: #b35c00;
+  }
+
+  &.info {
+    background: var(--me-bleu-fond);
+    color: var(--me-marine);
+  }
+
+  &.violet {
+    background: var(--me-violet-fond);
+    color: var(--me-violet);
+  }
+}
+
+// Champs de formulaire.
+.me-champ {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+
+  > label,
+  .libelle {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--me-texte);
+  }
+}
+
+.me-saisie {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  border: 1.5px solid var(--me-bordure);
+  border-radius: 10px;
+  background: var(--me-surface);
+  color: var(--me-texte);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &::placeholder {
+    color: var(--me-texte-leger);
+  }
+
+  &:focus {
+    border-color: var(--ion-color-primary);
+    box-shadow: 0 0 0 4px rgba(var(--ion-color-primary-rgb), 0.12);
+  }
+
+  &.invalide {
+    border-color: var(--ion-color-danger);
+  }
+
+  &:disabled {
+    background: var(--me-fond);
+    color: var(--me-texte-leger);
+  }
+
+  &[type='number'] {
+    -moz-appearance: textfield;
+
+    &::-webkit-inner-spin-button,
+    &::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  }
+}
+
+textarea.me-saisie {
+  height: auto;
+  min-height: 72px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+// Montant : saisie alignee a droite avec l'unite.
+.me-montant {
+  position: relative;
+
+  .me-saisie {
+    padding-right: 46px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  // Unite longue ("élèves") : plus de place a droite.
+  &[data-unite='élèves'] .me-saisie,
+  &[data-unite='unités'] .me-saisie {
+    padding-right: 62px;
+  }
+
+  &::after {
+    content: attr(data-unite);
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: var(--me-texte-leger);
+    pointer-events: none;
+  }
+}
+
+.me-erreur-champ,
+.me-aide-champ {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.me-erreur-champ {
+  color: var(--ion-color-danger);
+}
+
+.me-aide-champ {
+  color: var(--me-texte-leger);
+}
+
+// Choix exclusif en pastilles.
+.me-segments {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  button {
+    height: 38px;
+    padding: 0 14px;
+    border: 1.5px solid var(--me-bordure);
+    border-radius: 999px;
+    background: var(--me-surface);
+    color: var(--me-texte-doux);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      border-color: #b9c6ea;
+    }
+
+    &.actif {
+      border-color: var(--ion-color-primary);
+      background: #f4f7ff;
+      color: var(--me-marine);
+    }
+
+    &:disabled {
+      opacity: 0.55;
+      cursor: default;
+    }
+  }
+}
+
+// Case a cocher sous forme de carte (options d'un poste, droits...).
+.me-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--me-bordure);
+  border-radius: 12px;
+  background: var(--me-surface);
+  color: var(--me-texte);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  > ion-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+    font-size: 19px;
+    color: var(--me-bordure);
+  }
+
+  span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  strong {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  small {
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--me-texte-doux);
+  }
+
+  &:hover:not(:disabled) {
+    border-color: #b9c6ea;
+  }
+
+  &.choisi {
+    border-color: var(--ion-color-primary);
+    background: #f4f7ff;
+
+    > ion-icon {
+      color: var(--ion-color-primary);
+    }
+
+    strong {
+      color: var(--me-marine);
+    }
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
+}
+
+.me-alerte-erreur {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff0f0;
+  color: #b42323;
+  font-size: 13px;
+
+  ion-icon {
+    flex-shrink: 0;
+    font-size: 18px;
+  }
+}
+
+.me-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--me-bleu-fond);
+  color: var(--me-marine);
+  font-size: 13px;
+  line-height: 1.45;
+
+  ion-icon {
+    flex-shrink: 0;
+    margin-top: 1px;
+    font-size: 18px;
+  }
+
+  &.attention {
+    background: var(--me-orange-fond);
+    color: #8a4b00;
+  }
+}
+
+// Recherche dans une liste.
+.me-recherche {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 50px;
+  padding: 0 14px;
+  border: 1.5px solid var(--me-bordure);
+  border-radius: 12px;
+  background: var(--me-surface);
+  color: var(--me-texte-leger);
+  cursor: text;
+
+  &:focus-within {
+    border-color: var(--ion-color-primary);
+    box-shadow: 0 0 0 4px rgba(var(--ion-color-primary-rgb), 0.12);
+  }
+
+  ion-icon {
+    flex-shrink: 0;
+    font-size: 18px;
+  }
+
+  input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: none;
+    font: inherit;
+    font-size: 14px;
+    color: var(--me-texte);
+  }
+}
+
+// Modale de formulaire : en-tete et pied fixes, corps defilant.
+.me-modale-formulaire {
+  --width: min(94vw, 640px);
+  --height: min(92vh, 860px);
+  --border-radius: 22px;
+  --box-shadow: var(--me-ombre-forte);
+  --background: var(--me-surface);
+  --backdrop-opacity: 0.55;
+
+  &.large {
+    --width: min(96vw, 820px);
+  }
+
+  // Filtres sur une ligne (dates + mois + annee, listes deroulantes).
+  &.tres-large {
+    --width: min(96vw, 1100px);
+  }
+
+  // Visionneuse de documents : hauteur maximale pour l'apercu.
+  &.visionneuse-document {
+    --width: min(96vw, 980px);
+    --height: min(94vh, 1100px);
+
+    // Document en paysage (en-tete X-Orientation) : plus large, moins haut.
+    &.paysage {
+      --width: min(98vw, 1480px);
+      --height: min(94vh, 980px);
+    }
+  }
+
+  &.auto {
+    --height: auto;
+  }
+}
+
+.me-modale {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 92vh;
+  background: var(--me-surface);
+
+  > header {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 22px 22px 16px;
+    border-bottom: 1px solid var(--me-bordure);
+
+    > div {
+      flex: 1;
+      min-width: 0;
+    }
+
+    h1 {
+      margin: 2px 0 4px;
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--me-texte);
+    }
+
+    p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--me-texte-doux);
+    }
+  }
+
+  > .corps {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 22px 18px;
+
+    > section {
+      padding: 16px 0 6px;
+
+      & + section {
+        border-top: 1px dashed var(--me-bordure);
+      }
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--me-texte-leger);
+    }
+  }
+
+  > footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 14px 22px;
+    border-top: 1px solid var(--me-bordure);
+    background: var(--me-surface);
+  }
+}
+
+.me-fermer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  margin: -4px -6px 0 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--me-texte-doux);
+  font-size: 22px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--me-survol);
+  }
+}
+
+.me-grille {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+
+  @media (min-width: 560px) {
+    grid-template-columns: 1fr 1fr;
+    gap: 14px 16px;
+
+    .large {
+      grid-column: 1 / -1;
+    }
+  }
+}
+
+.me-requis {
+  color: var(--ion-color-danger);
+}
+
+// Listes : une ligne sur deux teintee.
+.me-ligne-alternee {
+  background: var(--me-ligne-alternee);
+}
+
+// Barre d'enregistrement collee en bas de l'ecran (pages de parametres).
+.me-barre-enregistrer {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 -16px -32px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--me-bordure);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(6px);
+
+  @media (min-width: $me-bureau) {
+    margin: 0 -28px -40px;
+    padding: 14px 28px;
+  }
+
+  .etat {
+    flex: 1;
+    min-width: 0;
+    font-size: 13px;
+    color: var(--me-texte-doux);
+
+    &.modifie {
+      color: #b35c00;
+      font-weight: 600;
+    }
+  }
+}
+
+// Interrupteur actif / desactive.
+.me-interrupteur {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #cfd5e2;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  span {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    transition: transform 0.15s ease;
+  }
+
+  &.actif {
+    background: var(--me-vert);
+
+    span {
+      transform: translateX(18px);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}

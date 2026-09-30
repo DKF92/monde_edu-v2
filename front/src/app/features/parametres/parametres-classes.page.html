@@ -1,0 +1,216 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/parametres')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Paramètres
+        </button>
+        <h1>Paramètres classes</h1>
+        <p>Numérotation des classes et nombre maximum d'élèves par classe{{ donnees()?.annee ? ' · année ' + donnees()?.annee : '' }}.</p>
+      </div>
+    </header>
+
+    <p class="me-note">
+      <ion-icon name="information-circle-outline"></ion-icon>
+      <span>
+        La limite la plus précise l'emporte : une limite de <strong>classe</strong> remplace celle du
+        <strong>niveau</strong>, qui remplace la limite <strong>générale</strong> de l'établissement.
+        Laissez un champ vide pour appliquer la limite au-dessus.
+      </span>
+    </p>
+
+    @if (chargement()) {
+      <section class="me-carte">
+        <ion-skeleton-text [animated]="true" style="width: 50%; height: 18px"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 44px; margin-top: 12px"></ion-skeleton-text>
+      </section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les paramètres</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (donnees()) {
+      @let d = donnees()!;
+      <!-- ================= Numerotation ================= -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-violet"><ion-icon name="list-outline"></ion-icon></span>
+          <div>
+            <h2>Numérotation des classes</h2>
+            <p>Utilisée pour nommer les nouvelles classes d'un niveau (création une à une ou plusieurs à la fois).</p>
+          </div>
+        </div>
+        <div class="choix-numerotation" role="radiogroup" aria-label="Numérotation des classes">
+          <button type="button" role="radio" class="me-option" [class.choisi]="numerotation() === 'chiffres'" [attr.aria-checked]="numerotation() === 'chiffres'" (click)="numerotation.set('chiffres')">
+            <ion-icon [name]="numerotation() === 'chiffres' ? 'radio-button-on' : 'radio-button-off-outline'"></ion-icon>
+            <span>
+              <strong>Chiffres</strong>
+              <small>6EME 1, 6EME 2, 6EME 3…</small>
+            </span>
+          </button>
+          <button type="button" role="radio" class="me-option" [class.choisi]="numerotation() === 'lettres'" [attr.aria-checked]="numerotation() === 'lettres'" (click)="numerotation.set('lettres')">
+            <ion-icon [name]="numerotation() === 'lettres' ? 'radio-button-on' : 'radio-button-off-outline'"></ion-icon>
+            <span>
+              <strong>Lettres</strong>
+              <small>6EME A, 6EME B, 6EME C… (26 classes au plus par niveau)</small>
+            </span>
+          </button>
+        </div>
+        <p class="me-aide-champ">Les classes déjà créées gardent leur nom.</p>
+      </section>
+
+      <!-- ================= Limite generale ================= -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-bleu"><ion-icon name="business-outline"></ion-icon></span>
+          <div>
+            <h2>Limite générale</h2>
+            <p>S'applique à toutes les classes de l'établissement.</p>
+          </div>
+        </div>
+        <div class="me-champ champ-limite">
+          <label for="limite-generale">Élèves maximum par classe</label>
+          <div class="me-montant" data-unite="élèves">
+            <input
+              id="limite-generale"
+              class="me-saisie"
+              type="number"
+              inputmode="numeric"
+              min="1"
+              max="500"
+              placeholder="Aucune limite"
+              [value]="general()"
+              [class.invalide]="!valide(general())"
+              (input)="general.set($any($event.target).value)"
+            />
+          </div>
+          @if (!valide(general())) {
+            <p class="me-erreur-champ">Nombre entier entre 1 et 500.</p>
+          }
+        </div>
+      </section>
+
+      <!-- ================= Par niveau et par classe ================= -->
+      <section class="me-carte bloc liste-niveaux">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-cyan"><ion-icon name="layers-outline"></ion-icon></span>
+          <div>
+            <h2>Par niveau et par classe</h2>
+            <p>Dépliez un niveau pour fixer une limite propre à une classe.</p>
+          </div>
+        </div>
+
+        @for (n of niveauxPage(); track n.id; let impaire = $odd) {
+          <div class="niveau" [class.me-ligne-alternee]="impaire">
+            <div class="niveau-ligne">
+              <button type="button" class="deplier" (click)="basculer(n.id)" [attr.aria-expanded]="ouverts().has(n.id)">
+                <ion-icon name="chevron-down-outline" [class.ouvert]="ouverts().has(n.id)"></ion-icon>
+                <span>
+                  <strong>{{ n.libelle }}</strong>
+                  <small>{{ n.classes.length }} classe{{ n.classes.length > 1 ? 's' : '' }}</small>
+                </span>
+              </button>
+              <div class="me-champ saisie-courte">
+                <label class="sr-only" [for]="'niveau-' + n.id">Limite du niveau {{ n.libelle }}</label>
+                <div class="me-montant" data-unite="élèves">
+                  <input
+                    [id]="'niveau-' + n.id"
+                    class="me-saisie"
+                    type="number"
+                    inputmode="numeric"
+                    min="1"
+                    max="500"
+                    [placeholder]="general() ? general() + ' (général)' : 'Aucune'"
+                    [value]="niveaux()[n.id]"
+                    [class.invalide]="!valide(niveaux()[n.id])"
+                    (input)="saisirNiveau(n.id, $any($event.target).value)"
+                  />
+                </div>
+              </div>
+            </div>
+            @if (!valide(niveaux()[n.id])) {
+              <p class="me-erreur-champ">Nombre entier entre 1 et 500.</p>
+            }
+
+            @if (ouverts().has(n.id)) {
+              <div class="classes">
+                @for (c of n.classes; track c.id) {
+                  @let limite = limiteClasse(n.id, c.id);
+                  <div class="classe">
+                    <span class="classe-nom">
+                      <ion-icon name="school-outline"></ion-icon>
+                      <span>
+                        <strong>{{ c.libelle }}</strong>
+                        <small [class.depasse]="limite.limite && c.effectif > limite.limite">
+                          @if (limite.limite && c.effectif > limite.limite) {
+                            <ion-icon name="warning-outline"></ion-icon>
+                          }
+                          {{ c.effectif }} élève{{ c.effectif > 1 ? 's' : '' }}
+                          @if (limite.limite) {
+                            / {{ limite.limite }} ({{ libelleSource(limite.source) }})
+                          } @else {
+                            · pas de limite
+                          }
+                        </small>
+                      </span>
+                    </span>
+                    <div class="me-champ saisie-courte">
+                      <label class="sr-only" [for]="'classe-' + c.id">Limite de la classe {{ c.libelle }}</label>
+                      <div class="me-montant" data-unite="élèves">
+                        <input
+                          [id]="'classe-' + c.id"
+                          class="me-saisie"
+                          type="number"
+                          inputmode="numeric"
+                          min="1"
+                          max="500"
+                          [placeholder]="limiteNiveau(n.id).limite ? limiteNiveau(n.id).limite + ' (hérité)' : 'Aucune'"
+                          [value]="classes()[c.id]"
+                          [class.invalide]="!valide(classes()[c.id])"
+                          (input)="saisirClasse(c.id, $any($event.target).value)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        } @empty {
+          <div class="me-etat-vide">
+            <ion-icon name="school-outline"></ion-icon>
+            <strong>Aucune classe cette année</strong>
+            <span>Les classes ouvertes pour l'année apparaîtront ici.</span>
+          </div>
+        }
+        <app-pagination
+          class="pagination-bloc"
+          [total]="d.niveaux.length"
+          [page]="page()"
+          [taille]="taille()"
+          (pageChange)="page.set($event)"
+          (tailleChange)="taille.set($event)"
+        ></app-pagination>
+      </section>
+
+      <div class="me-barre-enregistrer">
+        <span class="etat" [class.modifie]="modifie()">
+          {{ invalide() ? 'Corrigez les champs en rouge.' : modifie() ? 'Modifications non enregistrées' : 'Tout est enregistré' }}
+        </span>
+        @if (modifie()) {
+          <button type="button" class="me-bouton-texte" (click)="annuler()" [disabled]="enregistrement()">Annuler</button>
+        }
+        <button type="button" class="me-bouton-principal" (click)="enregistrer()" [disabled]="!modifie() || invalide() || enregistrement()">
+          @if (enregistrement()) {
+            <ion-spinner name="dots"></ion-spinner>
+          } @else {
+            Enregistrer
+          }
+        </button>
+      </div>
+    }
+  </div>
+</ion-content>

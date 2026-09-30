@@ -1,0 +1,90 @@
+<ion-content class="me-page-admin">
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/depenses')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Dépenses
+        </button>
+        <h1>Point de caisse</h1>
+        <p>Encaissements des élèves, dépenses et solde de caisse.</p>
+      </div>
+      <button type="button" class="me-bouton-principal" (click)="imprimer()" [disabled]="!point() || impression()">
+        @if (impression()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer }
+      </button>
+    </header>
+
+    <!-- ================= Periode ================= -->
+    <section class="me-carte barre">
+      <button type="button" class="me-bouton-secondaire" [class.actif]="filtres().periode === 'annee'" (click)="annee()">
+        <ion-icon name="school-outline"></ion-icon> Année scolaire
+      </button>
+      <div class="mois">
+        <app-selecteur idChamp="p-mois" icone="calendar-outline" [options]="optionsMois()" [valeur]="rangMois()" (valeurChange)="choisirMois($event)"></app-selecteur>
+      </div>
+      <div class="dates">
+        <input class="me-saisie" type="date" aria-label="Du" [value]="du()" (input)="du.set(valeurTexte($event))" />
+        <span>au</span>
+        <input class="me-saisie" type="date" aria-label="Au" [value]="au()" (input)="au.set(valeurTexte($event))" />
+        <button type="button" class="me-bouton-secondaire" [class.actif]="filtres().periode === 'dates'" (click)="afficherDates()"><ion-icon name="search-outline"></ion-icon> Afficher</button>
+      </div>
+    </section>
+
+    @if (chargement() && !point()) {
+      <section class="me-carte"><ion-skeleton-text [animated]="true" style="width: 100%; height: 220px"></ion-skeleton-text></section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>{{ erreur() }}</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (point()) {
+      @let p = point()!;
+      <h2 class="titre-point" [class.attenue]="chargement()">{{ p.titre }}</h2>
+      <section class="resume" [class.attenue]="chargement()">
+        <div class="me-carte chiffre"><span class="me-pastille teinte-vert"><ion-icon name="trending-up-outline"></ion-icon></span><span><small>Encaissements</small><strong>{{ f(p.encaissements) }}</strong></span></div>
+        <div class="me-carte chiffre"><span class="me-pastille teinte-rose"><ion-icon name="trending-down-outline"></ion-icon></span><span><small>Dépenses</small><strong>{{ f(p.depenses) }}</strong></span></div>
+        <div class="me-carte chiffre solde" [class.negatif]="p.solde < 0"><span class="me-pastille teinte-cyan"><ion-icon name="wallet-outline"></ion-icon></span><span><small>Solde de caisse</small><strong>{{ f(p.solde) }}</strong></span></div>
+      </section>
+
+      <div class="grille" [class.attenue]="chargement()">
+        <section class="me-carte bloc">
+          <h2>Par mois</h2>
+          <div class="table-defilante">
+            <table class="tableau-mois">
+              <thead>
+                <tr><th>Mois</th><th>Encaissements</th><th>Salaires</th><th>Autres dépenses</th><th>Total dépenses</th><th>Solde</th></tr>
+              </thead>
+              <tbody>
+                @for (l of p.par_mois; track l.mois) {
+                  <tr>
+                    <td>{{ l.mois }}</td><td>{{ f(l.encaissements) }}</td><td>{{ f(l.salaires) }}</td><td>{{ f(l.autres) }}</td><td>{{ f(l.depenses) }}</td>
+                    <td [class.negatif]="l.solde < 0">{{ f(l.solde) }}</td>
+                  </tr>
+                }
+                <tr class="total">
+                  <td>Total</td><td>{{ f(p.encaissements) }}</td><td>{{ f(total('salaires')) }}</td><td>{{ f(total('autres')) }}</td><td>{{ f(p.depenses) }}</td>
+                  <td [class.negatif]="p.solde < 0">{{ f(p.solde) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="me-carte bloc">
+          <h2>Dépenses par catégorie</h2>
+          <ul class="categories">
+            @for (c of p.par_categorie; track c.categorie) {
+              <li>
+                <span class="libelle">{{ c.libelle }}</span>
+                <span class="jauge"><span [style.width.%]="largeur(c.montant)"></span></span>
+                <strong>{{ f(c.montant) }}</strong>
+              </li>
+            }
+          </ul>
+        </section>
+      </div>
+    }
+  </div>
+</ion-content>

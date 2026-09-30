@@ -1,0 +1,300 @@
+$tableau: 760px;
+
+.boutons-entete {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  @media (max-width: 559px) {
+    width: 100%;
+
+    button {
+      flex: 1 1 calc(50% - 8px);
+      justify-content: center;
+    }
+  }
+}
+
+// ============================ Compteurs ============================
+
+.compteurs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+
+  > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  @media (min-width: 900px) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 16px;
+
+    > :first-child {
+      grid-column: auto;
+    }
+  }
+}
+
+.compteur {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  font: inherit;
+  text-align: left;
+  color: var(--me-texte);
+
+  &:is(button) {
+    cursor: pointer;
+
+    &:hover {
+      border-color: #b9c6ea;
+    }
+  }
+
+  &.actif {
+    border-color: var(--ion-color-primary);
+  }
+
+  > span:last-child {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  strong {
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+}
+
+// ============================ Liste ============================
+
+.liste {
+  padding: 0;
+  container-type: inline-size;
+}
+
+.filtres {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--me-bordure);
+
+  @media (min-width: 760px) {
+    grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, 220px));
+  }
+}
+
+.squelette {
+  padding: 14px 20px;
+}
+
+.titre-tableau {
+  padding: 14px 20px 4px;
+
+  h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--me-texte);
+  }
+}
+
+.tableau {
+  padding: 4px 8px 10px;
+
+  &.attenue {
+    opacity: 0.55;
+  }
+}
+
+.ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px 12px;
+  padding: 12px;
+  border-radius: 12px;
+
+  @container (min-width: #{$tableau}) {
+    grid-template-columns: 110px minmax(200px, 2fr) 80px minmax(150px, 1.4fr) 124px;
+    align-items: center;
+    border-radius: 10px;
+
+    &:not(.entete-tableau):hover {
+      background: var(--me-survol);
+    }
+  }
+}
+
+.entete-tableau {
+  display: none;
+
+  @container (min-width: #{$tableau}) {
+    display: grid;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--me-texte-leger);
+  }
+}
+
+.a-droite {
+  text-align: right;
+}
+
+.cellule-date,
+.cellule-eleve {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  strong {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--me-texte);
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+}
+
+.cellule-date {
+  flex-direction: row;
+  gap: 8px;
+
+  @container (min-width: #{$tableau}) {
+    flex-direction: column;
+    gap: 0;
+  }
+}
+
+.matricule {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 600;
+}
+
+.cellule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--me-texte);
+
+  &[data-libelle]::before {
+    content: attr(data-libelle);
+    flex: 0 0 100px;
+    font-size: 12px;
+    color: var(--me-texte-leger);
+  }
+
+  &.heures {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .motif {
+    flex-basis: 100%;
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+
+  @container (min-width: #{$tableau}) {
+    &[data-libelle]::before {
+      content: none;
+    }
+
+    &.heures {
+      justify-content: flex-end;
+    }
+  }
+}
+
+.actions {
+  justify-content: flex-end;
+
+  .me-action {
+    border: 1px solid var(--me-bordure);
+    background: var(--me-surface);
+  }
+
+  @container (min-width: #{$tableau}) {
+    .me-action {
+      border: none;
+      background: none;
+    }
+  }
+}
+
+// ============================ Appel ============================
+
+.texte-doux {
+  font-size: 13px;
+  color: var(--me-texte-doux);
+}
+
+.appel {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  @media (min-width: 640px) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  button {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--me-bordure);
+    border-radius: 10px;
+    background: var(--me-surface);
+    font: inherit;
+    font-size: 13.5px;
+    text-align: left;
+    color: var(--me-texte);
+    cursor: pointer;
+
+    ion-icon {
+      flex-shrink: 0;
+      font-size: 20px;
+      color: var(--me-texte-leger);
+    }
+
+    .nom {
+      flex: 1;
+      min-width: 0;
+    }
+
+    small {
+      font-size: 11px;
+      color: var(--me-texte-leger);
+    }
+
+    &.coche {
+      border-color: var(--ion-color-danger);
+      background: var(--me-orange-fond);
+
+      ion-icon {
+        color: var(--ion-color-danger);
+      }
+    }
+  }
+}

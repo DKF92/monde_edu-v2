@@ -2,13 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToEtablissement;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['eleve_id', 'personnel_id', 'date_debut', 'date_fin', 'nombre_heures', 'is_justifiee', 'motif', 'saisi_par_id'])]
+#[Fillable(['etablissement_id', 'annee_scolaire_id', 'periode_id', 'eleve_id', 'classe_id', 'personnel_id', 'date_debut', 'date_fin', 'nombre_heures', 'is_justifiee', 'motif', 'saisi_par_id'])]
 class Absence extends Model
 {
+    use BelongsToEtablissement;
+
     protected function casts(): array
     {
         return [
@@ -16,6 +19,16 @@ class Absence extends Model
             'date_fin' => 'date',
             'is_justifiee' => 'boolean',
         ];
+    }
+
+    public function classe(): BelongsTo
+    {
+        return $this->belongsTo(Classe::class);
+    }
+
+    public function periode(): BelongsTo
+    {
+        return $this->belongsTo(Periode::class);
     }
 
     public function eleve(): BelongsTo

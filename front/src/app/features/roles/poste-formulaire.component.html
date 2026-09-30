@@ -1,0 +1,163 @@
+<ion-modal class="me-modale-formulaire large" [isOpen]="isOpen" [backdropDismiss]="!enregistrement()" (didDismiss)="fermer()">
+  <ng-template>
+    <form class="me-modale" (ngSubmit)="enregistrer()" novalidate>
+      <header>
+        <span class="me-pastille teinte-bleu"><ion-icon name="briefcase-outline"></ion-icon></span>
+        <div>
+          <h1>{{ estCreation ? 'Nouveau poste' : 'Modifier le poste' }}</h1>
+          <p>
+            @if (estCreation) {
+              Choisissez le nom du poste et les modules auxquels il donne accès.
+            } @else {
+              {{ poste?.nombre_utilisateurs }} compte{{ (poste?.nombre_utilisateurs ?? 0) > 1 ? 's ont' : ' a' }} ce poste : les changements de droits s'appliquent à leur prochaine action.
+            }
+          </p>
+        </div>
+        <button type="button" class="me-fermer" (click)="fermer()" aria-label="Fermer">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </header>
+
+      <div class="corps">
+        <!-- ================= Identite ================= -->
+        <section>
+          <h2>Poste</h2>
+          <div class="me-grille">
+            <div class="me-champ">
+              <label for="p-nom">Nom du poste <span class="me-requis">*</span></label>
+              <input
+                id="p-nom"
+                name="nom"
+                class="me-saisie"
+                autocomplete="off"
+                maxlength="60"
+                placeholder="Ex : Surveillant général"
+                [(ngModel)]="nom"
+                [class.invalide]="erreur('nom')"
+                (input)="effacerErreur('nom')"
+              />
+              @if (erreur('nom'); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+            </div>
+            <div class="me-champ">
+              <label for="p-description">Description</label>
+              <input
+                id="p-description"
+                name="description"
+                class="me-saisie"
+                autocomplete="off"
+                maxlength="255"
+                placeholder="Rôle du poste en quelques mots"
+                [(ngModel)]="description"
+              />
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= Options ================= -->
+        <section>
+          <h2>Options</h2>
+          <div class="options">
+            <button
+              type="button"
+              class="me-option"
+              [class.choisi]="estSensible()"
+              [disabled]="!peutProteger"
+              [attr.aria-pressed]="estSensible()"
+              (click)="estSensible.set(!estSensible()); effacerErreur('est_sensible')"
+            >
+              <ion-icon [name]="estSensible() ? 'checkbox' : 'square-outline'"></ion-icon>
+              <span>
+                <strong><ion-icon name="lock-closed" class="cadenas"></ion-icon> Poste protégé</strong>
+                <small>Seul le Super admin peut attribuer ce poste et modifier les comptes qui l'ont (caisse, comptabilité…).</small>
+              </span>
+            </button>
+            <button type="button" class="me-option" [class.choisi]="lieNiveaux()" [attr.aria-pressed]="lieNiveaux()" (click)="lieNiveaux.set(!lieNiveaux())">
+              <ion-icon [name]="lieNiveaux() ? 'checkbox' : 'square-outline'"></ion-icon>
+              <span>
+                <strong>Rattaché à des niveaux</strong>
+                <small>Comme l'éducateur : on choisit ses niveaux (6EME, 5EME…) dans la fiche de l'utilisateur.</small>
+              </span>
+            </button>
+            <button type="button" class="me-option" [class.choisi]="lieMatieres()" [attr.aria-pressed]="lieMatieres()" (click)="lieMatieres.set(!lieMatieres())">
+              <ion-icon [name]="lieMatieres() ? 'checkbox' : 'square-outline'"></ion-icon>
+              <span>
+                <strong>Enseigne des matières</strong>
+                <small>Comme le professeur : on choisit ses matières dans la fiche de l'utilisateur.</small>
+              </span>
+            </button>
+          </div>
+          @if (!peutProteger && !poste?.super_admin) {
+            <p class="me-aide-champ"><ion-icon name="lock-closed"></ion-icon> Seul le Super admin peut déclarer un poste protégé.</p>
+          }
+        </section>
+
+        <!-- ================= Droits ================= -->
+        <section>
+          <h2>Droits ({{ droits().size }})</h2>
+          @if (droitsVerrouilles) {
+            <p class="me-note"><ion-icon name="information-circle-outline"></ion-icon> Le Super admin garde tous les droits : ils ne peuvent pas être retirés.</p>
+          } @else if (!catalogue?.peut_gerer_sensibles) {
+            <p class="me-note"><ion-icon name="information-circle-outline"></ion-icon> Vous ne pouvez accorder que les droits que vous avez vous-même (les autres sont grisés).</p>
+          }
+
+          @for (g of catalogue?.groupes ?? []; track g.groupe) {
+            <div class="groupe">
+              <div class="groupe-entete">
+                <h3>{{ g.groupe }} <span>{{ compteGroupe(g.droits) }} / {{ g.droits.length }}</span></h3>
+                @if (!droitsVerrouilles) {
+                  <button type="button" class="me-lien" (click)="basculerGroupe(g.droits)">
+                    {{ groupeComplet(g.droits) ? 'Tout décocher' : 'Tout cocher' }}
+                  </button>
+                }
+              </div>
+              <div class="droits">
+                @for (d of g.droits; track d.nom) {
+                  <button
+                    type="button"
+                    class="me-option"
+                    [class.choisi]="aLeDroit(d)"
+                    [disabled]="droitBloque(d)"
+                    [attr.aria-pressed]="aLeDroit(d)"
+                    [title]="!d.accordable ? 'Vous ne pouvez pas accorder un droit que vous n\'avez pas' : ''"
+                    (click)="basculerDroit(d)"
+                  >
+                    <ion-icon [name]="aLeDroit(d) ? 'checkbox' : 'square-outline'"></ion-icon>
+                    <span>
+                      <strong>
+                        @if (d.reserve) {
+                          <ion-icon name="lock-closed" class="cadenas"></ion-icon>
+                        }
+                        {{ d.libelle }}
+                      </strong>
+                      @if (d.description) {
+                        <small>{{ d.description }}</small>
+                      }
+                    </span>
+                  </button>
+                }
+              </div>
+            </div>
+          }
+        </section>
+
+        @if (erreurGenerale(); as e) {
+          <div class="me-alerte-erreur" role="alert">
+            <ion-icon name="alert-circle-outline"></ion-icon>
+            <span>{{ e }}</span>
+          </div>
+        }
+      </div>
+
+      <footer>
+        <button type="button" class="me-bouton-texte" (click)="fermer()" [disabled]="enregistrement()">Annuler</button>
+        <button type="submit" class="me-bouton-principal" [disabled]="enregistrement()">
+          @if (enregistrement()) {
+            <ion-spinner name="dots"></ion-spinner>
+          } @else {
+            {{ estCreation ? 'Créer le poste' : 'Enregistrer' }}
+          }
+        </button>
+      </footer>
+    </form>
+  </ng-template>
+</ion-modal>

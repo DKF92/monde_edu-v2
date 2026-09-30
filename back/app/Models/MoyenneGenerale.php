@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['eleve_id', 'classe_id', 'periode_id', 'moyenne_generale', 'rang_classe', 'rang_niveau', 'mention', 'decision'])]
+#[Fillable(['eleve_id', 'classe_id', 'periode_id', 'moyenne_generale', 'total_points', 'total_coefficients', 'moyenne_lettres', 'moyenne_sciences', 'rang_classe', 'rang_niveau', 'mention', 'decision'])]
 class MoyenneGenerale extends Model
 {
     protected $table = 'moyennes_generales';

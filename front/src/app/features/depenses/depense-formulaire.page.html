@@ -1,0 +1,103 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/depenses')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Dépenses
+        </button>
+        <h1>{{ modification() ? 'Modifier la dépense' + (existante() ? ' n° ' + existante()!.numero : '') : 'Nouvelle dépense' }}</h1>
+        <p>{{ modification() ? 'Correction historisée avec son motif.' : 'Sortie de caisse : un numéro lui est attribué à l\'enregistrement.' }}</p>
+      </div>
+    </header>
+
+    @if (chargement()) {
+      <section class="me-carte"><ion-skeleton-text [animated]="true" style="width: 100%; height: 220px"></ion-skeleton-text></section>
+    } @else {
+      <section class="me-carte bloc">
+        @if (modification()) {
+          <div class="me-champ">
+            <label for="d-motif">Motif de la modification <span class="me-requis">*</span></label>
+            <textarea id="d-motif" class="me-saisie zone" rows="2" maxlength="500" [value]="motif()" [class.invalide]="erreurs()['motif']" (input)="motif.set(valeurTexte($event)); effacer('motif')"></textarea>
+            @if (erreurs()['motif']) { <span class="me-erreur-champ">{{ erreurs()['motif'] }}</span> }
+          </div>
+        }
+
+        <div class="grille">
+          <div class="me-champ">
+            <label for="d-date">Date <span class="me-requis">*</span></label>
+            <input id="d-date" class="me-saisie" type="date" [max]="maxDate" [value]="date()" [class.invalide]="erreurs()['date_depense']" (input)="date.set(valeurTexte($event)); effacer('date_depense')" />
+            @if (erreurs()['date_depense']) { <span class="me-erreur-champ">{{ erreurs()['date_depense'] }}</span> }
+          </div>
+          <div class="me-champ">
+            <label for="d-montant">Montant <span class="me-requis">*</span></label>
+            <div class="me-montant" data-unite="F">
+              <input id="d-montant" class="me-saisie grand" type="number" inputmode="numeric" min="1" [value]="montant() ?? ''" [class.invalide]="erreurs()['montant']" (input)="montant.set(valeurNombre($event)); effacer('montant')" placeholder="0" />
+            </div>
+            @if (erreurs()['montant']) { <span class="me-erreur-champ">{{ erreurs()['montant'] }}</span> }
+          </div>
+        </div>
+
+        <div class="me-champ">
+          <span class="libelle">Catégorie <span class="me-requis">*</span></span>
+          <div class="me-segments" role="radiogroup" aria-label="Catégorie">
+            @for (c of categories; track c.valeur) {
+              <button type="button" [class.actif]="categorie() === c.valeur" (click)="categorie.set(c.valeur); effacer('categorie')">{{ c.libelle }}</button>
+            }
+          </div>
+          @if (erreurs()['categorie']) { <span class="me-erreur-champ">{{ erreurs()['categorie'] }}</span> }
+        </div>
+
+        <div class="me-champ">
+          <label for="d-libelle">Objet de la dépense <span class="me-requis">*</span></label>
+          <input id="d-libelle" class="me-saisie" type="text" maxlength="300" placeholder="Ex : achat de craies et marqueurs" [value]="libelle()" [class.invalide]="erreurs()['libelle']" (input)="libelle.set(valeurTexte($event)); effacer('libelle')" />
+          @if (erreurs()['libelle']) { <span class="me-erreur-champ">{{ erreurs()['libelle'] }}</span> }
+        </div>
+
+        <div class="grille">
+          <div class="me-champ">
+            <label for="d-beneficiaire">Bénéficiaire</label>
+            <input id="d-beneficiaire" class="me-saisie" type="text" maxlength="150" placeholder="Personne ou fournisseur payé" [value]="beneficiaire()" (input)="beneficiaire.set(valeurTexte($event))" />
+          </div>
+          <div class="me-champ">
+            <label for="d-piece">Pièce comptable</label>
+            <input id="d-piece" class="me-saisie" type="text" maxlength="100" placeholder="N° de facture, de bon…" [value]="pieceComptable()" (input)="pieceComptable.set(valeurTexte($event))" />
+          </div>
+        </div>
+
+        <div class="me-champ">
+          <span class="libelle">Mode de paiement</span>
+          <div class="me-segments" role="radiogroup" aria-label="Mode de paiement">
+            @for (m of modes; track m) {
+              <button type="button" [class.actif]="mode() === m" (click)="mode.set(m)">{{ libellesMode[m] }}</button>
+            }
+          </div>
+        </div>
+
+        <div class="me-champ">
+          <span class="libelle">Justificatif <small>(photo ou PDF, 5 Mo maximum)</small></span>
+          <div class="justificatif">
+            @if (justificatif()) {
+              <span class="fichier"><ion-icon name="document-attach-outline"></ion-icon> {{ justificatif()!.name }}</span>
+              <button type="button" class="me-bouton-texte" (click)="justificatif.set(null)"><ion-icon name="close-circle-outline"></ion-icon> Retirer</button>
+            } @else if (existante()?.justificatif_url && !retirerJustificatif()) {
+              <a class="fichier" [href]="existante()!.justificatif_url" target="_blank" rel="noopener"><ion-icon name="document-attach-outline"></ion-icon> Justificatif actuel</a>
+              <button type="button" class="me-bouton-texte" (click)="retirerJustificatif.set(true)"><ion-icon name="close-circle-outline"></ion-icon> Retirer</button>
+            }
+            <label class="me-bouton-secondaire">
+              <ion-icon name="cloud-upload-outline"></ion-icon> {{ justificatif() || (existante()?.justificatif_url && !retirerJustificatif()) ? 'Remplacer' : 'Joindre un fichier' }}
+              <input type="file" accept="image/*,application/pdf" hidden (change)="choisirFichier($event)" />
+            </label>
+          </div>
+          @if (erreurs()['justificatif']) { <span class="me-erreur-champ">{{ erreurs()['justificatif'] }}</span> }
+        </div>
+
+        <div class="actions">
+          <button type="button" class="me-bouton-texte" (click)="router.navigateByUrl('/tabs/depenses')">Annuler</button>
+          <button type="button" class="me-bouton-principal" (click)="enregistrer()" [disabled]="enregistrement()">
+            @if (enregistrement()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="save-outline"></ion-icon> Enregistrer{{ montant() ? ' · ' + f(montant()) : '' }} }
+          </button>
+        </div>
+      </section>
+    }
+  </div>
+</ion-content>

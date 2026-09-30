@@ -1,0 +1,191 @@
+.modale-contexte {
+  --width: min(92vw, 480px);
+  --height: auto;
+  --border-radius: 22px;
+  --box-shadow: var(--me-ombre-forte);
+  --background: var(--me-surface);
+  --backdrop-opacity: 0.55;
+
+  // La liste deroulante des selecteurs doit pouvoir depasser du cadre de la
+  // modale (sinon elle serait coupee sous le dernier champ).
+  &::part(content) {
+    overflow: visible;
+  }
+}
+
+.contenu-modale {
+  // Une simple div (pas ion-content, qui se positionne toujours en absolute
+  // pour remplir son parent : avec --height:auto sur la modale, ca donnait
+  // une hauteur de 0 et rendait tout le contenu invisible).
+  position: relative;
+  padding: 28px 24px 22px;
+  border-radius: 22px;
+  background: var(--me-surface);
+}
+
+.fermer {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--me-texte-doux);
+  font-size: 22px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--me-survol);
+  }
+}
+
+.entete {
+  text-align: center;
+  margin-bottom: 22px;
+
+  .grande {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    font-size: 28px;
+  }
+
+  h1 {
+    margin: 14px 0 6px;
+    font-size: 19px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--me-texte);
+  }
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--me-texte-doux);
+  }
+}
+
+.champs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.champ {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--me-texte);
+  }
+}
+
+// Champ Periode qui apparait au choix d'un poste qui y a droit.
+.apparition {
+  animation: apparition 0.18s ease-out;
+}
+
+@keyframes apparition {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.message {
+  margin: 0;
+  font-size: 12px;
+  color: var(--me-texte-leger);
+
+  &.erreur {
+    color: var(--ion-color-danger);
+  }
+}
+
+.alerte-erreur {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff0f0;
+  color: #b42323;
+  font-size: 13px;
+
+  ion-icon {
+    flex-shrink: 0;
+    font-size: 18px;
+  }
+}
+
+.lien-inline {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.bouton-texte {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border: none;
+  background: none;
+  color: var(--me-texte-doux);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--me-texte);
+  }
+}
+
+.bouton-confirmer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 140px;
+  height: 46px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 12px;
+  background: var(--me-marine);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--me-marine-fonce);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}

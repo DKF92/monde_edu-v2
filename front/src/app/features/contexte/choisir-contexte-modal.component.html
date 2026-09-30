@@ -1,0 +1,119 @@
+<ion-modal
+  class="modale-contexte"
+  [isOpen]="isOpen"
+  [backdropDismiss]="!obligatoire"
+  [canDismiss]="peutFermer"
+  [keyboardClose]="!obligatoire"
+  (didDismiss)="annuler()"
+>
+  <ng-template>
+    <div class="contenu-modale">
+      @if (!obligatoire) {
+        <button type="button" class="fermer" (click)="annuler()" aria-label="Fermer">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      }
+
+      <div class="entete">
+        <span class="me-pastille teinte-bleu grande"><ion-icon name="calendar-outline"></ion-icon></span>
+        <h1>{{ obligatoire ? 'Bonjour ' + prenom() + ' !' : "Changer d'espace de travail" }}</h1>
+        <p>Choisissez l'année scolaire, l'établissement et le poste avec lesquels vous allez travailler.</p>
+      </div>
+
+      <form class="champs" (submit)="$event.preventDefault(); valider()">
+        <div class="champ">
+          <label for="champ-annee">Année scolaire</label>
+          <app-selecteur
+            idChamp="champ-annee"
+            icone="calendar-outline"
+            [options]="optionsAnnees()"
+            [valeur]="anneeId()"
+            [chargement]="chargement()"
+            placeholder="Aucune année scolaire"
+            (valeurChange)="choisirAnnee($event)"
+          ></app-selecteur>
+          @if (!chargement() && contexte() && optionsAnnees().length === 0) {
+            <p class="message erreur">Aucune année scolaire n'est encore configurée pour cet établissement.</p>
+          }
+        </div>
+
+        <div class="champ">
+          <label for="champ-etablissement">Établissement</label>
+          <app-selecteur
+            idChamp="champ-etablissement"
+            icone="business-outline"
+            [options]="optionsEtablissements()"
+            [valeur]="etablissementId()"
+            (valeurChange)="choisirEtablissement($event)"
+          ></app-selecteur>
+          @if (optionsEtablissements().length === 1) {
+            <p class="message">Seul établissement rattaché à votre compte.</p>
+          }
+        </div>
+
+        <div class="champ">
+          <label for="champ-poste">Poste</label>
+          <app-selecteur
+            idChamp="champ-poste"
+            icone="briefcase-outline"
+            [options]="optionsPostes()"
+            [valeur]="posteId()"
+            [chargement]="chargement()"
+            placeholder="Choisissez votre poste…"
+            (valeurChange)="posteId.set($event)"
+          ></app-selecteur>
+          @if (!chargement() && contexte()) {
+            @if (optionsPostes().length === 0) {
+              <p class="message erreur">
+                Aucun poste ne vous est attribué dans cet établissement. Contactez son administration.
+              </p>
+            } @else if (optionsPostes().length === 1) {
+              <p class="message">Seul poste qui vous est attribué dans cet établissement.</p>
+            }
+          }
+        </div>
+
+        <!-- Uniquement pour les postes qui ont le droit "periodes.choisir". -->
+        @if (afficherPeriode()) {
+          <div class="champ apparition">
+            <label for="champ-periode">Période</label>
+            <app-selecteur
+              idChamp="champ-periode"
+              icone="calendar-clear-outline"
+              [options]="optionsPeriodes()"
+              [valeur]="periodeId()"
+              placeholder="Aucune période"
+              (valeurChange)="periodeId.set($event)"
+            ></app-selecteur>
+            @if (optionsPeriodes().length === 0) {
+              <p class="message">
+                Aucun trimestre n'est configuré pour cette année : vous travaillerez sur l'année entière.
+              </p>
+            }
+          </div>
+        }
+
+        @if (erreur()) {
+          <div class="alerte-erreur" role="alert">
+            <ion-icon name="alert-circle-outline"></ion-icon>
+            <span>
+              Impossible de charger les informations de l'établissement.
+              <button type="button" class="lien-inline" (click)="reessayer()">Réessayer</button>
+            </span>
+          </div>
+        }
+
+        <div class="actions">
+          @if (obligatoire) {
+            <button type="button" class="bouton-texte" (click)="seDeconnecter()">
+              <ion-icon name="log-out-outline"></ion-icon> Se déconnecter
+            </button>
+          } @else {
+            <button type="button" class="bouton-texte" (click)="annuler()">Annuler</button>
+          }
+          <button type="submit" class="bouton-confirmer" [disabled]="!peutValider()">Continuer</button>
+        </div>
+      </form>
+    </div>
+  </ng-template>
+</ion-modal>

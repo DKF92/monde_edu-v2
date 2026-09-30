@@ -1,49 +1,230 @@
-<ion-header>
-  <ion-toolbar color="primary">
-    <ion-title>{{ etablissement()?.nom }}</ion-title>
+<!-- En-tete mobile uniquement : sur bureau, la barre du haut de la coquille le remplace. -->
+<ion-header class="ion-no-border entete-mobile">
+  <ion-toolbar class="me-toolbar">
+    <div class="entete-mobile-contenu">
+      <app-logo [taille]="30"></app-logo>
+      <div class="entete-mobile-actions">
+        @if (peutVoirEleves()) {
+          <a routerLink="/tabs/eleves" class="bouton-rond" aria-label="Rechercher un élève">
+            <ion-icon name="search-outline"></ion-icon>
+          </a>
+        }
+        <button type="button" class="pastille-annee" (click)="espaceTravail.ouvrir()">
+          <ion-icon name="calendar-outline"></ion-icon>
+          {{ anneeScolaire()?.libelle }}
+          <ion-icon name="chevron-down-outline"></ion-icon>
+        </button>
+      </div>
+    </div>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="page-dashboard">
+<ion-content class="page-accueil">
   <ion-refresher slot="fixed" (ionRefresh)="charger($event)">
     <ion-refresher-content></ion-refresher-content>
   </ion-refresher>
 
-  @if (stats(); as s) {
-    <p class="annee-active">Année scolaire {{ s.annee_scolaire_active }}</p>
-
-    <div class="grille-kpi">
-      <div class="carte-kpi">
-        <ion-icon name="people-outline" color="primary"></ion-icon>
-        <div>
-          <span class="valeur">{{ s.effectif_eleves }}</span>
-          <span class="libelle">Élèves</span>
+  <div class="page">
+    <!-- ================= Bandeau + trimestre ================= -->
+    <div class="ligne-haut">
+      <section class="bandeau">
+        <div class="bandeau-texte">
+          <p class="bandeau-date">{{ dateDuJour }}</p>
+          <h1>{{ salutation }} {{ prenom() }} !</h1>
+          <p class="bandeau-sous-titre">
+            Bienvenue sur l'espace de <strong>{{ etablissement()?.nom }}</strong>.
+          </p>
+          <p class="bandeau-citation">« Apprendre aujourd'hui, construire demain. »</p>
         </div>
-      </div>
+        <svg class="bandeau-deco" viewBox="0 0 220 180" aria-hidden="true">
+          <circle cx="160" cy="40" r="70" class="halo" />
+          <circle cx="40" cy="170" r="46" class="halo" />
+          <g class="livre" transform="translate(58 44)">
+            <path d="M52 16C42 7 27 4 6 5v64c21-1 36 2 46 11 10-9 25-12 46-11V5C77 4 62 7 52 16Z" />
+            <path d="M52 16v64" class="trait" />
+            <path d="M16 20c10 0 18 2 25 6M16 32c10 0 18 2 25 6M16 44c10 0 18 2 25 6M88 20c-10 0-18 2-25 6M88 32c-10 0-18 2-25 6M88 44c-10 0-18 2-25 6" class="trait" />
+          </g>
+        </svg>
+      </section>
 
-      <div class="carte-kpi">
-        <ion-icon name="school-outline" color="secondary"></ion-icon>
-        <div>
-          <span class="valeur">{{ s.nombre_classes }}</span>
-          <span class="libelle">Classes</span>
+      <section class="me-carte carte-periode">
+        <div class="me-carte-entete">
+          <h2>Période en cours</h2>
+          <button type="button" class="me-lien" (click)="espaceTravail.ouvrir()">Changer</button>
         </div>
-      </div>
 
-      <div class="carte-kpi">
-        <ion-icon name="cash-outline" color="success"></ion-icon>
-        <div>
-          <span class="valeur">{{ formaterMontant(s.encaissements_du_jour) }}</span>
-          <span class="libelle">Encaissé aujourd'hui</span>
+        <div class="periode-annee">
+          <span class="me-pastille teinte-bleu"><ion-icon name="calendar-clear-outline"></ion-icon></span>
+          <div>
+            <strong>{{ periode()?.libelle ?? 'Aucun trimestre' }}</strong>
+            <span>Année scolaire {{ anneeScolaire()?.libelle }}</span>
+          </div>
         </div>
-      </div>
 
-      <div class="carte-kpi">
-        <ion-icon name="wallet-outline" color="tertiary"></ion-icon>
-        <div>
-          <span class="valeur">{{ formaterMontant(s.encaissements_du_mois) }}</span>
-          <span class="libelle">Encaissé ce mois</span>
-        </div>
-      </div>
+        @if (chargement()) {
+          <ion-skeleton-text [animated]="true" class="squelette-barre"></ion-skeleton-text>
+        } @else {
+          @if (avancementPeriode(); as a) {
+            <div class="progression" role="progressbar" [attr.aria-valuenow]="a.pourcentage" aria-valuemin="0" aria-valuemax="100">
+              <div class="progression-remplie" [style.width.%]="a.pourcentage"></div>
+            </div>
+            <div class="progression-legende">
+              <span>{{ a.debut }}</span>
+              <strong>{{ a.joursRestants }} jour{{ a.joursRestants > 1 ? 's' : '' }} restant{{ a.joursRestants > 1 ? 's' : '' }}</strong>
+              <span>{{ a.fin }}</span>
+            </div>
+          } @else {
+            <p class="periode-info">Les dates de début et de fin du trimestre ne sont pas encore renseignées.</p>
+          }
+        }
+      </section>
     </div>
-  }
+
+    @if (erreur()) {
+      <section class="me-carte carte-erreur">
+        <span class="me-pastille teinte-rose"><ion-icon name="cloud-offline-outline"></ion-icon></span>
+        <div>
+          <strong>Impossible de charger le tableau de bord</strong>
+          <p>Vérifiez votre connexion ou que le serveur est démarré, puis réessayez.</p>
+        </div>
+        <button type="button" class="bouton-secondaire" (click)="charger()">
+          <ion-icon name="refresh-outline"></ion-icon> Réessayer
+        </button>
+      </section>
+    }
+
+    <!-- ================= Indicateurs ================= -->
+    <section class="indicateurs" aria-label="Chiffres clés">
+      @if (chargement()) {
+        @for (i of [1, 2, 3]; track i) {
+          <div class="me-carte indicateur">
+            <ion-skeleton-text [animated]="true" class="squelette-pastille"></ion-skeleton-text>
+            <div class="indicateur-texte">
+              <ion-skeleton-text [animated]="true" style="width: 60%"></ion-skeleton-text>
+              <ion-skeleton-text [animated]="true" style="width: 80%"></ion-skeleton-text>
+            </div>
+          </div>
+        }
+      } @else {
+        @for (indicateur of indicateurs(); track indicateur.libelle) {
+          <div class="me-carte indicateur">
+            <span class="me-pastille" [class]="'teinte-' + indicateur.teinte">
+              <ion-icon [name]="indicateur.icone"></ion-icon>
+            </span>
+            <div class="indicateur-texte">
+              <span class="indicateur-valeur">{{ indicateur.valeur }}</span>
+              <span class="indicateur-libelle">{{ indicateur.libelle }}</span>
+            </div>
+          </div>
+        }
+      }
+    </section>
+
+    <!-- ================= Acces rapides ================= -->
+    @if (accesRapides().length) {
+      <section>
+        <h2 class="titre-section">Accès rapides</h2>
+        <div class="tuiles">
+          @for (entree of accesRapides(); track entree.route) {
+            @if (entree.disponible) {
+              <a class="tuile" [class]="'teinte-' + entree.teinte" [routerLink]="entree.route">
+                <ion-icon [name]="entree.icone"></ion-icon>
+                <strong>{{ entree.libelle }}</strong>
+                <span>{{ entree.description }}</span>
+              </a>
+            } @else {
+              <div class="tuile desactivee" [class]="'teinte-' + entree.teinte" [title]="entree.libelle + ' · bientôt disponible'">
+                <span class="me-bientot badge-tuile">Bientôt</span>
+                <ion-icon [name]="entree.icone"></ion-icon>
+                <strong>{{ entree.libelle }}</strong>
+                <span>{{ entree.description }}</span>
+              </div>
+            }
+          }
+        </div>
+      </section>
+    }
+
+    <!-- ================= Classes + evenements ================= -->
+    <div class="blocs">
+      @if (chargement() || stats()?.classes_portee) {
+        <section class="me-carte">
+          <div class="me-carte-entete">
+            <h2>{{ stats()?.classes_portee === 'mes' ? 'Mes classes' : 'Classes' }}</h2>
+            @if (stats()?.classes_total) {
+              <span class="compteur">{{ stats()?.classes_total }}</span>
+            }
+          </div>
+
+          @if (chargement()) {
+            @for (i of [1, 2, 3]; track i) {
+              <div class="ligne">
+                <ion-skeleton-text [animated]="true" style="width: 45%"></ion-skeleton-text>
+              </div>
+            }
+          } @else {
+            @for (classe of stats()?.classes; track classe.id) {
+              <div class="ligne">
+                <span class="me-pastille teinte-cyan petite">{{ classe.niveau }}</span>
+                <div class="ligne-texte">
+                  <strong>{{ classe.libelle }}</strong>
+                  <span>
+                    {{ classe.effectif }} élève{{ classe.effectif > 1 ? 's' : '' }}
+                    @if (classe.capacite) {
+                      <span> / {{ classe.capacite }} places</span>
+                    }
+                    @if (classe.salle) {
+                      <span> · Salle {{ classe.salle }}</span>
+                    }
+                  </span>
+                </div>
+              </div>
+            } @empty {
+              <div class="me-etat-vide">
+                <ion-icon name="library-outline"></ion-icon>
+                <strong>Aucune classe</strong>
+                <span>Aucune classe n'est ouverte pour cette année scolaire.</span>
+              </div>
+            }
+            @if (classesRestantes() > 0) {
+              <p class="pied-carte">et {{ classesRestantes() }} autre{{ classesRestantes() > 1 ? 's' : '' }} classe{{ classesRestantes() > 1 ? 's' : '' }}</p>
+            }
+          }
+        </section>
+      }
+
+      <section class="me-carte">
+        <div class="me-carte-entete">
+          <h2>Prochaines échéances</h2>
+        </div>
+
+        @if (chargement()) {
+          @for (i of [1, 2, 3]; track i) {
+            <div class="ligne">
+              <ion-skeleton-text [animated]="true" style="width: 55%"></ion-skeleton-text>
+            </div>
+          }
+        } @else {
+          @for (evenement of evenements(); track $index) {
+            <div class="ligne">
+              <span class="date-badge" [class]="'teinte-' + evenement.teinte">
+                <strong>{{ jour(evenement.date) }}</strong>
+                <small>{{ mois(evenement.date) }}</small>
+              </span>
+              <div class="ligne-texte">
+                <strong>{{ evenement.titre }}</strong>
+                <span>{{ evenement.detail }}</span>
+              </div>
+            </div>
+          } @empty {
+            <div class="me-etat-vide">
+              <ion-icon name="flag-outline"></ion-icon>
+              <strong>Rien de prévu</strong>
+              <span>Les fins de trimestre et les dates limites de paiement apparaîtront ici.</span>
+            </div>
+          }
+        }
+      </section>
+    </div>
+  </div>
 </ion-content>

@@ -1,0 +1,33 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <h1>Paramètres</h1>
+        <p>Réglages de {{ etablissement()?.nom }}.</p>
+      </div>
+    </header>
+
+    <section class="rubriques" aria-label="Types de paramètres">
+      @for (r of visibles(); track r.titre) {
+        @if (r.route) {
+          <a class="me-carte rubrique" [routerLink]="r.route" [class]="'teinte-' + r.teinte">
+            <span class="me-pastille"><ion-icon [name]="r.icone"></ion-icon></span>
+            <span class="texte">
+              <strong>{{ r.titre }}</strong>
+              <small>{{ r.description }}</small>
+            </span>
+            <ion-icon name="chevron-forward-outline" class="chevron"></ion-icon>
+          </a>
+        } @else {
+          <div class="me-carte rubrique bientot" [class]="'teinte-' + r.teinte" aria-disabled="true">
+            <span class="me-pastille"><ion-icon [name]="r.icone"></ion-icon></span>
+            <span class="texte">
+              <strong>{{ r.titre }} <span class="me-bientot">Bientôt</span></strong>
+              <small>{{ r.description }}</small>
+            </span>
+          </div>
+        }
+      }
+    </section>
+  </div>
+</ion-content>

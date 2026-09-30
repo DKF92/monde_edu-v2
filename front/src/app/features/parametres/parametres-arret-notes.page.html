@@ -1,0 +1,129 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/parametres')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Paramètres
+        </button>
+        <h1>Arrêt des notes</h1>
+        <p>Réservé au directeur : arrêter les notes des classes et mettre fin à une période.</p>
+      </div>
+    </header>
+
+    <p class="me-note">
+      <ion-icon name="information-circle-outline"></ion-icon>
+      <span>
+        <strong>Arrêter</strong> les notes d'une classe fige ses moyennes : les professeurs ne peuvent plus les modifier.
+        <strong>Clôturer</strong> la période arrête les notes de toutes les classes et bloque aussi les absences et la conduite.
+        Les deux se rouvrent ici.
+      </span>
+    </p>
+
+    @if (erreur() && !page()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger l'arrêt des notes</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (!page()) {
+      <section class="me-carte">
+        <ion-skeleton-text [animated]="true" style="width: 60%; height: 20px"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 160px; margin-top: 14px"></ion-skeleton-text>
+      </section>
+    } @else {
+      @let d = page()!;
+      @let p = d.periode;
+      <!-- ================= Choix de la periode ================= -->
+      <div class="me-segments periodes" role="radiogroup" aria-label="Période">
+        @for (x of d.periodes; track x.id) {
+          <button type="button" role="radio" [class.actif]="x.id === p.id" [attr.aria-checked]="x.id === p.id" (click)="charger(x.id)">
+            @if (x.cloturee) { <ion-icon name="lock-closed-outline"></ion-icon> }
+            {{ x.libelle }}
+          </button>
+        }
+      </div>
+
+      <!-- ================= Etat de la periode ================= -->
+      <section class="me-carte bloc periode" [class.cloturee]="p.cloturee" [class.attenue]="chargement()">
+        <div class="bloc-entete">
+          <span class="me-pastille" [class.teinte-orange]="p.cloturee" [class.teinte-violet]="!p.cloturee"><ion-icon [name]="p.cloturee ? 'lock-closed-outline' : 'calendar-outline'"></ion-icon></span>
+          <div>
+            <h2>
+              {{ p.libelle }}
+              @if (p.cloturee) { <span class="me-badge attention">Clôturé</span> } @else if (p.active) { <span class="me-badge info">En cours</span> }
+            </h2>
+            @if (p.date_debut || p.date_fin) { <p>Du {{ date(p.date_debut) }} au {{ date(p.date_fin) }}</p> }
+          </div>
+        </div>
+        <div class="chiffres">
+          <div><strong>{{ d.totaux.classes_arretees }} / {{ d.totaux.classes }}</strong><small>classes arrêtées</small></div>
+          <div><strong>{{ d.totaux.classes_notees }}</strong><small>classes avec des notes</small></div>
+          <div><strong>{{ d.totaux.notes }}</strong><small>notes saisies</small></div>
+        </div>
+        <div class="boutons">
+          @if (p.cloturee) {
+            <button type="button" class="me-bouton-secondaire" (click)="cloturer(true)" [disabled]="!!action()">
+              @if (action() === 'cloture') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="lock-open-outline"></ion-icon> Rouvrir la période }
+            </button>
+          } @else {
+            <button type="button" class="me-bouton-secondaire" (click)="arreterTout()" [disabled]="!!action() || !d.totaux.notes">
+              @if (action() === 'tout') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="lock-closed-outline"></ion-icon> Arrêter toutes les notes }
+            </button>
+            <button type="button" class="me-bouton-principal danger" (click)="cloturer()" [disabled]="!!action()">
+              @if (action() === 'cloture') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="flag-outline"></ion-icon> Mettre fin au {{ p.libelle }} }
+            </button>
+          }
+        </div>
+      </section>
+
+      <!-- ================= Classes ================= -->
+      <section class="me-carte liste-classes" [class.attenue]="chargement()">
+        <div class="ligne entete">
+          <span>Classe</span>
+          <span class="nombre">Élèves</span>
+          <span class="nombre">Notes</span>
+          <span>Matières notées arrêtées</span>
+          <span></span>
+        </div>
+        @for (c of d.classes; track c.id; let impaire = $odd) {
+          @let e = etat(c);
+          <div class="ligne" [class.me-ligne-alternee]="impaire">
+            <span class="nom-classe"><strong>{{ c.libelle }}</strong><small>{{ c.niveau }}</small></span>
+            <span class="nombre" data-libelle="Élèves">{{ c.effectif }}</span>
+            <span class="nombre" data-libelle="Notes">{{ c.notes }}<small> · {{ c.matieres_notees }} matière{{ c.matieres_notees > 1 ? 's' : '' }}</small></span>
+            <span class="progression" data-libelle="Arrêtées">
+              <span class="barre"><span [style.width.%]="pourcentage(c)" [class.complete]="e === 'arretee'"></span></span>
+              <small>
+                {{ c.matieres_arretees }} / {{ c.matieres_notees }}
+                @if (e === 'arretee') { <ion-icon name="lock-closed-outline" class="verrou"></ion-icon> }
+              </small>
+            </span>
+            <span class="actions">
+              @if (!p.cloturee) {
+                @if (c.matieres_arretees) {
+                  <button type="button" class="me-bouton-texte" (click)="arreterClasse(c, true)" [disabled]="!!action()">
+                    @if (action() === c.id) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="lock-open-outline"></ion-icon> Rouvrir }
+                  </button>
+                }
+                @if (e !== 'arretee') {
+                  <button type="button" class="me-bouton-secondaire petit" (click)="arreterClasse(c)" [disabled]="!!action() || !c.notes">
+                    @if (action() === c.id) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="lock-closed-outline"></ion-icon> Arrêter }
+                  </button>
+                }
+              } @else {
+                <span class="me-badge">Période clôturée</span>
+              }
+            </span>
+          </div>
+        } @empty {
+          <div class="me-etat-vide">
+            <ion-icon name="school-outline"></ion-icon>
+            <strong>Aucune classe cette année</strong>
+          </div>
+        }
+      </section>
+    }
+  </div>
+</ion-content>

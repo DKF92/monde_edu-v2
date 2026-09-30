@@ -1,4 +1,5 @@
 /* You can add global styles to this file, and also import other style files */
+@use './theme/admin';
 
 // Filet de securite : quel que soit le contenu d'une page (nom d'etablissement
 // long, tres petit ecran, fort zoom navigateur...), jamais de scroll horizontal.
@@ -8,6 +9,11 @@ body {
   max-width: 100vw;
 }
 
+body {
+  font-family: var(--me-font);
+  -webkit-font-smoothing: antialiased;
+}
+
 // Evite qu'un mot long (email, nom d'etablissement) ne force un debordement
 // plutot qu'un retour a la ligne.
 h1,
@@ -15,4 +21,179 @@ h2,
 h3,
 p {
   overflow-wrap: break-word;
+}
+
+// ---------------------------------------------------------------------------
+// Briques communes de la charte (voir theme/variables.css pour les jetons).
+// Elles sont globales pour que toutes les futures pages (classes, notes,
+// paiements...) reprennent exactement le meme vocabulaire visuel.
+// ---------------------------------------------------------------------------
+
+// Teintes des modules : fixent --teinte / --teinte-fond, reutilises par
+// .me-pastille, les tuiles d'acces rapide, etc.
+@each $nom in 'bleu', 'vert', 'violet', 'orange', 'rose', 'cyan' {
+  .teinte-#{$nom} {
+    --teinte: var(--me-#{$nom});
+    --teinte-fond: var(--me-#{$nom}-fond);
+  }
+}
+
+// Carte blanche standard (blocs du tableau de bord, listes...).
+.me-carte {
+  background: var(--me-surface);
+  border: 1px solid var(--me-bordure);
+  border-radius: var(--me-rayon);
+  box-shadow: var(--me-ombre);
+  padding: 18px 20px;
+  min-width: 0;
+}
+
+.me-carte-entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+
+  h2 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--me-texte);
+    margin: 0;
+  }
+}
+
+// Lien discret "Voir tout".
+.me-lien {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ion-color-primary);
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// Icone dans une pastille coloree (teinte du module).
+.me-pastille {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--teinte-fond, var(--me-bleu-fond));
+  color: var(--teinte, var(--me-bleu));
+  font-size: 20px;
+}
+
+// Etat vide d'un bloc (aucune donnee) : jamais de fausses donnees.
+.me-etat-vide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 20px 8px 12px;
+  color: var(--me-texte-leger);
+  font-size: 13px;
+
+  ion-icon {
+    font-size: 30px;
+    color: var(--me-bordure);
+  }
+
+  strong {
+    color: var(--me-texte-doux);
+    font-weight: 600;
+  }
+}
+
+// Etiquette "Bientot" pour les modules pas encore developpes.
+.me-bientot {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--me-texte-leger);
+  background: var(--me-fond);
+  border: 1px solid var(--me-bordure);
+  border-radius: 999px;
+  padding: 1px 7px;
+  white-space: nowrap;
+}
+
+// En-tete de page (mobile et pages internes) : blanc, texte sombre, au lieu
+// de l'ancienne barre bleue pleine.
+ion-toolbar.me-toolbar {
+  --background: var(--me-surface);
+  --color: var(--me-texte);
+  --border-color: var(--me-bordure);
+
+  ion-title {
+    font-size: 17px;
+    font-weight: 700;
+  }
+}
+
+// Boites de confirmation (AlertController), rendues a la racine du document.
+ion-alert.alerte-me {
+  --backdrop-opacity: 0.55;
+  --max-width: 400px;
+
+  .alert-wrapper {
+    border-radius: 18px;
+  }
+
+  .alert-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--me-texte);
+  }
+
+  .alert-message {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--me-texte-doux);
+  }
+
+  .alert-button {
+    font-weight: 700;
+    text-transform: none;
+  }
+
+  .bouton-danger {
+    color: var(--ion-color-danger);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Taille du texte (echelle globale de l'interface, 30/09/2026).
+// Pour revenir a l'ancienne taille : mettre la valeur a 1.
+//   --me-echelle-web    : ordinateur (>= 992px). Ancienne taille : 1 (100 %).
+//   --me-echelle-mobile : telephone (< 768px).   Ancienne taille : 1 (100 %).
+// ---------------------------------------------------------------------------
+:root {
+  --me-echelle-web: 0.94;
+  --me-echelle-mobile: 0.9;
+}
+
+@media (min-width: 992px) {
+  ion-app {
+    zoom: var(--me-echelle-web);
+  }
+}
+
+@media (max-width: 767px) {
+  ion-app {
+    zoom: var(--me-echelle-mobile);
+  }
 }

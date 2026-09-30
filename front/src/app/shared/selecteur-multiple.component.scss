@@ -1,0 +1,78 @@
+// Complete selecteur.component.scss (charge avant ce fichier).
+
+.declencheur {
+  height: 44px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.invalide .declencheur {
+  border-color: var(--ion-color-danger);
+}
+
+.vider {
+  display: inline-flex;
+  flex-shrink: 0;
+  font-size: 18px;
+  color: var(--me-texte-leger);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--ion-color-danger);
+  }
+}
+
+.liste-multiple {
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+
+  ul {
+    flex: 1;
+    margin: 0;
+    padding: 6px;
+    list-style: none;
+    overflow-y: auto;
+  }
+}
+
+.tout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  border-bottom: 1px solid var(--me-bordure);
+  background: var(--me-surface);
+  color: var(--ion-color-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+
+  span {
+    font-weight: 600;
+    color: var(--me-texte-leger);
+  }
+
+  &:hover {
+    background: var(--me-survol);
+  }
+}
+
+.option {
+  min-height: 42px;
+
+  strong {
+    font-size: 14px;
+  }
+}
+
+.coche {
+  font-size: 20px;
+}

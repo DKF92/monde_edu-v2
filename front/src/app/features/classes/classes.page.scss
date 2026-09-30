@@ -1,0 +1,306 @@
+// Cartes sur mobile, tableau des que la carte-liste est assez large.
+$tableau: 900px;
+
+.boutons-entete {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  @media (max-width: 559px) {
+    width: 100%;
+
+    button {
+      flex: 1 1 calc(50% - 8px);
+      justify-content: center;
+    }
+  }
+}
+
+// ============================ Compteurs ============================
+
+.compteurs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+
+  > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  @media (min-width: 900px) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 16px;
+
+    > :first-child {
+      grid-column: auto;
+    }
+  }
+}
+
+.compteur {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+
+  > span:last-child {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  strong {
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+}
+
+// ============================ Liste ============================
+
+.liste {
+  padding: 0;
+  container-type: inline-size;
+}
+
+.filtres {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: 1px solid var(--me-bordure);
+
+  .me-recherche {
+    grid-column: 1 / -1;
+  }
+
+  @media (min-width: 760px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  @media (min-width: 1280px) {
+    grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(0, 1fr));
+
+    .me-recherche {
+      grid-column: auto;
+    }
+  }
+}
+
+.squelette {
+  padding: 14px 20px;
+}
+
+.titre-tableau {
+  padding: 14px 20px 4px;
+
+  h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--me-texte);
+  }
+}
+
+.tableau {
+  padding: 4px 8px 10px;
+}
+
+.ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 12px;
+  padding: 12px;
+  border-radius: 12px;
+
+  &.cliquable {
+    cursor: pointer;
+  }
+
+  @container (min-width: #{$tableau}) {
+    grid-template-columns: minmax(140px, 1.2fr) minmax(130px, 1fr) 64px 64px 70px 70px minmax(150px, 1.3fr) 150px;
+    align-items: center;
+    border-radius: 10px;
+
+    &:not(.entete-tableau):hover {
+      background: var(--me-survol);
+    }
+  }
+}
+
+.entete-tableau {
+  display: none;
+
+  @container (min-width: #{$tableau}) {
+    display: grid;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--me-texte-leger);
+  }
+}
+
+.a-droite {
+  text-align: right;
+}
+
+.centre {
+  @container (min-width: #{$tableau}) {
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+.cellule-classe {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+
+  > span:last-child {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  strong {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--me-texte);
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+}
+
+.cellule-effectif {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--me-texte-doux);
+
+  strong {
+    font-size: 15px;
+    color: var(--me-texte);
+  }
+
+  small {
+    font-size: 11px;
+    color: var(--me-texte-leger);
+  }
+}
+
+.jauge {
+  display: block;
+  width: 100%;
+  max-width: 180px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--me-bordure);
+  overflow: hidden;
+
+  span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--me-vert);
+  }
+
+  &.pleine span {
+    background: var(--ion-color-danger);
+  }
+}
+
+.cellule {
+  display: flex;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--me-texte);
+  font-variant-numeric: tabular-nums;
+
+  &[data-libelle]::before {
+    content: attr(data-libelle);
+    flex: 0 0 110px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--me-texte-leger);
+  }
+
+  @container (min-width: #{$tableau}) {
+    &[data-libelle]::before {
+      content: none;
+    }
+  }
+}
+
+.cellule-encadrement {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+
+  small {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--me-texte-doux);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    ion-icon {
+      flex-shrink: 0;
+      font-size: 14px;
+      color: var(--me-texte-leger);
+    }
+  }
+}
+
+.actions {
+  justify-content: flex-end;
+
+  .me-action {
+    border: 1px solid var(--me-bordure);
+    background: var(--me-surface);
+  }
+
+  @container (min-width: #{$tableau}) {
+    .me-action {
+      border: none;
+      background: none;
+    }
+  }
+}
+
+// ============================ Formulaire ============================
+
+.nom-classe {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.apercu-lot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  .me-badge {
+    font-size: 12px;
+    padding: 5px 12px;
+  }
+}

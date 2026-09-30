@@ -1,0 +1,200 @@
+<ion-content class="me-page-admin">
+  @if (peutVoir()) {
+    <ion-refresher slot="fixed" (ionRefresh)="charger($event)">
+      <ion-refresher-content></ion-refresher-content>
+    </ion-refresher>
+  }
+
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        @if (peutEncaisser()) {
+          <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/paiements')">
+            <ion-icon name="chevron-back-outline"></ion-icon> Caisse
+          </button>
+        }
+        <h1>{{ mesEncaissements() ? 'Mes encaissements' : 'Paiements' }}</h1>
+        <p>Liste des paiements de l'année scolaire en cours : reçus, totaux par mode de paiement.</p>
+      </div>
+      @if (peutEncaisser()) {
+        <button type="button" class="me-bouton-principal" (click)="encaisser()">
+          <ion-icon name="cash-outline"></ion-icon>
+          <span>Encaisser</span>
+        </button>
+      }
+    </header>
+
+    @if (cellule() || titreBilan()) {
+      <p class="me-note filtre-bilan">
+        <ion-icon name="funnel-outline"></ion-icon>
+        <span>
+          {{ titreBilan() }}@if (cellule()) { · <strong>{{ cellule()!.libelle }}</strong> }
+          @if (totalParts() !== null) { : {{ f(totalParts()) }} au total. }
+        </span>
+        @if (cellule()) {
+          <button type="button" class="me-bouton-texte" (click)="retirerCellule()"><ion-icon name="close-circle-outline"></ion-icon> Tous les frais</button>
+        }
+      </p>
+    }
+
+    @if (!peutVoir()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="lock-closed-outline"></ion-icon>
+          <strong>Journal des paiements non accessible</strong>
+          <span>Votre poste permet d'encaisser, pas de consulter le journal.</span>
+        </div>
+      </section>
+    } @else {
+      <!-- ================= Recherche par matricule ================= -->
+      <section class="me-carte recherche-matricule">
+        <form class="me-champ" (submit)="$event.preventDefault(); chercherMatricule()">
+          <label class="libelle" for="p-matricule">Rechercher par matricule</label>
+          <span class="saisie-matricule">
+            <span class="champ">
+              <input id="p-matricule" class="me-saisie matricule" type="text" placeholder="Ex : 18583394P" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20" [value]="saisieMatricule()" (input)="saisieMatricule.set(valeurTexte($event).toUpperCase())" />
+              @if (saisieMatricule() || matricule()) {
+                <button type="button" class="me-action effacer" aria-label="Effacer le matricule" title="Effacer" (click)="effacerMatricule()"><ion-icon name="close-circle-outline"></ion-icon></button>
+              }
+            </span>
+            <button type="submit" class="me-bouton-principal loupe" aria-label="Rechercher le matricule" title="Rechercher" [disabled]="!saisieMatricule().trim() && !matricule()"><ion-icon name="search-outline"></ion-icon></button>
+          </span>
+        </form>
+        <p class="me-aide-champ">
+          @if (matricule().trim()) {
+            Tous les paiements de l'élève sur l'année scolaire, quel que soit l'encaisseur.
+          } @else if (peutEncaisser()) {
+            La liste montre vos encaissements ; le matricule d'un élève affiche tous ses paiements.
+          } @else {
+            Matricule exact de l'élève : tous ses paiements de l'année.
+          }
+        </p>
+      </section>
+
+      <!-- ================= Periode ================= -->
+      @if (!matricule().trim()) {
+      <div class="periodes me-segments" role="radiogroup" aria-label="Période">
+        @for (p of periodes; track p.valeur) {
+          <button type="button" [class.actif]="periode() === p.valeur" (click)="choisirPeriode(p.valeur)">{{ p.libelle }}</button>
+        }
+        @if (periode() === 'dates') {
+          <span class="dates">
+            <input class="me-saisie" type="date" aria-label="Du" [value]="du()" (change)="majDate('du', valeurTexte($event))" />
+            <span>au</span>
+            <input class="me-saisie" type="date" aria-label="Au" [value]="au()" (change)="majDate('au', valeurTexte($event))" />
+          </span>
+        }
+      </div>
+
+      }
+
+      <!-- ================= Totaux ================= -->
+      <section class="totaux" aria-label="Totaux">
+        <div class="me-carte total-general">
+          <span class="me-pastille teinte-cyan"><ion-icon name="receipt-outline"></ion-icon></span>
+          <span><strong>{{ f(totaux()?.montant) }}</strong><small>{{ totaux()?.nombre ?? 0 }} paiement{{ (totaux()?.nombre ?? 0) > 1 ? 's' : '' }}</small></span>
+        </div>
+        @for (c of cartesMode; track c.mode) {
+          <button type="button" class="me-carte total-mode" [class.actif]="mode() === c.mode" (click)="choisirMode(mode() === c.mode ? '' : c.mode)">
+            <span [class]="'me-pastille teinte-' + c.teinte"><ion-icon [name]="c.icone"></ion-icon></span>
+            <span><strong>{{ f(totaux()?.par_mode?.[c.mode]) }}</strong><small>{{ libellesMode[c.mode] }}</small></span>
+          </button>
+        }
+      </section>
+
+      <!-- ================= Journal ================= -->
+      <section class="me-carte liste">
+        <div class="filtres">
+          <label class="me-recherche">
+            <ion-icon name="search-outline"></ion-icon>
+            <input type="search" placeholder="Rechercher (élève, matricule, n° de reçu…)" aria-label="Rechercher un paiement" [value]="recherche()" (input)="rechercher(valeurTexte($event))" />
+            @if (liste.actualisation() && !liste.chargementInitial()) {
+              <ion-spinner name="crescent" class="attente-recherche"></ion-spinner>
+            }
+          </label>
+          <app-selecteur idChamp="filtre-mode" icone="wallet-outline" [options]="optionsMode()" [valeur]="rangMode()" (valeurChange)="choisirRangMode($event)"></app-selecteur>
+          @if (!peutEncaisser() && !matricule().trim()) {
+            <app-selecteur idChamp="filtre-caissier" icone="person-outline" [options]="optionsCaissier()" [valeur]="caissier()" (valeurChange)="choisirCaissier($event)"></app-selecteur>
+          }
+        </div>
+
+        @if (liste.chargementInitial()) {
+          @for (i of [1, 2, 3]; track i) {
+            <div class="squelette"><ion-skeleton-text [animated]="true" style="width: 60%"></ion-skeleton-text></div>
+          }
+        } @else if (liste.erreur()) {
+          <div class="me-etat-vide">
+            <ion-icon name="cloud-offline-outline"></ion-icon>
+            <strong>Impossible de charger les paiements</strong>
+            <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+          </div>
+        } @else {
+          <div class="titre-tableau">
+            <h2>{{ titre() }}</h2>
+            @if (liste.chargementFond()) {
+              <span class="etat-chargement"><ion-spinner name="dots"></ion-spinner> {{ liste.charges() }} / {{ liste.total() }} chargés</span>
+            }
+          </div>
+
+          <div class="tableau" role="table" aria-label="Paiements" [class.attenue]="liste.actualisation()">
+            <div class="ligne entete-tableau" role="row">
+              <span role="columnheader">Date</span>
+              <span role="columnheader">Élève</span>
+              <span role="columnheader">Versement</span>
+              <span role="columnheader">Mode</span>
+              <span role="columnheader" class="a-droite">Montant</span>
+              <span role="columnheader" class="a-droite">Actions</span>
+            </div>
+            @for (r of lignesPage(); track r.id; let impaire = $odd) {
+              <div class="ligne cliquable" role="row" [class.me-ligne-alternee]="impaire" (click)="ouvrir(r)">
+                <span class="cellule date" role="cell">
+                  <strong>{{ dateFr(r.date) }}</strong><small>{{ heure(r.date) }}</small>
+                </span>
+                <span class="cellule-eleve" role="cell">
+                  <strong>{{ r.eleve?.nom }} {{ r.eleve?.prenoms }}</strong>
+                  <small><span class="matricule">{{ r.eleve?.matricule }}</span>{{ r.classe ? ' · ' + r.classe : '' }}</small>
+                </span>
+                <span class="cellule" role="cell" data-libelle="Versement">
+                  {{ versement(r.numero_versement) }}<small class="recu">n° {{ r.numero_recu }}{{ r.caissier ? ' · ' + r.caissier : '' }}</small>
+                </span>
+                <span class="cellule" role="cell" data-libelle="Mode"><span class="me-badge">{{ libellesMode[r.mode] }}</span></span>
+                <span class="cellule montant" role="cell" data-libelle="Montant">
+                  {{ f(r.montant) }}
+                  @if (r.part !== null && r.part !== undefined && r.part !== r.montant) {
+                    <small class="part">dont {{ f(r.part) }}</small>
+                  }
+                </span>
+                <span class="cellule actions" role="cell">
+                  <button type="button" class="me-action" title="Imprimer le reçu" aria-label="Imprimer le reçu" (click)="imprimer(r, $event)">
+                    <ion-icon name="print-outline"></ion-icon>
+                  </button>
+                  @if (peutModifier()) {
+                    <button type="button" class="me-action" title="Modifier le paiement" aria-label="Modifier le paiement" (click)="modifier(r, $event)">
+                      <ion-icon name="create-outline"></ion-icon>
+                    </button>
+                    <button type="button" class="me-action danger" title="Supprimer le paiement" aria-label="Supprimer le paiement" (click)="supprimer(r, $event)">
+                      <ion-icon name="trash-outline"></ion-icon>
+                    </button>
+                  }
+                </span>
+              </div>
+            } @empty {
+              @if (!pageEnAttente()) {
+                <div class="me-etat-vide">
+                  <ion-icon name="receipt-outline"></ion-icon>
+                  <strong>Aucun paiement sur cette période</strong>
+                  @if (peutEncaisser()) {
+                    <button type="button" class="me-bouton-principal" (click)="encaisser()">
+                      <ion-icon name="cash-outline"></ion-icon> Encaisser
+                    </button>
+                  }
+                </div>
+              }
+            }
+          </div>
+          <app-pagination [total]="liste.total()" [page]="page()" [taille]="taille()" (pageChange)="page.set($event)" (tailleChange)="changerTaille($event)"></app-pagination>
+        }
+      </section>
+    }
+  </div>
+</ion-content>

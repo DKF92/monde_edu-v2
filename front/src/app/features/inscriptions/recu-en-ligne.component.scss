@@ -1,0 +1,139 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.infos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--me-fond);
+
+  div {
+    min-width: 0;
+  }
+
+  dt {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--me-texte-leger);
+  }
+
+  dd {
+    margin: 2px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--me-texte);
+    overflow-wrap: anywhere;
+  }
+}
+
+.ecarts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+
+  .aide {
+    margin: -6px 0 0;
+  }
+}
+
+.tableau-ecarts {
+  width: 100%;
+  border: 1px solid var(--me-bordure);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ligne-ecart {
+  display: grid;
+  grid-template-columns: 24px minmax(90px, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: var(--me-surface);
+  color: var(--me-texte);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+
+  &.me-ligne-alternee {
+    background: var(--me-ligne-alternee);
+  }
+
+  &.entete {
+    cursor: default;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--me-texte-leger);
+    border-bottom: 1px solid var(--me-bordure);
+  }
+
+  ion-icon {
+    font-size: 19px;
+    color: var(--me-bordure);
+  }
+
+  .libelle {
+    font-weight: 600;
+  }
+
+  .notre {
+    color: var(--me-texte-doux);
+    text-decoration: line-through;
+    text-decoration-color: transparent;
+    overflow-wrap: anywhere;
+  }
+
+  .etat {
+    font-weight: 700;
+    color: var(--me-marine);
+    overflow-wrap: anywhere;
+  }
+
+  &.choisi {
+    ion-icon {
+      color: var(--ion-color-primary);
+    }
+
+    .notre {
+      text-decoration-color: currentColor;
+    }
+  }
+
+  @media (max-width: 559px) {
+    grid-template-columns: 24px minmax(0, 1fr);
+
+    &.entete {
+      display: none;
+    }
+
+    .notre,
+    .etat {
+      grid-column: 2;
+    }
+  }
+}
+
+h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.aide {
+  font-size: 13px;
+  color: var(--me-texte-doux);
+}

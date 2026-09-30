@@ -1,0 +1,469 @@
+// ============================ Onglets ============================
+
+.onglets {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  overflow-x: auto;
+  border: 1px solid var(--me-bordure);
+  border-radius: 14px;
+  background: var(--me-surface);
+  scrollbar-width: none;
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex: 1 0 auto;
+    height: 40px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 10px;
+    background: none;
+    color: var(--me-texte-doux);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+
+    ion-icon {
+      font-size: 17px;
+    }
+
+    &:hover:not(.actif) {
+      background: var(--me-survol);
+    }
+
+    &.actif {
+      background: var(--me-marine);
+      color: #fff;
+    }
+  }
+
+  // Petit ecran : 3 onglets egaux, sans icone, libelle sur 2 lignes si besoin.
+  @media (max-width: 560px) {
+    button {
+      flex: 1 1 0;
+      min-width: 0;
+      height: auto;
+      min-height: 40px;
+      padding: 6px 8px;
+      font-size: 12px;
+      line-height: 1.2;
+      white-space: normal;
+      text-align: center;
+
+      ion-icon {
+        display: none;
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .bloc {
+    padding: 16px;
+  }
+}
+
+.bloc-entete {
+  flex-wrap: wrap;
+
+  .me-bouton-secondaire {
+    height: 40px;
+    padding: 0 14px;
+  }
+}
+
+// ============================ Grille des montants ============================
+
+.grille-tarif {
+  margin-top: 18px;
+}
+
+.rang {
+  display: grid;
+  // Libelles jamais ecrases : les champs retrecissent d'abord.
+  grid-template-columns: minmax(84px, 1fr) minmax(0, 150px) minmax(0, 150px);
+  align-items: center;
+  gap: 8px;
+  margin: 0 -8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+
+  .libelle {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    font-size: 14px;
+    color: var(--me-texte);
+
+    small {
+      font-size: 11px;
+      color: var(--me-texte-leger);
+    }
+  }
+
+  .me-montant {
+    min-width: 0;
+  }
+
+  .me-saisie {
+    height: 40px;
+    padding-left: 8px;
+    padding-right: 24px;
+  }
+
+  &.entete {
+    padding-top: 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--me-texte-leger);
+
+    span:not(:first-child) {
+      text-align: right;
+    }
+  }
+
+  &.total {
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--me-bordure);
+    border-radius: 0;
+
+    .libelle {
+      font-weight: 700;
+    }
+
+    strong {
+      text-align: right;
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--me-marine);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+
+  &.minimum {
+    background: var(--me-orange-fond);
+
+    .libelle {
+      font-weight: 600;
+    }
+  }
+}
+
+// Unite "F" plus proche du champ.
+.grille-tarif .me-montant::after {
+  right: 10px;
+}
+
+.groupe-titre {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--me-texte-leger);
+}
+
+.identiques {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--me-texte-doux);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+
+  ion-icon {
+    font-size: 17px;
+    color: var(--me-bordure);
+  }
+
+  &.choisi ion-icon {
+    color: var(--ion-color-primary);
+  }
+}
+
+// ============================ Recapitulatif ============================
+
+.recap-ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--me-texte);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+
+  &:is(button) {
+    cursor: pointer;
+
+    &:hover {
+      background: var(--me-survol);
+    }
+  }
+
+  &.me-ligne-alternee {
+    background: var(--me-ligne-alternee);
+  }
+
+  &.courant {
+    box-shadow: inset 3px 0 0 var(--ion-color-primary);
+  }
+
+  // Colonnes de montants alignees a droite ; la 1re colonne (niveau) a gauche,
+  // en-tete compris.
+  > :first-child {
+    text-align: left;
+  }
+
+  > span:not(:first-child) {
+    display: flex;
+    flex-direction: column;
+    text-align: right;
+  }
+
+  small {
+    font-size: 11px;
+    color: var(--me-texte-leger);
+  }
+
+  .a-saisir {
+    grid-column: span 2;
+    align-items: flex-end;
+  }
+
+  &.entete {
+    padding-top: 0;
+    padding-bottom: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--me-texte-leger);
+  }
+}
+
+// ============================ Reductions ============================
+
+.reduction {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 -8px;
+  padding: 12px;
+  border-radius: 12px;
+
+  &.inactif .reduction-texte {
+    opacity: 0.55;
+  }
+}
+
+.reduction-texte {
+  flex: 1;
+  min-width: 0;
+
+  strong {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  ul {
+    margin: 6px 0 0;
+    padding-left: 18px;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--me-texte-doux);
+  }
+
+  b {
+    color: var(--me-texte);
+    font-weight: 600;
+  }
+}
+
+.reduction-actions {
+  display: flex;
+  gap: 6px;
+
+  .me-action {
+    border: 1px solid var(--me-bordure);
+    background: var(--me-surface);
+  }
+}
+
+.choix-base {
+  display: grid;
+  gap: 8px;
+
+  @media (min-width: 560px) {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+// ============================ Types de frais ============================
+
+.ajout-frais {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+
+  .me-champ {
+    flex: 1;
+  }
+
+  .me-bouton-secondaire {
+    margin-top: 25px;
+  }
+}
+
+.frais {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    margin: 0 -8px;
+    padding: 4px 8px;
+    border-radius: 10px;
+
+    .me-saisie {
+      flex: 1;
+      height: 38px;
+    }
+  }
+}
+
+.rang-frais {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--me-fond);
+  color: var(--me-texte-doux);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.frais-nom {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+}
+
+.frais li.inactif .frais-texte {
+  opacity: 0.5;
+}
+
+.frais-texte {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+
+  .frais-nom {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+// Types d'eleve concernes par le frais.
+.concernes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.concerne {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px 0 6px;
+  border: 1px solid var(--me-bordure);
+  border-radius: 999px;
+  background: var(--me-surface);
+  color: var(--me-texte-leger);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+
+  ion-icon {
+    font-size: 15px;
+  }
+
+  &.choisi {
+    border-color: #c9d5f5;
+    background: #f4f7ff;
+    color: var(--me-marine);
+
+    ion-icon {
+      color: var(--ion-color-primary);
+    }
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+}
+
+// Minimum calcule : affiche grise, non modifiable.
+.rang.minimum .me-saisie:disabled {
+  color: var(--me-texte);
+  font-weight: 700;
+  opacity: 1;
+}
+
+.groupe-titre .precision {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--me-texte-leger);
+}
+
+.nature-frais {
+  margin-bottom: 4px;
+}

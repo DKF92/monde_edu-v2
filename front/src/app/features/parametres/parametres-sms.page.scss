@@ -1,0 +1,156 @@
+.chiffres {
+  display: grid;
+  gap: 12px;
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+.chiffre {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+
+  > span:last-child {
+    display: flex;
+    flex-direction: column;
+  }
+
+  strong {
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+}
+
+.bloc-entete {
+  flex-wrap: wrap;
+
+  .me-bouton-secondaire {
+    height: 40px;
+    padding: 0 14px;
+  }
+}
+
+.reglage-actif {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--me-fond);
+
+  > span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  strong {
+    font-size: 14px;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+}
+
+.bloc-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.filtres-sms {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 10px;
+
+  @media (min-width: 640px) {
+    grid-template-columns: minmax(0, 1fr) 220px;
+  }
+}
+
+// Tableaux (rechargements, historique) : cartes sur petit ecran.
+.tableau-bloc {
+  container-type: inline-size;
+}
+
+.rangee {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+
+  > span {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  small {
+    font-size: 11px;
+    color: var(--me-texte-leger);
+  }
+
+  &.entete {
+    display: none;
+  }
+
+  @container (min-width: 600px) {
+    grid-template-columns: minmax(150px, 1.4fr) 90px 110px minmax(120px, 1fr);
+    align-items: center;
+    gap: 12px;
+
+    &.entete {
+      display: grid;
+      padding-top: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--me-texte-leger);
+    }
+
+    .droite {
+      text-align: right;
+    }
+  }
+}
+
+.historique .rangee {
+  @container (min-width: 600px) {
+    grid-template-columns: 140px minmax(120px, 1fr) minmax(0, 2fr) 100px;
+  }
+}
+
+.fort {
+  font-weight: 700;
+  color: var(--me-vert);
+}
+
+.doux {
+  color: var(--me-texte-doux);
+}
+
+.message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  small {
+    white-space: nowrap;
+  }
+}

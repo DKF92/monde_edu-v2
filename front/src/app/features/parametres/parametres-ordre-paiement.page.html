@@ -1,0 +1,123 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/parametres')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Paramètres
+        </button>
+        <h1>Ordre de paiement</h1>
+        <p>Répartition d'un montant encaissé sur les frais de l'élève.</p>
+      </div>
+    </header>
+
+    <p class="me-note">
+      <ion-icon name="information-circle-outline"></ion-icon>
+      <span>
+        Quand un montant est encaissé, il paie d'abord le <strong>1er frais</strong> de la liste jusqu'à le solder ;
+        ce qui reste du versement passe au <strong>2e frais</strong>, puis au suivant, et ainsi de suite.
+        Les dettes des années précédentes sont réglées à part, avec leur propre montant. Le nouvel ordre s'applique aux prochains encaissements.
+      </span>
+    </p>
+
+    @if (erreur() && !tarifs()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les types de frais</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (!tarifs()) {
+      <section class="me-carte">
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 220px"></ion-skeleton-text>
+      </section>
+    } @else {
+      <div class="colonnes">
+        <!-- ================= Ordre ================= -->
+        <section class="me-carte bloc">
+          <div class="bloc-entete">
+            <span class="me-pastille teinte-vert"><ion-icon name="swap-vertical-outline"></ion-icon></span>
+            <div>
+              <h2>Ordre des frais</h2>
+              <p>Flèches ou glisser-déposer pour changer l'ordre.</p>
+            </div>
+            <button type="button" class="me-bouton-texte" (click)="ordreV1()" title="Frais annexes, puis inscription, puis scolarité">
+              <ion-icon name="refresh-outline"></ion-icon> Ordre par défaut
+            </button>
+          </div>
+          <ol class="ordre">
+            @for (t of types(); track t.id; let i = $index; let premier = $first; let dernier = $last) {
+              <li draggable="true" [class.inactif]="!t.is_active" (dragstart)="debutGlisser(i)" (dragover)="$event.preventDefault()" (drop)="deposer(i)">
+                <span class="rang">{{ i + 1 }}</span>
+                <span class="texte">
+                  <strong>{{ t.libelle }}</strong>
+                  <small>{{ natures[t.nature] ?? t.nature }}{{ t.is_active ? '' : ' · désactivé' }}</small>
+                </span>
+                <span class="fleches">
+                  <button type="button" class="me-action" [disabled]="premier" (click)="deplacer(i, -1)" [attr.aria-label]="'Monter ' + t.libelle" title="Payer plus tôt"><ion-icon name="chevron-up-outline"></ion-icon></button>
+                  <button type="button" class="me-action" [disabled]="dernier" (click)="deplacer(i, 1)" [attr.aria-label]="'Descendre ' + t.libelle" title="Payer plus tard"><ion-icon name="chevron-down-outline"></ion-icon></button>
+                </span>
+              </li>
+            }
+          </ol>
+        </section>
+
+        <!-- ================= Simulation ================= -->
+        <section class="me-carte bloc simulation">
+          <div class="bloc-entete">
+            <span class="me-pastille teinte-bleu"><ion-icon name="calculator-outline"></ion-icon></span>
+            <div>
+              <h2>Simulation</h2>
+              <p>Avec les montants d'inscription d'un niveau.</p>
+            </div>
+          </div>
+          <div class="champs">
+            <div class="me-champ">
+              <span class="libelle">Niveau</span>
+              <app-selecteur idChamp="o-niveau" icone="school-outline" [options]="optionsNiveau()" [valeur]="niveauId()" (valeurChange)="niveauId.set($event)"></app-selecteur>
+            </div>
+            <div class="me-segments" role="radiogroup" aria-label="Statut">
+              <button type="button" role="radio" [class.actif]="!affecte()" [attr.aria-checked]="!affecte()" (click)="affecte.set(false)">Non affecté</button>
+              <button type="button" role="radio" [class.actif]="affecte()" [attr.aria-checked]="affecte()" (click)="affecte.set(true)">Affecté</button>
+            </div>
+            <div class="me-champ">
+              <label for="o-montant">Montant encaissé</label>
+              <span class="me-montant" data-unite="F"><input id="o-montant" class="me-saisie" inputmode="numeric" [value]="montant()" (input)="montant.set(valeurTexte($event))" /></span>
+            </div>
+          </div>
+          @if (simulation(); as s) {
+            <ol class="repartition">
+              @for (l of s.lignes; track l.id; let i = $index) {
+                <li [class.solde]="l.part === l.du" [class.partiel]="l.part > 0 && l.part < l.du">
+                  <span class="rang">{{ i + 1 }}</span>
+                  <span class="texte"><strong>{{ l.libelle }}</strong><small>dû {{ f(l.du) }}</small></span>
+                  <span class="part">
+                    {{ f(l.part) }}
+                    <small>{{ l.part === l.du ? 'soldé' : l.part ? 'reste ' + f(l.du - l.part) : 'rien' }}</small>
+                  </span>
+                </li>
+              } @empty {
+                <li class="vide">Aucun montant d'inscription saisi pour ce niveau (Paramètres paiements).</li>
+              }
+            </ol>
+            @if (s.reste > 0) {
+              <p class="me-aide-champ">Le montant dépasse le total dû ({{ f(s.total) }}) : {{ f(s.reste) }} ne seraient pas répartis (la caisse refuse ce cas).</p>
+            }
+          } @else {
+            <p class="me-aide-champ">Aucun montant d'inscription pour ce niveau et ce statut.</p>
+          }
+        </section>
+      </div>
+
+      @if (modifie()) {
+        <div class="me-barre-enregistrer">
+          <span class="etat">Ordre modifié, non enregistré</span>
+          <button type="button" class="me-bouton-texte" (click)="annuler()" [disabled]="enregistrement()">Annuler</button>
+          <button type="button" class="me-bouton-principal" (click)="enregistrer()" [disabled]="enregistrement()">
+            @if (enregistrement()) { <ion-spinner name="dots"></ion-spinner> } @else { Enregistrer l'ordre }
+          </button>
+        </div>
+      }
+    }
+  </div>
+</ion-content>

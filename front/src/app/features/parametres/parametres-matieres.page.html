@@ -1,0 +1,151 @@
+<ion-content class="me-page-admin">
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/parametres')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Paramètres
+        </button>
+        <h1>Matières et coefficients</h1>
+        <p>Matières enseignées dans chaque niveau et leur coefficient dans la moyenne.</p>
+      </div>
+      <button type="button" class="me-bouton-principal" (click)="nouvelle()" [disabled]="!donnees()">
+        <ion-icon name="add-outline"></ion-icon> Nouvelle matière
+      </button>
+    </header>
+
+    <p class="me-note">
+      <ion-icon name="information-circle-outline"></ion-icon>
+      <span>
+        Laissez un coefficient <strong>vide</strong> si la matière n'est pas enseignée dans le niveau. Les langues (Allemand, Espagnol)
+        ne concernent que les élèves qui les suivent. La <strong>conduite</strong> est notée par l'éducateur (Absences › Conduite).
+      </span>
+    </p>
+
+    @if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les matières</strong>
+          <button type="button" class="me-lien" (click)="ionViewWillEnter()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (!donnees()) {
+      <section class="me-carte"><ion-skeleton-text [animated]="true" style="width: 100%; height: 200px"></ion-skeleton-text></section>
+    } @else {
+      <div class="me-segments cycles" role="radiogroup" aria-label="Cycle">
+        @for (c of cycles; track c.valeur) {
+          <button type="button" role="radio" [attr.aria-checked]="cycle() === c.valeur" [class.actif]="cycle() === c.valeur" (click)="cycle.set(c.valeur)">{{ c.libelle }}</button>
+        }
+      </div>
+
+      <section class="me-carte tableau-coef">
+        <div class="defilant">
+          <table>
+            <thead>
+              <tr>
+                <th class="matiere">Matière</th>
+                @for (n of niveaux(); track n.id) {
+                  <th>{{ n.libelle }}<small>{{ enseignees(n.id) }} matières</small></th>
+                }
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (m of matieres(); track m.id) {
+                <tr>
+                  <td class="matiere">
+                    <button type="button" class="nom" [disabled]="m.reservee" (click)="modifier(m)" [attr.aria-label]="'Modifier ' + m.libelle">
+                      <strong>{{ m.libelle }}</strong>
+                      <small><span class="code">{{ m.code }}</span> · {{ libellesGroupe[m.groupe] }}{{ m.reservee ? ' · réservée' : '' }}</small>
+                    </button>
+                  </td>
+                  @for (n of niveaux(); track n.id) {
+                    <td>
+                      <input
+                        class="me-saisie"
+                        type="text"
+                        inputmode="numeric"
+                        maxlength="2"
+                        placeholder="—"
+                        [attr.aria-label]="'Coefficient ' + m.libelle + ' en ' + n.libelle"
+                        [class.invalide]="invalides().includes(cle(m.id, n.id))"
+                        [value]="saisies()[cle(m.id, n.id)]"
+                        (input)="saisir(m.id, n.id, valeurTexte($event))"
+                      />
+                    </td>
+                  }
+                  <td class="actions">
+                    @if (!m.reservee) {
+                      <button type="button" class="me-action" title="Modifier" [attr.aria-label]="'Modifier ' + m.libelle" (click)="modifier(m)"><ion-icon name="create-outline"></ion-icon></button>
+                      @if (!m.utilisee) {
+                        <button type="button" class="me-action danger" title="Supprimer" [attr.aria-label]="'Supprimer ' + m.libelle" (click)="supprimer(m)"><ion-icon name="trash-outline"></ion-icon></button>
+                      }
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="me-barre-enregistrer">
+        <span class="etat" [class.modifie]="changements().length > 0">
+          {{ invalides().length ? 'Coefficients entiers de 1 à 20.' : changements().length ? changements().length + ' coefficient' + (changements().length > 1 ? 's' : '') + ' modifié' + (changements().length > 1 ? 's' : '') : 'Tout est enregistré' }}
+        </span>
+        @if (changements().length) {
+          <button type="button" class="me-bouton-texte" (click)="annuler()" [disabled]="enregistrement()">Annuler</button>
+        }
+        <button type="button" class="me-bouton-principal" (click)="enregistrer()" [disabled]="!changements().length || invalides().length > 0 || enregistrement()">
+          @if (enregistrement()) { <ion-spinner name="dots"></ion-spinner> } @else { Enregistrer }
+        </button>
+      </div>
+    }
+  </div>
+</ion-content>
+
+<ion-modal class="me-modale-formulaire auto" [isOpen]="modale()" (didDismiss)="modale.set(false)">
+  <ng-template>
+    <div class="me-modale">
+      <header>
+        <span class="me-pastille teinte-violet"><ion-icon name="book-outline"></ion-icon></span>
+        <div>
+          <h1>{{ edition() ? 'Modifier ' + edition()!.libelle : 'Nouvelle matière' }}</h1>
+          <p>Le groupe place la matière dans le bilan lettres ou sciences du bulletin.</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="modale.set(false)" aria-label="Fermer"><ion-icon name="close-outline"></ion-icon></button>
+      </header>
+      <div class="corps">
+        <section class="me-grille">
+          <div class="me-champ">
+            <label for="m-libelle">Nom <span class="me-requis">*</span></label>
+            <input id="m-libelle" class="me-saisie" type="text" maxlength="100" placeholder="Ex : Mathématiques" [class.invalide]="!!erreursMatiere()['libelle']" [value]="mLibelle()" (input)="mLibelle.set(valeurTexte($event))" />
+            @if (erreursMatiere()['libelle']; as e) { <p class="me-erreur-champ">{{ e }}</p> }
+          </div>
+          <div class="me-champ">
+            <label for="m-code">Code <span class="me-requis">*</span></label>
+            <input id="m-code" class="me-saisie code-saisie" type="text" maxlength="15" placeholder="Ex : MATH" [class.invalide]="!!erreursMatiere()['code']" [value]="mCode()" (input)="mCode.set(valeurTexte($event).toUpperCase())" />
+            @if (erreursMatiere()['code']; as e) { <p class="me-erreur-champ">{{ e }}</p> } @else { <p class="me-aide-champ">Affiché en tête de colonne des résultats.</p> }
+          </div>
+          <div class="me-champ large">
+            <span class="libelle">Groupe</span>
+            <div class="me-segments" role="radiogroup" aria-label="Groupe">
+              @for (g of donnees()?.groupes ?? []; track g.valeur) {
+                <button type="button" role="radio" [attr.aria-checked]="mGroupe() === g.valeur" [class.actif]="mGroupe() === g.valeur" (click)="mGroupe.set(g.valeur)">{{ g.libelle }}</button>
+              }
+            </div>
+          </div>
+        </section>
+      </div>
+      <footer>
+        @if (edition() && !edition()!.utilisee) {
+          <button type="button" class="me-bouton-texte danger" (click)="supprimer(edition()!)"><ion-icon name="trash-outline"></ion-icon> Supprimer</button>
+        }
+        <button type="button" class="me-bouton-texte" (click)="modale.set(false)" [disabled]="enregistrement()">Annuler</button>
+        <button type="button" class="me-bouton-principal" (click)="enregistrerMatiere()" [disabled]="enregistrement()">
+          @if (enregistrement()) { <ion-spinner name="dots"></ion-spinner> } @else { {{ edition() ? 'Enregistrer' : 'Ajouter' }} }
+        </button>
+      </footer>
+    </div>
+  </ng-template>
+</ion-modal>

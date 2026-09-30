@@ -1,22 +1,212 @@
-<ion-tabs>
-  <ion-tab-bar slot="bottom">
-    <ion-tab-button tab="dashboard" href="/tabs/dashboard">
-      <ion-icon name="home-outline"></ion-icon>
-      <ion-label>Accueil</ion-label>
-    </ion-tab-button>
+<ion-split-pane contentId="contenu-principal" when="lg" [class.menu-reduit]="menuReduit()">
+  <!-- ================= Menu lateral ================= -->
+  <ion-menu contentId="contenu-principal" menuId="principal" type="overlay" class="menu-principal">
+    <div class="menu">
+      <div class="menu-entete">
+        <a routerLink="/tabs/dashboard" class="menu-logo" aria-label="Accueil">
+          <app-logo [taille]="34"></app-logo>
+        </a>
+        <ion-menu-toggle menu="principal" class="mobile-seulement">
+          <button type="button" class="bouton-icone" aria-label="Fermer le menu">
+            <ion-icon name="close-outline"></ion-icon>
+          </button>
+        </ion-menu-toggle>
+      </div>
 
-    @if (peutVoirEleves()) {
-      <ion-tab-button tab="eleves" href="/tabs/eleves">
-        <ion-icon name="people-outline"></ion-icon>
-        <ion-label>Élèves</ion-label>
-      </ion-tab-button>
-    }
+      <!-- Sur mobile, le menu reprend l'identite de l'utilisateur (pas de barre du haut). -->
+      <div class="menu-utilisateur mobile-seulement">
+        <span class="avatar">{{ initiales() }}</span>
+        <span class="identite">
+          <strong>{{ nomComplet() }}</strong>
+          <small>{{ role() }}</small>
+        </span>
+      </div>
 
-    <ion-tab-button tab="profil" href="/tabs/profil">
-      <ion-icon name="person-circle-outline"></ion-icon>
-      <ion-label>Profil</ion-label>
-    </ion-tab-button>
-  </ion-tab-bar>
-</ion-tabs>
+      @if (etablissement()) {
+        <div class="menu-etablissement" [title]="etablissement()?.nom ?? ''">
+          <ion-icon name="business-outline"></ion-icon>
+          <span class="libelle">{{ etablissement()?.nom }}</span>
+        </div>
+      }
 
-<app-choisir-annee-modal [isOpen]="anneeScolaireManquante()" [obligatoire]="true"></app-choisir-annee-modal>
+      <nav class="menu-liens" aria-label="Navigation principale">
+        @for (section of sections(); track section.titre) {
+          @if (section.titre) {
+            <p class="menu-section">{{ section.titre }}</p>
+          }
+          @for (entree of section.entrees; track entree.route) {
+            @if (entree.disponible) {
+              <ion-menu-toggle menu="principal" [autoHide]="false">
+                <a
+                  class="menu-lien"
+                  [routerLink]="entree.route"
+                  [class.actif]="estActif(entree.route)"
+                  [title]="entree.libelle"
+                >
+                  <ion-icon [name]="entree.icone"></ion-icon>
+                  <span class="libelle">{{ entree.libelle }}</span>
+                </a>
+              </ion-menu-toggle>
+            } @else {
+              <span class="menu-lien desactive" [title]="entree.libelle + ' · bientôt disponible'" aria-disabled="true">
+                <ion-icon [name]="entree.icone"></ion-icon>
+                <span class="libelle">{{ entree.libelle }}</span>
+                <span class="me-bientot libelle">Bientôt</span>
+              </span>
+            }
+          }
+        }
+      </nav>
+
+      <div class="menu-pied">
+        <ion-menu-toggle menu="principal" [autoHide]="false">
+          <a class="menu-lien" [routerLink]="entreeProfil.route" routerLinkActive="actif" [title]="entreeProfil.libelle">
+            <ion-icon [name]="entreeProfil.icone"></ion-icon>
+            <span class="libelle">{{ entreeProfil.libelle }}</span>
+          </a>
+        </ion-menu-toggle>
+        <ion-menu-toggle menu="principal" [autoHide]="false" class="mobile-seulement">
+          <button type="button" class="menu-lien" (click)="changerEspace()">
+            <ion-icon name="swap-horizontal-outline"></ion-icon>
+            <span class="libelle">Changer d'espace de travail</span>
+          </button>
+        </ion-menu-toggle>
+        <button type="button" class="menu-lien mobile-seulement" (click)="seDeconnecter()">
+          <ion-icon name="log-out-outline"></ion-icon>
+          <span class="libelle">Déconnexion</span>
+        </button>
+        <button
+          type="button"
+          class="menu-lien bureau-seulement"
+          (click)="basculerMenu()"
+          [title]="menuReduit() ? 'Agrandir le menu' : 'Réduire le menu'"
+        >
+          <ion-icon [name]="menuReduit() ? 'chevron-forward-outline' : 'chevron-back-outline'"></ion-icon>
+          <span class="libelle">Réduire le menu</span>
+        </button>
+      </div>
+    </div>
+  </ion-menu>
+
+  <!-- ================= Zone principale ================= -->
+  <div class="ion-page" id="contenu-principal">
+    <header class="barre-haut bureau-seulement">
+      @if (peutRechercherEleves()) {
+        <form class="recherche" role="search" (ngSubmit)="rechercher()">
+          <ion-icon name="search-outline"></ion-icon>
+          <input
+            type="search"
+            name="recherche"
+            placeholder="Rechercher un élève (nom, prénoms, matricule)…"
+            aria-label="Rechercher un élève"
+            [ngModel]="recherche()"
+            (ngModelChange)="recherche.set($event)"
+          />
+        </form>
+      }
+
+      <div class="barre-haut-actions">
+        @if (anneeScolaire()) {
+          <button type="button" class="contexte" (click)="changerEspace()" title="Changer d'espace de travail (année, établissement, poste)">
+            <ion-icon name="calendar-outline"></ion-icon>
+            <span>
+              <strong>{{ anneeScolaire()?.libelle }}</strong>
+              @if (periode(); as p) {
+                <small>{{ p.libelle }}</small>
+              }
+            </span>
+            <ion-icon name="chevron-down-outline" class="chevron"></ion-icon>
+          </button>
+        }
+
+        <button type="button" class="bouton-aide" (click)="assistant.basculer()" title="Assistant : posez votre question sur l'application">
+          <ion-icon name="chatbubbles-outline"></ion-icon>
+          <span>Aide</span>
+        </button>
+
+        <button type="button" class="bouton-icone" id="declencheur-notifications" aria-label="Notifications">
+          <ion-icon name="notifications-outline"></ion-icon>
+        </button>
+        <ion-popover trigger="declencheur-notifications" triggerAction="click" class="popover-me" alignment="end">
+          <ng-template>
+            <ion-content>
+              <div class="popover-titre">Notifications</div>
+              <div class="me-etat-vide">
+                <ion-icon name="notifications-off-outline"></ion-icon>
+                <strong>Aucune notification</strong>
+                <span>Vous serez prévenu ici des messages et des évaluations à saisir.</span>
+              </div>
+            </ion-content>
+          </ng-template>
+        </ion-popover>
+
+        <button type="button" class="compte" id="declencheur-compte" aria-label="Mon compte">
+          <span class="avatar">{{ initiales() }}</span>
+          <span class="identite">
+            <strong>{{ nomComplet() }}</strong>
+            <small>{{ role() }}</small>
+          </span>
+          <ion-icon name="chevron-down-outline" class="chevron"></ion-icon>
+        </button>
+        <ion-popover
+          trigger="declencheur-compte"
+          triggerAction="click"
+          class="popover-me"
+          alignment="end"
+          [dismissOnSelect]="true"
+        >
+          <ng-template>
+            <ion-content>
+              <div class="popover-compte">
+                <span class="avatar">{{ initiales() }}</span>
+                <span class="identite">
+                  <strong>{{ nomComplet() }}</strong>
+                  <small>{{ role() }}</small>
+                </span>
+              </div>
+              <a class="popover-lien" routerLink="/tabs/profil">
+                <ion-icon name="person-circle-outline"></ion-icon> Mon profil
+              </a>
+              <button type="button" class="popover-lien" (click)="changerEspace()">
+                <ion-icon name="swap-horizontal-outline"></ion-icon> Changer d'espace de travail
+              </button>
+              <button type="button" class="popover-lien danger" (click)="seDeconnecter()">
+                <ion-icon name="log-out-outline"></ion-icon> Déconnexion
+              </button>
+            </ion-content>
+          </ng-template>
+        </ion-popover>
+      </div>
+    </header>
+
+    <ion-router-outlet></ion-router-outlet>
+
+    <nav class="barre-bas mobile-seulement" aria-label="Navigation">
+      @for (onglet of ongletsMobile(); track onglet.route) {
+        <a class="onglet" [routerLink]="onglet.route" routerLinkActive="actif">
+          <ion-icon [name]="onglet.icone"></ion-icon>
+          <span>{{ onglet.route === entreeProfil.route ? 'Profil' : onglet.libelle }}</span>
+        </a>
+      }
+      <button type="button" class="onglet" (click)="assistant.basculer()">
+        <ion-icon name="chatbubbles-outline"></ion-icon>
+        <span>Aide</span>
+      </button>
+      <ion-menu-toggle menu="principal" [autoHide]="false" class="onglet-menu">
+        <button type="button" class="onglet">
+          <ion-icon name="grid-outline"></ion-icon>
+          <span>Menu</span>
+        </button>
+      </ion-menu-toggle>
+    </nav>
+  </div>
+</ion-split-pane>
+
+<!-- Assistant de support, sur toutes les pages. -->
+<app-assistant #assistant></app-assistant>
+
+<app-choisir-contexte-modal
+  [isOpen]="modaleOuverte()"
+  [obligatoire]="contexteManquant()"
+  (ferme)="espaceTravail.fermer()"
+></app-choisir-contexte-modal>

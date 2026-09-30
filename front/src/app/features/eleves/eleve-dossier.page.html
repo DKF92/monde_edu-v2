@@ -1,0 +1,228 @@
+<ion-content class="me-page-admin">
+  <div class="me-page">
+    @if (chargement()) {
+      <section class="me-carte">
+        <ion-skeleton-text [animated]="true" style="width: 50%; height: 28px"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 140px; margin-top: 14px"></ion-skeleton-text>
+      </section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger le dossier</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (dossier()) {
+      @let d = dossier()!;
+      @let e = d.eleve;
+      <!-- ================= En-tete ================= -->
+      <header class="me-entete-page">
+        <div>
+          <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/eleves')">
+            <ion-icon name="chevron-back-outline"></ion-icon> Élèves
+          </button>
+          <h1>Dossier de {{ e.nom }} {{ e.prenoms }}</h1>
+          <p>
+            <span class="matricule">{{ e.matricule }}</span>
+            · {{ d.parcours.length }} année{{ d.parcours.length > 1 ? 's' : '' }} dans l'établissement
+            @if (anneeEnCours(); as c) {
+              <span class="me-badge succes">Inscrit(e) {{ c.annee }} · {{ c.classe || c.niveau }}</span>
+            } @else {
+              <span class="me-badge">Non inscrit(e) cette année</span>
+            }
+          </p>
+        </div>
+        @if (anneeEnCours() && peutVoirInscription()) {
+          <button type="button" class="me-bouton-principal" (click)="voirInscription(anneeEnCours()!)">
+            <ion-icon name="eye-outline"></ion-icon> Inscription {{ anneeEnCours()!.annee }}
+          </button>
+        }
+      </header>
+
+      <div class="grille-dossier">
+        <!-- ================= Fiche ================= -->
+        <div class="colonne">
+          <section class="me-carte bloc">
+            <div class="identite">
+              <div class="photo">
+                @if (e.photo_url) {
+                  <img [src]="e.photo_url" alt="Photo de l'élève" />
+                } @else {
+                  <span class="initiales" [class.feminin]="e.sexe === 'F'">{{ initiales(d) }}</span>
+                }
+              </div>
+              <dl class="infos">
+                <div><dt>Sexe</dt><dd>{{ e.sexe === 'F' ? 'Féminin' : e.sexe === 'M' ? 'Masculin' : '—' }}</dd></div>
+                <div><dt>Naissance</dt><dd>{{ dateFr(e.date_naissance) }}{{ age(e.date_naissance) }}{{ e.lieu_naissance ? ' à ' + e.lieu_naissance : '' }}</dd></div>
+                <div><dt>Nationalité</dt><dd>{{ e.nationalite || '—' }}</dd></div>
+                <div><dt>Téléphone</dt><dd>{{ e.telephone || '—' }}</dd></div>
+                <div><dt>Quartier</dt><dd>{{ e.quartier || '—' }}</dd></div>
+                @if (e.orphelin_pere || e.orphelin_mere) {
+                  <div><dt>Orphelin(e)</dt><dd>{{ e.orphelin_pere && e.orphelin_mere ? 'de père et de mère' : e.orphelin_pere ? 'de père' : 'de mère' }}</dd></div>
+                }
+                @if (e.particularites_medicales) {
+                  <div class="large"><dt>Santé</dt><dd>{{ e.particularites_medicales }}</dd></div>
+                }
+              </dl>
+            </div>
+          </section>
+
+          <section class="me-carte bloc">
+            <h2><ion-icon name="person-outline"></ion-icon> Parents</h2>
+            <ul class="parents">
+              @for (p of e.parents; track p.lien_parente) {
+                <li>
+                  <span>
+                    <strong>{{ p.nom_complet || '—' }}</strong>
+                    <small>
+                      {{ liens[p.lien_parente] || p.lien_parente }}{{ p.profession ? ' · ' + p.profession : '' }}
+                      @if (p.is_contact_principal) { <span class="me-badge info">Contact</span> }
+                      @if (p.is_payeur) { <span class="me-badge succes">Payeur</span> }
+                    </small>
+                  </span>
+                  @if (p.telephone) {
+                    <a class="telephone" [href]="'tel:' + p.telephone"><ion-icon name="call-outline"></ion-icon> {{ p.telephone }}</a>
+                  }
+                </li>
+              } @empty {
+                <li class="vide">Aucun parent renseigné.</li>
+              }
+            </ul>
+          </section>
+
+          @if (d.finances_visibles) {
+            <section class="me-carte bloc">
+              <h2><ion-icon name="cash-outline"></ion-icon> Finances</h2>
+              <dl class="infos compacte">
+                <div><dt>Total payé (toutes années)</dt><dd>{{ montant(totalPaye()) }}</dd></div>
+                <div><dt>Dettes en cours</dt><dd [class.a-payer]="totalDettes() > 0">{{ totalDettes() > 0 ? montant(totalDettes()) : 'Aucune' }}</dd></div>
+              </dl>
+              @for (x of dettesOuvertes(); track x.annee) {
+                <p class="me-note attention">
+                  <ion-icon name="warning-outline"></ion-icon>
+                  <span>Dette {{ x.annee }} : reste <strong>{{ montant(x.reste) }}</strong> sur {{ montant(x.montant) }}.</span>
+                </p>
+              }
+            </section>
+          }
+        </div>
+
+        <!-- ================= Parcours ================= -->
+        <div class="colonne">
+          <section class="me-carte bloc">
+            <h2><ion-icon name="school-outline"></ion-icon> Parcours dans l'établissement</h2>
+            <ol class="parcours">
+              @for (p of d.parcours; track p.id) {
+                <li class="annee" [class.en-cours]="p.en_cours">
+                  <div class="entete-annee">
+                    <div>
+                      <strong>{{ p.annee }} · {{ p.classe || p.niveau || '—' }}</strong>
+                      <span class="etiquettes">
+                        <span [class]="'me-badge ' + ton(p.statut)">{{ libellesStatut[p.statut] || p.statut }}</span>
+                        <span class="me-badge" [class.info]="p.affecte">{{ p.affecte ? 'Affecté(e)' : 'Non affecté(e)' }}</span>
+                        @if (p.redoublant) { <span class="me-badge attention">Redoublant(e)</span> }
+                        @if (p.boursier) { <span class="me-badge violet">Boursier(ère)</span> }
+                        @if (p.inscrit_en_ligne) { <span class="me-badge succes"><ion-icon name="globe-outline"></ion-icon> En ligne</span> }
+                      </span>
+                    </div>
+                    @if (peutVoirInscription()) {
+                      <button type="button" class="me-action" title="Voir l'inscription" aria-label="Voir l'inscription" (click)="voirInscription(p)">
+                        <ion-icon name="open-outline"></ion-icon>
+                      </button>
+                    }
+                  </div>
+
+                  <dl class="infos compacte">
+                    <div><dt>Inscrit(e) le</dt><dd>{{ dateFr(p.date_inscription) }}{{ p.enregistre_par ? ' par ' + p.enregistre_par : '' }}</dd></div>
+                    <div><dt>Décision de fin d'année</dt><dd>{{ p.decision_finale ? libellesDecision[p.decision_finale] || p.decision_finale : (p.en_cours ? 'En cours' : 'Non saisie') }}{{ p.moyenne_annuelle ? ' · ' + p.moyenne_annuelle + '/20' : '' }}</dd></div>
+                    @if (p.niveau_a_suivre) {
+                      <div><dt>Niveau suivant</dt><dd>{{ p.niveau_a_suivre }}</dd></div>
+                    }
+                    @if (p.langue_vivante_2) {
+                      <div><dt>LV2</dt><dd>{{ p.langue_vivante_2 }}</dd></div>
+                    }
+                    @if (p.provenance) {
+                      <div><dt>Provenance</dt><dd>{{ p.provenance }}</dd></div>
+                    }
+                  </dl>
+
+                  @if (p.moyennes.length) {
+                    <div class="moyennes">
+                      @for (m of p.moyennes; track m.periode) {
+                        <span class="moyenne">
+                          <small>{{ m.periode }}</small>
+                          <strong>{{ m.moyenne ?? '—' }}</strong>
+                          @if (m.rang) { <small>{{ m.rang }}{{ m.rang === 1 ? 'er' : 'e' }}</small> }
+                        </span>
+                      }
+                    </div>
+                  }
+
+                  @if (p.finances; as f) {
+                    <button type="button" class="resume-finances" (click)="basculer(p)" [attr.aria-expanded]="deplies().has(p.id)">
+                      <span>Dû <strong>{{ montant(f.total_du) }}</strong></span>
+                      <span>Payé <strong>{{ montant(f.total_paye) }}</strong></span>
+                      <span [class.a-payer]="f.reste > 0">Reste <strong>{{ montant(f.reste) }}</strong></span>
+                      <ion-icon [name]="deplies().has(p.id) ? 'chevron-up-outline' : 'chevron-down-outline'"></ion-icon>
+                    </button>
+                    @if (deplies().has(p.id)) {
+                      <div class="detail-frais">
+                        @for (x of f.frais; track x.libelle; let impaire = $odd) {
+                          <div class="ligne-frais" [class.me-ligne-alternee]="impaire">
+                            <span>{{ x.libelle }}</span>
+                            <span>{{ montant(x.montant_du) }}</span>
+                            <span>{{ montant(x.montant_paye) }}</span>
+                          </div>
+                        } @empty {
+                          <p class="texte-doux">Aucun frais (classe non attribuée ou montants non définis).</p>
+                        }
+                      </div>
+                    }
+                  }
+                </li>
+              } @empty {
+                <li class="vide">Cet élève n'a encore aucune inscription.</li>
+              }
+            </ol>
+          </section>
+
+          @if (d.finances_visibles) {
+            <section class="me-carte bloc">
+              <h2><ion-icon name="time-outline"></ion-icon> Paiements</h2>
+              @if (d.reglements.length) {
+                <div class="paiements">
+                  @for (r of d.reglements; track r.id; let impaire = $odd) {
+                    <div class="ligne-paiement" [class.me-ligne-alternee]="impaire">
+                      <span><strong>{{ dateFr(r.date) }}</strong><small>Reçu {{ r.numero_recu }} · {{ r.annee }}</small></span>
+                      <span class="mode">{{ modes[r.mode] || r.mode }}</span>
+                      <strong class="montant">{{ montant(r.montant) }}</strong>
+                      <button type="button" class="me-action" title="Imprimer le reçu" aria-label="Imprimer le reçu" (click)="imprimerRecu(r.id)">
+                        <ion-icon name="print-outline"></ion-icon>
+                      </button>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <p class="texte-doux">Aucun paiement enregistré.</p>
+              }
+            </section>
+          }
+
+          <section class="me-carte bloc">
+            <h2><ion-icon name="document-text-outline"></ion-icon> Documents</h2>
+            @if (d.documents.length) {
+              <ul class="documents">
+                @for (doc of d.documents; track doc.id) {
+                  <li><a [href]="doc.url" target="_blank" rel="noopener">{{ doc.type }}</a><small>{{ dateFr(doc.date) }}</small></li>
+                }
+              </ul>
+            } @else {
+              <p class="texte-doux">Aucun document dans le dossier.</p>
+            }
+          </section>
+        </div>
+      </div>
+    }
+  </div>
+</ion-content>

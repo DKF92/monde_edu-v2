@@ -1,0 +1,555 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/parametres')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Paramètres
+        </button>
+        <h1>Paramètres paiements</h1>
+        <p>Montants d'inscription{{ tarifs()?.annee ? ' ' + tarifs()?.annee : '' }}, types de réductions et de frais.</p>
+      </div>
+    </header>
+
+    <nav class="onglets" role="tablist" aria-label="Paramètres des paiements">
+      <button type="button" role="tab" [class.actif]="onglet() === 'montants'" [attr.aria-selected]="onglet() === 'montants'" (click)="onglet.set('montants')">
+        <ion-icon name="cash-outline"></ion-icon> Montants d'inscription
+      </button>
+      <button type="button" role="tab" [class.actif]="onglet() === 'reductions'" [attr.aria-selected]="onglet() === 'reductions'" (click)="onglet.set('reductions')">
+        <ion-icon name="pricetag-outline"></ion-icon> Réductions
+      </button>
+      <button type="button" role="tab" [class.actif]="onglet() === 'frais'" [attr.aria-selected]="onglet() === 'frais'" (click)="onglet.set('frais')">
+        <ion-icon name="receipt-outline"></ion-icon> Types de frais
+      </button>
+    </nav>
+
+    @if (chargement()) {
+      <section class="me-carte">
+        <ion-skeleton-text [animated]="true" style="width: 40%; height: 18px"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 200px; margin-top: 12px"></ion-skeleton-text>
+      </section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les paramètres</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else {
+      <!-- ============================================================ Montants -->
+      @if (onglet() === 'montants') {
+        <p class="me-note">
+          <ion-icon name="information-circle-outline"></ion-icon>
+          <span>
+            Comme dans l'ancienne version, deux colonnes par niveau : élève <strong>affecté</strong> par l'État et
+            <strong>non affecté</strong>. Seuls les types de frais actifs apparaissent ; un champ grisé est un frais qui ne
+            concerne pas ce type d'élève (réglable dans l'onglet Types de frais). Le <strong>minimum</strong> à verser à
+            l'inscription est calculé : les frais annexes pour un affecté, les frais annexes et d'inscription pour un non affecté.
+          </span>
+        </p>
+
+        <section class="me-carte bloc">
+          <div class="bloc-entete">
+            <span class="me-pastille teinte-orange"><ion-icon name="layers-outline"></ion-icon></span>
+            <div>
+              <h2>Niveau</h2>
+              <p>Choisissez le niveau dont vous saisissez les montants.</p>
+            </div>
+          </div>
+          <app-selecteur
+            idChamp="niveau-tarif"
+            icone="layers-outline"
+            [options]="optionsNiveaux()"
+            [valeur]="niveauId()"
+            (valeurChange)="changerNiveau($event)"
+          ></app-selecteur>
+
+          @if (niveau(); as n) {
+            <div class="grille-tarif" role="table" [attr.aria-label]="'Montants ' + n.libelle">
+              <div class="rang entete" role="row">
+                <span role="columnheader">Frais</span>
+                <span role="columnheader">Affecté</span>
+                <span role="columnheader">Non affecté</span>
+              </div>
+
+              <div class="groupe-titre">Frais principaux</div>
+              @for (t of fraisPrincipaux(); track t.id; let impaire = $odd) {
+                <ng-container *ngTemplateOutlet="rangFrais; context: { $implicit: t, impaire: impaire }"></ng-container>
+              }
+
+              <div class="groupe-titre">
+                Frais annexes
+                <button type="button" class="identiques" [class.choisi]="annexesIdentiques()" (click)="basculerAnnexesIdentiques()">
+                  <ion-icon [name]="annexesIdentiques() ? 'checkbox' : 'square-outline'"></ion-icon>
+                  Mêmes montants pour les deux colonnes
+                </button>
+              </div>
+              @for (t of fraisAnnexes(); track t.id; let impaire = $odd) {
+                <ng-container *ngTemplateOutlet="rangFrais; context: { $implicit: t, impaire: impaire }"></ng-container>
+              } @empty {
+                <p class="me-aide-champ">Aucun frais annexe actif.</p>
+              }
+
+              @if (fraisEnNature().length) {
+                <div class="groupe-titre">
+                  Frais en nature
+                  <small class="precision">Quantité apportée par l'élève (hors total)</small>
+                </div>
+                @for (t of fraisEnNature(); track t.id; let impaire = $odd) {
+                  <ng-container *ngTemplateOutlet="rangFrais; context: { $implicit: t, impaire: impaire }"></ng-container>
+                }
+              }
+
+              <!-- Une ligne de frais : champ grise si le frais ne concerne pas ce type d'eleve. -->
+              <ng-template #rangFrais let-t let-impaire="impaire">
+                <div class="rang" role="row" [class.me-ligne-alternee]="impaire">
+                  <span role="rowheader" class="libelle">{{ t.libelle }}</span>
+                  @for (col of colonnes; track col) {
+                    <div class="me-montant" [attr.data-unite]="t.nature === 'en_nature' ? 'unités' : 'F'" role="cell">
+                      <input
+                        class="me-saisie"
+                        type="number"
+                        inputmode="numeric"
+                        min="0"
+                        placeholder="0"
+                        [attr.aria-label]="t.libelle + (col === 'affecte' ? ' affecté' : ' non affecté')"
+                        [disabled]="bloque(col, t)"
+                        [title]="bloque(col, t) ? 'Ce frais ne concerne pas les élèves ' + (col === 'affecte' ? 'affectés' : 'non affectés') + ' (onglet Types de frais)' : ''"
+                        [value]="bloque(col, t) ? '' : valeur(col, t.id)"
+                        [class.invalide]="!valide(valeur(col, t.id))"
+                        (input)="saisir(col, t, $any($event.target).value)"
+                      />
+                    </div>
+                  }
+                </div>
+              </ng-template>
+
+              <div class="rang total" role="row">
+                <span role="rowheader" class="libelle">Total à payer</span>
+                <strong role="cell">{{ montant(total('affecte')) }} F</strong>
+                <strong role="cell">{{ montant(total('non_affecte')) }} F</strong>
+              </div>
+              <!-- Minimum calcule, non modifiable : affecte = annexes ; non affecte = annexes + inscription. -->
+              <div class="rang minimum" role="row">
+                <span role="rowheader" class="libelle">
+                  Minimum à l'inscription
+                  <small>Calculé : annexes (+ frais d'inscription pour un non affecté)</small>
+                </span>
+                @for (col of colonnes; track col) {
+                  <div class="me-montant" data-unite="F" role="cell">
+                    <input
+                      class="me-saisie"
+                      type="text"
+                      disabled
+                      [attr.aria-label]="'Minimum ' + (col === 'affecte' ? 'affecté' : 'non affecté')"
+                      [value]="montant(minimum(col))"
+                    />
+                  </div>
+                }
+              </div>
+            </div>
+          } @else {
+            <div class="me-etat-vide">
+              <ion-icon name="layers-outline"></ion-icon>
+              <strong>Aucun niveau</strong>
+            </div>
+          }
+        </section>
+
+        <!-- Recapitulatif de tous les niveaux -->
+        <section class="me-carte bloc">
+          <div class="bloc-entete">
+            <span class="me-pastille teinte-bleu"><ion-icon name="cash-outline"></ion-icon></span>
+            <div>
+              <h2>Récapitulatif</h2>
+              <p>Total dû par niveau. Touchez un niveau pour le modifier.</p>
+            </div>
+          </div>
+          <div class="recap" role="table" aria-label="Récapitulatif des montants">
+            <div class="recap-ligne entete" role="row">
+              <span role="columnheader">Niveau</span>
+              <span role="columnheader">Affecté</span>
+              <span role="columnheader">Non affecté</span>
+            </div>
+            @for (n of recapPage(); track n.id; let impaire = $odd) {
+              <button type="button" class="recap-ligne" role="row" [class.me-ligne-alternee]="impaire" [class.courant]="n.id === niveauId()" (click)="changerNiveau(n.id)">
+                <strong role="rowheader">{{ n.libelle }}</strong>
+                @if (n.affecte || n.non_affecte) {
+                  <span role="cell">
+                    {{ montant(totalGrille(n.affecte, 'affecte')) }} F
+                    <small>min. {{ montant((n.affecte?.montant_minimum ?? 0)) }} F</small>
+                  </span>
+                  <span role="cell">
+                    {{ montant(totalGrille(n.non_affecte, 'non_affecte')) }} F
+                    <small>min. {{ montant((n.non_affecte?.montant_minimum ?? 0)) }} F</small>
+                  </span>
+                } @else {
+                  <span role="cell" class="a-saisir"><span class="me-badge attention">À saisir</span></span>
+                  <span role="cell"></span>
+                }
+              </button>
+            }
+          </div>
+          <app-pagination
+            class="pagination-bloc"
+            [total]="tarifs()?.niveaux?.length ?? 0"
+            [page]="pageRecap()"
+            [taille]="tailleRecap()"
+            (pageChange)="pageRecap.set($event)"
+            (tailleChange)="tailleRecap.set($event)"
+          ></app-pagination>
+        </section>
+
+        <div class="me-barre-enregistrer">
+          <span class="etat" [class.modifie]="modifie()">
+            {{ tarifInvalide() ? 'Corrigez les montants en rouge.' : modifie() ? 'Montants ' + (niveau()?.libelle ?? '') + ' non enregistrés' : 'Tout est enregistré' }}
+          </span>
+          @if (modifie()) {
+            <button type="button" class="me-bouton-texte" (click)="annulerTarif()" [disabled]="enregistrementTarif()">Annuler</button>
+          }
+          <button type="button" class="me-bouton-principal" (click)="enregistrerTarif()" [disabled]="!modifie() || tarifInvalide() || enregistrementTarif()">
+            @if (enregistrementTarif()) {
+              <ion-spinner name="dots"></ion-spinner>
+            } @else {
+              Enregistrer
+            }
+          </button>
+        </div>
+      }
+
+      <!-- ============================================================ Reductions -->
+      @if (onglet() === 'reductions') {
+        <p class="me-note">
+          <ion-icon name="information-circle-outline"></ion-icon>
+          <span>
+            Chaque type fixe les limites d'une réduction accordée en caisse. Comme dans l'ancienne version, une
+            <strong>réduction</strong> ne porte que sur les frais principaux, alors qu'un <strong>cas social</strong> peut
+            aller jusqu'à la totalité des frais mais doit au moins couvrir les frais principaux.
+          </span>
+        </p>
+
+        <section class="me-carte bloc">
+          <div class="bloc-entete">
+            <span class="me-pastille teinte-violet"><ion-icon name="pricetag-outline"></ion-icon></span>
+            <div>
+              <h2>Types de réductions</h2>
+              <p>{{ typesReductions().length }} type{{ typesReductions().length > 1 ? 's' : '' }}</p>
+            </div>
+            <button type="button" class="me-bouton-secondaire" (click)="nouvelleReduction()">
+              <ion-icon name="add-outline"></ion-icon> Nouveau type
+            </button>
+          </div>
+
+          <div class="reductions">
+            @for (t of reductionsPage(); track t.id; let impaire = $odd) {
+              <div class="reduction" [class.me-ligne-alternee]="impaire" [class.inactif]="!t.is_active">
+                <div class="reduction-texte">
+                  <strong>
+                    {{ t.libelle }}
+                    @if (!t.is_active) {
+                      <span class="me-badge">Désactivé</span>
+                    }
+                  </strong>
+                  <ul>
+                    <li>
+                      Porte sur
+                      <b>{{ t.base === 'total' ? 'la totalité des frais (annexes comprises)' : 'les frais principaux (inscription ou scolarité)' }}</b>
+                    </li>
+                    <li>
+                      Minimum :
+                      <b>{{ montant(t.montant_minimum) }} F</b>
+                      @if (t.minimum_frais_principaux) {
+                        et au moins le reste des frais principaux
+                      }
+                    </li>
+                    <li>
+                      Plafond :
+                      <b>{{ t.plafond_pourcentage ? t.plafond_pourcentage + ' % de la base' : 'toute la base (réduction totale possible)' }}</b>
+                    </li>
+                  </ul>
+                </div>
+                <div class="reduction-actions">
+                  <button type="button" class="me-action" title="Modifier" aria-label="Modifier" (click)="modifierReduction(t)">
+                    <ion-icon name="create-outline"></ion-icon>
+                  </button>
+                  <button
+                    type="button"
+                    class="me-action"
+                    [class.danger]="t.is_active"
+                    [title]="t.is_active ? 'Désactiver' : 'Réactiver'"
+                    [attr.aria-label]="t.is_active ? 'Désactiver' : 'Réactiver'"
+                    [disabled]="actionReduction() === t.id"
+                    (click)="basculerReduction(t)"
+                  >
+                    <ion-icon [name]="t.is_active ? 'power-outline' : 'refresh-outline'"></ion-icon>
+                  </button>
+                </div>
+              </div>
+            } @empty {
+              <div class="me-etat-vide">
+                <ion-icon name="pricetag-outline"></ion-icon>
+                <strong>Aucun type de réduction</strong>
+              </div>
+            }
+          </div>
+          <app-pagination
+            class="pagination-bloc"
+            [total]="typesReductions().length"
+            [page]="pageReductions()"
+            [taille]="tailleReductions()"
+            (pageChange)="pageReductions.set($event)"
+            (tailleChange)="tailleReductions.set($event)"
+          ></app-pagination>
+        </section>
+      }
+
+      <!-- ============================================================ Types de frais -->
+      @if (onglet() === 'frais') {
+        <p class="me-note">
+          <ion-icon name="information-circle-outline"></ion-icon>
+          <span>
+            L'ordre dans lequel un paiement est réparti sur ces frais se règle dans <button type="button" class="me-lien" (click)="router.navigateByUrl('/tabs/parametres/ordre-paiement')">Paramètres › Ordre de paiement</button>.
+            Ajoutez ici les frais propres à votre établissement (cantine, transport…), activez ou désactivez-les, et choisissez les élèves concernés (affectés, non affectés).
+          </span>
+        </p>
+
+        <section class="me-carte bloc">
+          <div class="bloc-entete">
+            <span class="me-pastille teinte-cyan"><ion-icon name="receipt-outline"></ion-icon></span>
+            <div>
+              <h2>Types de frais</h2>
+              <p>{{ typesFrais().length }} types, dans l'ordre de paiement.</p>
+            </div>
+          </div>
+
+          <form class="ajout-frais" (submit)="$event.preventDefault(); ajouterFrais()">
+            <div class="me-champ">
+              <label for="nouveau-frais">Nouveau type de frais</label>
+              <div class="me-segments nature-frais" role="radiogroup" aria-label="Catégorie du frais">
+                <button type="button" [class.actif]="natureNouveauFrais() === 'annexe'" (click)="natureNouveauFrais.set('annexe')">Frais annexe (montant)</button>
+                <button type="button" [class.actif]="natureNouveauFrais() === 'en_nature'" (click)="natureNouveauFrais.set('en_nature')">En nature (fourniture)</button>
+              </div>
+              <input
+                id="nouveau-frais"
+                class="me-saisie"
+                maxlength="100"
+                [placeholder]="natureNouveauFrais() === 'en_nature' ? 'Ex : Balai' : 'Ex : Cantine'"
+                autocomplete="off"
+                [value]="nouveauFrais()"
+                [class.invalide]="erreurFrais()"
+                (input)="nouveauFrais.set($any($event.target).value); erreurFrais.set(null)"
+              />
+              @if (erreurFrais(); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+            </div>
+            <button type="submit" class="me-bouton-secondaire" [disabled]="ajoutFrais()">
+              @if (ajoutFrais()) {
+                <ion-spinner name="dots"></ion-spinner>
+              } @else {
+                <ion-icon name="add-outline"></ion-icon> Ajouter
+              }
+            </button>
+          </form>
+
+          <ol class="frais">
+            @for (t of fraisPage(); track t.id; let i = $index; let impaire = $odd) {
+              <li [class.me-ligne-alternee]="impaire" [class.inactif]="!t.is_active">
+                <!-- Activer / desactiver le type de frais -->
+                <button
+                  type="button"
+                  role="switch"
+                  class="me-interrupteur"
+                  [class.actif]="t.is_active"
+                  [attr.aria-checked]="t.is_active"
+                  [attr.aria-label]="(t.is_active ? 'Désactiver ' : 'Activer ') + t.libelle"
+                  [title]="t.is_active ? 'Actif : cliquer pour désactiver' : 'Désactivé : cliquer pour activer'"
+                  [disabled]="fraisEnCours() === t.id"
+                  (click)="reglerFrais(t, { is_active: !t.is_active })"
+                >
+                  <span></span>
+                </button>
+                <span class="rang-frais">{{ (pageFrais() - 1) * tailleFrais() + i + 1 }}</span>
+                @if (fraisEdite() === t.id) {
+                  <input
+                    class="me-saisie"
+                    maxlength="100"
+                    [attr.aria-label]="'Nouveau nom de ' + t.libelle"
+                    [value]="libelleEdite()"
+                    (input)="libelleEdite.set($any($event.target).value)"
+                    (keydown.enter)="renommerFrais(t)"
+                    (keydown.escape)="fraisEdite.set(null)"
+                  />
+                  <button type="button" class="me-action" title="Valider" aria-label="Valider" (click)="renommerFrais(t)">
+                    <ion-icon name="checkmark-outline"></ion-icon>
+                  </button>
+                  <button type="button" class="me-action" title="Annuler" aria-label="Annuler" (click)="fraisEdite.set(null)">
+                    <ion-icon name="close-outline"></ion-icon>
+                  </button>
+                } @else {
+                  <span class="frais-texte">
+                    <span class="frais-nom">
+                      {{ t.libelle }}
+                      <span class="me-badge" [class.info]="t.nature !== 'annexe'">{{ libelleNature(t) }}</span>
+                    </span>
+                    <!-- Types d'eleve concernes : decoche = champ grise dans les montants -->
+                    <span class="concernes" role="group" [attr.aria-label]="'Élèves concernés par ' + t.libelle">
+                      @for (col of colonnes; track col) {
+                        @let concerne = col === 'affecte' ? t.applicable_affecte : t.applicable_non_affecte;
+                        <button
+                          type="button"
+                          class="concerne"
+                          [class.choisi]="concerne"
+                          [attr.aria-pressed]="concerne"
+                          [disabled]="!t.is_active || fraisEnCours() === t.id"
+                          [title]="concerne ? 'Concerne les élèves ' + libelleColonne(col) : 'Grisé pour les élèves ' + libelleColonne(col)"
+                          (click)="reglerFrais(t, col === 'affecte' ? { applicable_affecte: !concerne } : { applicable_non_affecte: !concerne })"
+                        >
+                          <ion-icon [name]="concerne ? 'checkbox' : 'square-outline'"></ion-icon>
+                          {{ col === 'affecte' ? 'Affecté' : 'Non affecté' }}
+                        </button>
+                      }
+                    </span>
+                  </span>
+                  <button type="button" class="me-action" title="Renommer" aria-label="Renommer" (click)="editerFrais(t)">
+                    <ion-icon name="create-outline"></ion-icon>
+                  </button>
+                }
+              </li>
+            }
+          </ol>
+          <app-pagination
+            class="pagination-bloc"
+            [total]="typesFrais().length"
+            [page]="pageFrais()"
+            [taille]="tailleFrais()"
+            (pageChange)="pageFrais.set($event)"
+            (tailleChange)="tailleFrais.set($event)"
+          ></app-pagination>
+        </section>
+      }
+    }
+  </div>
+</ion-content>
+
+<!-- ================= Formulaire type de reduction ================= -->
+<ion-modal class="me-modale-formulaire auto" [isOpen]="reductionOuverte()" [backdropDismiss]="!enregistrementReduction()" (didDismiss)="reductionOuverte.set(false)">
+  <ng-template>
+    <form class="me-modale" (submit)="$event.preventDefault(); enregistrerReduction()" novalidate>
+      <header>
+        <span class="me-pastille teinte-violet"><ion-icon name="pricetag-outline"></ion-icon></span>
+        <div>
+          <h1>{{ reductionEditee() ? 'Modifier le type de réduction' : 'Nouveau type de réduction' }}</h1>
+          <p>Limites appliquées quand une réduction de ce type est accordée en caisse.</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="reductionOuverte.set(false)" aria-label="Fermer">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </header>
+
+      <div class="corps">
+        <section>
+          <div class="me-grille">
+            <div class="me-champ large">
+              <label for="r-libelle">Libellé <span class="me-requis">*</span></label>
+              <input
+                id="r-libelle"
+                class="me-saisie"
+                maxlength="100"
+                placeholder="Ex : Réduction fratrie"
+                autocomplete="off"
+                [value]="formReduction().libelle"
+                [class.invalide]="erreursReduction()['libelle']"
+                (input)="majReduction({ libelle: $any($event.target).value })"
+              />
+              @if (erreursReduction()['libelle']; as e) { <p class="me-erreur-champ">{{ e }}</p> }
+            </div>
+
+            <div class="me-champ large">
+              <span class="libelle">La réduction porte sur</span>
+              <div class="choix-base" role="radiogroup" aria-label="Base de la réduction">
+                <button type="button" role="radio" class="me-option" [class.choisi]="formReduction().base === 'frais_principaux'" [attr.aria-checked]="formReduction().base === 'frais_principaux'" (click)="majReduction({ base: 'frais_principaux' })">
+                  <ion-icon [name]="formReduction().base === 'frais_principaux' ? 'radio-button-on' : 'radio-button-off-outline'"></ion-icon>
+                  <span>
+                    <strong>Frais principaux</strong>
+                    <small>Inscription (élève affecté) ou scolarité (non affecté). Les annexes restent dues.</small>
+                  </span>
+                </button>
+                <button type="button" role="radio" class="me-option" [class.choisi]="formReduction().base === 'total'" [attr.aria-checked]="formReduction().base === 'total'" (click)="majReduction({ base: 'total' })">
+                  <ion-icon [name]="formReduction().base === 'total' ? 'radio-button-on' : 'radio-button-off-outline'"></ion-icon>
+                  <span>
+                    <strong>Totalité des frais</strong>
+                    <small>Annexes comprises : peut aller jusqu'à une réduction totale.</small>
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div class="me-champ">
+              <label for="r-minimum">Montant minimum</label>
+              <div class="me-montant" data-unite="F">
+                <input
+                  id="r-minimum"
+                  class="me-saisie"
+                  type="number"
+                  inputmode="numeric"
+                  min="0"
+                  [value]="minimumTexte()"
+                  [class.invalide]="erreursReduction()['montant_minimum']"
+                  (input)="minimumTexte.set($any($event.target).value); effacerErreurReduction('montant_minimum')"
+                />
+              </div>
+              @if (erreursReduction()['montant_minimum']; as e) {
+                <p class="me-erreur-champ">{{ e }}</p>
+              } @else {
+                <p class="me-aide-champ">Plus petite réduction accordable (0 = aucun minimum).</p>
+              }
+            </div>
+
+            <div class="me-champ">
+              <label for="r-plafond">Plafond</label>
+              <div class="me-montant" data-unite="%">
+                <input
+                  id="r-plafond"
+                  class="me-saisie"
+                  type="number"
+                  inputmode="numeric"
+                  min="1"
+                  max="100"
+                  placeholder="Aucun"
+                  [value]="plafondTexte()"
+                  [class.invalide]="erreursReduction()['plafond_pourcentage']"
+                  (input)="plafondTexte.set($any($event.target).value); effacerErreurReduction('plafond_pourcentage')"
+                />
+              </div>
+              @if (erreursReduction()['plafond_pourcentage']; as e) {
+                <p class="me-erreur-champ">{{ e }}</p>
+              } @else {
+                <p class="me-aide-champ">Part maximum de la base, vide = toute la base.</p>
+              }
+            </div>
+
+            <div class="me-champ large">
+              <button type="button" class="me-option" [class.choisi]="formReduction().minimum_frais_principaux" [attr.aria-pressed]="formReduction().minimum_frais_principaux" (click)="majReduction({ minimum_frais_principaux: !formReduction().minimum_frais_principaux })">
+                <ion-icon [name]="formReduction().minimum_frais_principaux ? 'checkbox' : 'square-outline'"></ion-icon>
+                <span>
+                  <strong>Doit couvrir au moins les frais principaux</strong>
+                  <small>Règle du « cas social » : la réduction doit dépasser ce qui reste d'inscription et de scolarité.</small>
+                </span>
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <footer>
+        <button type="button" class="me-bouton-texte" (click)="reductionOuverte.set(false)" [disabled]="enregistrementReduction()">Annuler</button>
+        <button type="submit" class="me-bouton-principal" [disabled]="enregistrementReduction()">
+          @if (enregistrementReduction()) {
+            <ion-spinner name="dots"></ion-spinner>
+          } @else {
+            {{ reductionEditee() ? 'Enregistrer' : 'Créer' }}
+          }
+        </button>
+      </footer>
+    </form>
+  </ng-template>
+</ion-modal>

@@ -46,7 +46,22 @@ export interface Periode {
   is_cloturee: boolean;
 }
 
-/** Permissions dont la presence indique un profil pedagogique (a qui on
- * propose le choix du trimestre). Les profils purement finance (caissier,
- * comptable, econome...) n'en ont aucune et n'ont donc pas ce choix. */
-export const PERMISSIONS_PEDAGOGIQUES = ['notes.saisir', 'notes.voir', 'moyennes.gerer', 'absences.gerer'];
+/** Poste (role) de l'utilisateur dans un etablissement : c'est lui qui
+ * determine le menu et les droits, comme le poste du compte en V1. */
+export interface Poste {
+  id: number;
+  nom: string;
+  permissions: string[];
+}
+
+/** Reponse de GET /contexte pour un etablissement donne. */
+export interface ContexteEtablissement {
+  etablissement: Etablissement;
+  annees: (AnneeScolaire & { periodes: Periode[] })[];
+  postes: Poste[];
+}
+
+/** Droit (attribuable a n'importe quel poste) de choisir la periode
+ * (trimestre/semestre) de travail dans la modale d'espace de travail. Sans
+ * lui, l'utilisateur travaille sur la periode en cours de l'annee. */
+export const PERMISSION_CHOIX_PERIODE = 'periodes.choisir';

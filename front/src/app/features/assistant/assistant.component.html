@@ -1,0 +1,85 @@
+@if (ouvert()) {
+  <section class="panneau" role="dialog" aria-label="Assistant Monde Éducatif">
+    <header>
+      <span class="avatar"><ion-icon name="sparkles-outline"></ion-icon></span>
+      <div>
+        <h2>Assistant</h2>
+        <p>{{ etat() ? (etat()!.ia ? 'Réponses en direct · consultation seule' : 'Guide de l\'application') : 'Connexion…' }}</p>
+      </div>
+      @if (messages().length) {
+        <button type="button" class="me-action" title="Nouvelle conversation" aria-label="Nouvelle conversation" (click)="nouvelle()"><ion-icon name="refresh-outline"></ion-icon></button>
+      }
+      <button type="button" class="me-action" title="Fermer" aria-label="Fermer l'assistant" (click)="basculer()"><ion-icon name="close-outline"></ion-icon></button>
+    </header>
+
+    <div class="fil" #fil>
+      @if (!messages().length) {
+        <div class="accueil">
+          <p class="bonjour">Bonjour {{ auth.user()?.prenoms || auth.user()?.name }} ! Posez votre question sur l'application : je vous guide pas à pas, je peux vérifier la situation d'un élève, d'une classe ou vos droits, et vous montrer une démonstration.</p>
+          <p class="note">Je ne fais aucune modification : je vous explique comment faire.</p>
+          @if (etat()?.suggestions?.length) {
+            <div class="suggestions">
+              @for (s of etat()!.suggestions; track s) {
+                <button type="button" (click)="poser(s)">{{ s }}</button>
+              }
+            </div>
+          }
+          @if (etat()?.demos?.length) {
+            <button type="button" class="me-lien lien-demos" (click)="voirDemos.set(!voirDemos())"><ion-icon name="play-circle-outline"></ion-icon> {{ voirDemos() ? 'Cacher les démonstrations' : 'Voir les démonstrations vidéo' }}</button>
+            @if (voirDemos()) {
+              <ul class="demos">
+                @for (d of etat()!.demos; track d.id) {
+                  <li><button type="button" (click)="videoAgrandie.set(d)"><ion-icon name="play-circle-outline"></ion-icon> {{ d.titre }} <small>{{ d.duree }}</small></button></li>
+                }
+              </ul>
+            }
+          }
+        </div>
+      }
+
+      @for (m of messages(); track $index) {
+        <div class="message" [class.utilisateur]="m.role === 'user'" [class.erreur]="m.erreur">
+          @if (m.role === 'user') {
+            <div class="bulle">{{ m.texte }}</div>
+          } @else {
+            <div class="bulle">
+              @if (m.texte) { <div class="contenu" [innerHTML]="html(m.texte)"></div> }
+              @if (m.statut && m.enCours) { <p class="statut"><ion-spinner name="dots"></ion-spinner> {{ m.statut }}</p> }
+              @for (f of m.fiches; track f.route) {
+                <button type="button" class="fiche" (click)="ouvrirFiche(f)"><ion-icon name="arrow-forward-outline"></ion-icon> Ouvrir {{ f.menu }}</button>
+              }
+              @for (d of m.demos; track d.id) {
+                <figure class="video">
+                  <video [src]="urlDemo(d.id)" controls muted playsinline preload="metadata" (loadedmetadata)="corrigerDuree($event)"></video>
+                  <figcaption>
+                    <ion-icon name="play-circle-outline"></ion-icon> {{ d.titre }}
+                    <button type="button" class="me-action" title="Agrandir" aria-label="Agrandir la vidéo" (click)="videoAgrandie.set(d)"><ion-icon name="expand-outline"></ion-icon></button>
+                  </figcaption>
+                </figure>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <form class="saisie" (submit)="$event.preventDefault(); envoyer()">
+      <textarea #champ rows="1" placeholder="Votre question… (ex : comment encaisser ?)" aria-label="Votre question" maxlength="2000" [value]="saisie()" (input)="saisie.set($any($event.target).value)" (keydown)="touche($event)"></textarea>
+      <button type="submit" class="envoyer" [disabled]="!peutEnvoyer()" aria-label="Envoyer">
+        @if (envoi()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="send-outline"></ion-icon> }
+      </button>
+    </form>
+  </section>
+}
+
+@if (videoAgrandie(); as v) {
+  <div class="voile" (click)="videoAgrandie.set(null)" role="presentation">
+    <figure class="grande-video" (click)="$event.stopPropagation()">
+      <figcaption>
+        <strong>{{ v.titre }}</strong>
+        <button type="button" class="me-action" aria-label="Fermer la vidéo" (click)="videoAgrandie.set(null)"><ion-icon name="close-outline"></ion-icon></button>
+      </figcaption>
+      <video [src]="urlDemo(v.id)" controls autoplay muted playsinline (loadedmetadata)="corrigerDuree($event)"></video>
+    </figure>
+  </div>
+}

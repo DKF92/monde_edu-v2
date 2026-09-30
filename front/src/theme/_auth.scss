@@ -1,0 +1,285 @@
+// Mise en page commune des ecrans d'authentification (choix de
+// l'etablissement, connexion) :
+// - mobile : bandeau bleu marine en haut, feuille blanche arrondie par-dessus ;
+// - bureau (>= 992px) : panneau de marque a gauche, contenu a droite.
+
+$auth-bureau: 992px;
+
+.page-auth {
+  --background: var(--me-surface);
+}
+
+.auth {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--me-marine-fonce);
+
+  @media (min-width: $auth-bureau) {
+    flex-direction: row;
+    background: var(--me-surface);
+  }
+}
+
+app-auth-marque {
+  flex-shrink: 0;
+
+  @media (min-width: $auth-bureau) {
+    flex: 0 0 min(46%, 620px);
+    min-height: 100vh;
+  }
+}
+
+.auth-panneau {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  margin-top: -28px;
+  padding: 28px 20px calc(28px + env(safe-area-inset-bottom));
+  border-radius: 28px 28px 0 0;
+  background: var(--me-surface);
+  position: relative;
+  z-index: 1;
+
+  @media (min-width: $auth-bureau) {
+    align-items: center;
+    margin-top: 0;
+    border-radius: 0;
+    padding: 48px;
+  }
+}
+
+.auth-contenu {
+  width: 100%;
+  max-width: 440px;
+}
+
+.auth-titre {
+  margin: 0 0 6px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--me-texte);
+
+  @media (min-width: $auth-bureau) {
+    font-size: 28px;
+  }
+}
+
+.auth-sous-titre {
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: var(--me-texte-doux);
+}
+
+// Champ de saisie avec icone a gauche.
+.champ {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--me-texte);
+  }
+}
+
+.champ-saisie {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 50px;
+  padding: 0 14px;
+  border: 1.5px solid var(--me-bordure);
+  border-radius: 12px;
+  background: var(--me-surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  > ion-icon {
+    flex-shrink: 0;
+    font-size: 19px;
+    color: var(--me-texte-leger);
+  }
+
+  input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: none;
+    outline: none;
+    background: none;
+    font: inherit;
+    font-size: 15px;
+    color: var(--me-texte);
+
+    &::placeholder {
+      color: var(--me-texte-leger);
+    }
+  }
+
+  &:focus-within {
+    border-color: var(--ion-color-primary);
+    box-shadow: 0 0 0 4px rgba(var(--ion-color-primary-rgb), 0.12);
+
+    > ion-icon {
+      color: var(--ion-color-primary);
+    }
+  }
+
+  &.invalide {
+    border-color: var(--ion-color-danger);
+  }
+}
+
+.erreur-champ {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ion-color-danger);
+}
+
+.bouton-principal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 50px;
+  border: none;
+  border-radius: 12px;
+  background: var(--me-marine);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+
+  &:hover:not(:disabled) {
+    background: var(--me-marine-fonce);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.99);
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: default;
+  }
+
+  ion-spinner {
+    --color: #fff;
+  }
+}
+
+.alerte-erreur {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff0f0;
+  color: #b42323;
+  font-size: 13px;
+  font-weight: 500;
+
+  ion-icon {
+    flex-shrink: 0;
+    font-size: 18px;
+  }
+}
+
+.auth-aide {
+  margin: 24px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--me-texte-leger);
+  text-align: center;
+}
+
+// Carte d'etablissement (liste de recherche, rappel sur l'ecran de connexion).
+.carte-etablissement {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--me-bordure);
+  border-radius: 14px;
+  background: var(--me-surface);
+  color: var(--me-texte);
+  font: inherit;
+  text-align: left;
+
+  .logo-etablissement {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--me-bleu-fond);
+    color: var(--me-marine);
+    font-size: 15px;
+    font-weight: 800;
+    overflow: hidden;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .infos {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+
+    strong {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    span {
+      font-size: 12px;
+      color: var(--me-texte-doux);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  > ion-icon {
+    flex-shrink: 0;
+    font-size: 18px;
+    color: var(--me-texte-leger);
+  }
+}
+
+button.carte-etablissement {
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--ion-color-primary);
+    background: var(--me-survol);
+    outline: none;
+
+    > ion-icon {
+      color: var(--ion-color-primary);
+    }
+  }
+}
+
+// Remplissage automatique du navigateur : garde le fond blanc du champ au lieu
+// du bleu/jaune impose (qui ne couvrait que l'input, pas tout le champ).
+.champ-saisie input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 100px var(--me-surface) inset;
+  -webkit-text-fill-color: var(--me-texte);
+  caret-color: var(--me-texte);
+}

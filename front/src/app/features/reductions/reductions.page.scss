@@ -1,0 +1,249 @@
+$tableau: 900px;
+
+.boutons-entete {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  @media (max-width: 559px) {
+    width: 100%;
+
+    button {
+      flex: 1 1 calc(50% - 8px);
+      justify-content: center;
+    }
+  }
+}
+
+.totaux {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+
+  @media (max-width: 899px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @media (max-width: 479px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .total {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+
+    > span:last-child {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    strong {
+      font-size: 18px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    small {
+      font-size: 12px;
+      color: var(--me-texte-doux);
+    }
+  }
+}
+
+.liste {
+  container-type: inline-size;
+  padding: 0;
+}
+
+.barre {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 16px 8px;
+
+  .me-recherche {
+    flex: 1 1 260px;
+  }
+
+  .boutons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    button {
+      height: 46px;
+    }
+
+    .me-badge {
+      margin-left: 2px;
+    }
+
+    @media (max-width: 559px) {
+      width: 100%;
+
+      button {
+        flex: 1 1 calc(50% - 8px);
+      }
+    }
+  }
+}
+
+.resume-filtres {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0 18px 6px;
+  font-size: 13px;
+  color: var(--me-marine);
+}
+
+.squelette {
+  padding: 14px 20px;
+}
+
+.tableau {
+  padding: 4px 8px 10px;
+
+  &.attenue {
+    opacity: 0.55;
+  }
+}
+
+.ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px 12px;
+  padding: 12px;
+  border-radius: 12px;
+
+  @container (min-width: #{$tableau}) {
+    grid-template-columns: minmax(170px, 2fr) minmax(100px, 1fr) minmax(120px, 1.2fr) 104px 86px minmax(120px, 1.3fr) 80px;
+    gap: 6px 10px;
+    align-items: center;
+    border-radius: 10px;
+
+    &:not(.entete-tableau):hover {
+      background: var(--me-survol);
+    }
+  }
+}
+
+.entete-tableau {
+  display: none;
+
+  @container (min-width: #{$tableau}) {
+    display: grid;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--me-texte-leger);
+  }
+}
+
+.a-droite {
+  text-align: right;
+}
+
+.eleve {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  strong {
+    font-size: 14px;
+    color: var(--me-texte);
+  }
+}
+
+.matricule {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--me-texte-doux);
+}
+
+.cellule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--me-texte);
+
+  small {
+    color: var(--me-texte-doux);
+  }
+
+  &[data-libelle]::before {
+    content: attr(data-libelle);
+    flex: 0 0 110px;
+    font-size: 12px;
+    color: var(--me-texte-leger);
+  }
+
+  &.montant {
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @container (min-width: #{$tableau}) {
+    &[data-libelle]::before {
+      content: none;
+    }
+
+    &.montant {
+      justify-content: flex-end;
+    }
+  }
+}
+
+.actions {
+  justify-content: flex-end;
+}
+
+.matricule-saisie {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.filtres-reductions {
+  section + section {
+    margin-top: 16px;
+  }
+
+  h2 {
+    margin: 0 0 10px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--me-texte-doux);
+  }
+
+  .grille-filtres {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    align-items: end;
+
+    @media (min-width: 900px) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .appliquer {
+      height: 44px;
+      justify-content: center;
+    }
+  }
+}

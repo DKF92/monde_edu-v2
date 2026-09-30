@@ -1,0 +1,75 @@
+<ion-content class="page-auth" [fullscreen]="true">
+  <div class="auth">
+    <app-auth-marque></app-auth-marque>
+
+    <main class="auth-panneau">
+      <div class="auth-contenu">
+        <h1 class="auth-titre">Choisissez votre mot de passe</h1>
+        <p class="auth-sous-titre">
+          Bienvenue {{ auth.prenom() }} ! Votre mot de passe actuel est un mot de passe provisoire.
+          Pour protéger votre compte, choisissez maintenant votre propre mot de passe.
+        </p>
+
+        <form (submit)="$event.preventDefault(); valider()" class="formulaire" novalidate>
+          <input type="email" class="cache" autocomplete="username" [value]="auth.user()?.email ?? ''" tabindex="-1" aria-hidden="true" readonly />
+
+          <div class="champ">
+            <label for="mdp-actuel">Mot de passe provisoire</label>
+            <div class="champ-saisie" [class.invalide]="erreurChamp('actuel')">
+              <ion-icon name="key-outline"></ion-icon>
+              <input id="mdp-actuel" [type]="visible() ? 'text' : 'password'" autocomplete="current-password" placeholder="Reçu de l'administration" [value]="valeurs().actuel" (input)="saisir('actuel', $event)" [attr.aria-invalid]="!!erreurChamp('actuel')" />
+            </div>
+            @if (erreurChamp('actuel'); as e) { <p class="erreur-champ">{{ e }}</p> }
+          </div>
+
+          <div class="champ">
+            <label for="mdp-nouveau">Nouveau mot de passe</label>
+            <div class="champ-saisie" [class.invalide]="erreurChamp('nouveau')">
+              <ion-icon name="lock-closed-outline"></ion-icon>
+              <input id="mdp-nouveau" [type]="visible() ? 'text' : 'password'" autocomplete="new-password" placeholder="Votre nouveau mot de passe" [value]="valeurs().nouveau" (input)="saisir('nouveau', $event)" [attr.aria-invalid]="!!erreurChamp('nouveau')" />
+              <button type="button" class="bouton-oeil" (click)="visible.set(!visible())" [attr.aria-label]="visible() ? 'Masquer les mots de passe' : 'Afficher les mots de passe'">
+                <ion-icon [name]="visible() ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+              </button>
+            </div>
+            <ul class="regles" aria-label="Règles du mot de passe">
+              @for (r of regles(); track r.libelle) {
+                <li [class.ok]="r.ok"><ion-icon [name]="r.ok ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon> {{ r.libelle }}</li>
+              }
+            </ul>
+            @if (erreurChamp('nouveau'); as e) { <p class="erreur-champ">{{ e }}</p> }
+          </div>
+
+          <div class="champ">
+            <label for="mdp-confirmation">Confirmez le nouveau mot de passe</label>
+            <div class="champ-saisie" [class.invalide]="erreurChamp('confirmation')">
+              <ion-icon name="lock-closed-outline"></ion-icon>
+              <input id="mdp-confirmation" [type]="visible() ? 'text' : 'password'" autocomplete="new-password" placeholder="Saisissez-le à nouveau" [value]="valeurs().confirmation" (input)="saisir('confirmation', $event)" [attr.aria-invalid]="!!erreurChamp('confirmation')" />
+            </div>
+            @if (erreurChamp('confirmation'); as e) { <p class="erreur-champ">{{ e }}</p> }
+          </div>
+
+          @if (erreur()) {
+            <div class="alerte-erreur" role="alert">
+              <ion-icon name="alert-circle-outline"></ion-icon>
+              <span>{{ erreur() }}</span>
+            </div>
+          }
+
+          <button type="submit" class="bouton-principal" [disabled]="chargement()">
+            @if (chargement()) {
+              <ion-spinner name="dots"></ion-spinner>
+            } @else {
+              Enregistrer et continuer
+              <ion-icon name="arrow-forward-outline"></ion-icon>
+            }
+          </button>
+        </form>
+
+        <p class="auth-aide">
+          Ce n'est pas votre compte ?
+          <button type="button" class="lien-deconnexion" (click)="seDeconnecter()">Se déconnecter</button>
+        </p>
+      </div>
+    </main>
+  </div>
+</ion-content>

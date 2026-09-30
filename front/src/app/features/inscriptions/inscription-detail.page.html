@@ -1,0 +1,375 @@
+<ion-content class="me-page-admin">
+  <div class="me-page">
+    @if (chargement()) {
+      <section class="me-carte">
+        <ion-skeleton-text [animated]="true" style="width: 50%; height: 28px"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 120px; margin-top: 14px"></ion-skeleton-text>
+      </section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger l'inscription</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (detail()) {
+      @let d = detail()!;
+      <!-- ================= En-tete ================= -->
+      <header class="me-entete-page">
+        <div>
+          <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/inscriptions')">
+            <ion-icon name="chevron-back-outline"></ion-icon> Inscriptions
+          </button>
+          <h1>{{ d.eleve.nom }} {{ d.eleve.prenoms }}</h1>
+          <p>
+            <span class="matricule">{{ d.eleve.matricule }}</span> · Inscription {{ d.annee }}
+            <span [class]="'me-badge ' + tons[d.statut]">{{ libellesStatut[d.statut] }}</span>
+          </p>
+        </div>
+        <div class="boutons-entete">
+          @if (d.modifiable_tarif) {
+            <button type="button" class="me-bouton-texte danger" (click)="annuler()" [disabled]="!!action()">
+              <ion-icon name="close-circle-outline"></ion-icon> Annuler
+            </button>
+          }
+          @if (!d.inscrit_en_ligne && d.statut < 2) {
+            <button type="button" class="me-bouton-secondaire" (click)="ouvrirEnLigne()">
+              <ion-icon name="globe-outline"></ion-icon> Mise à jour inscription en ligne
+            </button>
+          }
+          <button type="button" class="me-bouton-secondaire" (click)="modifier()">
+            <ion-icon name="create-outline"></ion-icon> Modifier
+          </button>
+          <button type="button" [class]="peutEncaisser() && d.classe ? 'me-bouton-secondaire' : 'me-bouton-principal'" (click)="imprimer()">
+            <ion-icon name="print-outline"></ion-icon> Imprimer la fiche
+          </button>
+          @if (peutEncaisser() && d.classe) {
+            <button type="button" class="me-bouton-principal" (click)="router.navigate(['/tabs/paiements/encaisser'], { queryParams: { inscription: d.id } })">
+              <ion-icon name="cash-outline"></ion-icon> Encaisser
+            </button>
+          }
+        </div>
+      </header>
+
+      @if (nouvelle()) {
+        <p class="me-note bandeau-succes">
+          <ion-icon name="checkmark-circle-outline"></ion-icon>
+          <span>
+            <strong>Inscription enregistrée.</strong>
+            @if (d.classe) {
+              @if (d.montant_minimum !== null) {
+                Prochaine étape : passage à la caisse avec au moins <strong>{{ montant(d.montant_minimum) }}</strong>.
+              } @else {
+                Prochaine étape : passage à la caisse.
+              }
+            } @else {
+              Placez l'élève dans une classe dès que possible : ses frais seront alors fixés.
+            }
+          </span>
+        </p>
+      }
+
+      <div class="grille-detail">
+        <!-- ================= Colonne principale ================= -->
+        <div class="colonne">
+          <section class="me-carte bloc">
+            <div class="eleve">
+              <label class="photo" [class.chargement]="action() === 'photo'" title="Changer la photo">
+                @if (d.eleve.photo_url) {
+                  <img [src]="d.eleve.photo_url" alt="Photo de l'élève" />
+                } @else {
+                  <span class="initiales" [class.feminin]="d.eleve.sexe === 'F'">{{ initiales(d) }}</span>
+                }
+                <span class="changer"><ion-icon name="camera-outline"></ion-icon></span>
+                <input type="file" accept="image/*" capture="user" hidden (change)="choisirPhoto($event)" [disabled]="!!action()" />
+              </label>
+              <dl class="infos">
+                <div><dt>Sexe</dt><dd>{{ d.eleve.sexe === 'F' ? 'Féminin' : d.eleve.sexe === 'M' ? 'Masculin' : '—' }}</dd></div>
+                <div><dt>Naissance</dt><dd>{{ dateFr(d.eleve.date_naissance) }}{{ d.eleve.lieu_naissance ? ' à ' + d.eleve.lieu_naissance : '' }}</dd></div>
+                <div><dt>Nationalité</dt><dd>{{ d.eleve.nationalite || '—' }}</dd></div>
+                <div><dt>Téléphone</dt><dd>{{ d.eleve.telephone || '—' }}</dd></div>
+                <div><dt>Quartier</dt><dd>{{ d.eleve.quartier || '—' }}</dd></div>
+                @if (d.eleve.orphelin_pere || d.eleve.orphelin_mere) {
+                  <div><dt>Orphelin(e)</dt><dd>{{ d.eleve.orphelin_pere && d.eleve.orphelin_mere ? 'de père et de mère' : d.eleve.orphelin_pere ? 'de père' : 'de mère' }}</dd></div>
+                }
+                @if (d.eleve.particularites_medicales) {
+                  <div class="large"><dt>Santé</dt><dd>{{ d.eleve.particularites_medicales }}</dd></div>
+                }
+              </dl>
+            </div>
+          </section>
+
+          <!-- Frais -->
+          <section class="me-carte bloc">
+            <div class="entete-bloc">
+              <h2><ion-icon name="cash-outline"></ion-icon> Frais {{ d.affecte ? '(élève affecté)' : '(élève non affecté)' }}</h2>
+            </div>
+            @if (!d.classe) {
+              <p class="me-note">
+                <ion-icon name="information-circle-outline"></ion-icon>
+                <span>Les frais seront fixés quand l'élève sera placé dans une classe.</span>
+              </p>
+            } @else if (!d.frais.length) {
+              <p class="me-note attention">
+                <ion-icon name="alert-circle-outline"></ion-icon>
+                <span>Aucun montant n'était défini pour {{ d.niveau?.libelle }} au choix de la classe (Paramètres › Paiements).</span>
+              </p>
+            } @else {
+              <div class="tableau-frais" role="table">
+                <div class="ligne-frais entete" role="row">
+                  <span>Frais</span><span>Montant</span><span>Réduction</span><span>Payé</span><span>Reste</span>
+                </div>
+                @for (f of d.frais; track f.id; let impaire = $odd) {
+                  <div class="ligne-frais" role="row" [class.me-ligne-alternee]="impaire">
+                    <span class="libelle">{{ f.libelle }}</span>
+                    <span data-libelle="Montant">{{ montant(f.montant_du) }}</span>
+                    <span data-libelle="Réduction">{{ f.montant_reduit ? montant(f.montant_reduit) : '—' }}</span>
+                    <span data-libelle="Payé">{{ montant(f.montant_paye) }}</span>
+                    <span data-libelle="Reste" [class.a-payer]="f.reste > 0">{{ montant(f.reste) }}</span>
+                  </div>
+                }
+                <div class="ligne-frais total" role="row">
+                  <span class="libelle">Total</span>
+                  <span data-libelle="Montant">{{ montant(d.total_du) }}</span>
+                  <span data-libelle="Réduction">{{ d.total_reduit ? montant(d.total_reduit) : '—' }}</span>
+                  <span data-libelle="Payé">{{ montant(d.total_paye) }}</span>
+                  <span data-libelle="Reste" [class.a-payer]="d.reste > 0">{{ montant(d.reste) }}</span>
+                </div>
+              </div>
+              @if (d.montant_minimum !== null && d.statut === 1) {
+                <p class="me-note">
+                  <ion-icon name="information-circle-outline"></ion-icon>
+                  <span>Minimum à verser en caisse pour valider l'inscription : <strong>{{ montant(d.montant_minimum) }}</strong>.</span>
+                </p>
+              }
+            }
+            @for (x of d.dettes; track x.annee) {
+              <p class="me-note attention">
+                <ion-icon name="warning-outline"></ion-icon>
+                <span>Dette {{ x.annee }} : reste <strong>{{ montant(x.reste) }}</strong> sur {{ montant(x.montant) }}.</span>
+              </p>
+            }
+          </section>
+
+          <!-- Fournitures en nature -->
+          @if (d.fournitures.length) {
+            <section class="me-carte bloc">
+              <h2><ion-icon name="cube-outline"></ion-icon> Fournitures à apporter</h2>
+              <div class="fournitures">
+                @for (f of d.fournitures; track f.id) {
+                  @if (f.quantite_due > 1) {
+                    <div class="fourniture">
+                      <span><strong>{{ f.libelle }}</strong><small>{{ f.quantite_due }} à apporter</small></span>
+                      <div class="me-montant" [attr.data-unite]="'/ ' + f.quantite_due">
+                        <input class="me-saisie" type="number" min="0" [max]="f.quantite_due" [value]="quantite(f.id, f.quantite_remise)" (input)="majRemise(f.id, valeurNombre($event), f.quantite_due)" [attr.aria-label]="f.libelle + ' remis'" />
+                      </div>
+                    </div>
+                  } @else {
+                    <button type="button" class="me-option" [class.choisi]="quantite(f.id, f.quantite_remise) >= 1" (click)="majRemise(f.id, quantite(f.id, f.quantite_remise) >= 1 ? 0 : 1, 1)">
+                      <ion-icon [name]="quantite(f.id, f.quantite_remise) >= 1 ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+                      <span><strong>{{ f.libelle }}</strong><small>{{ quantite(f.id, f.quantite_remise) >= 1 ? 'Remis(e)' : 'Pas encore remis(e)' }}</small></span>
+                    </button>
+                  }
+                }
+              </div>
+              @if (fournituresModifiees()) {
+                <div class="actions-bloc">
+                  <button type="button" class="me-bouton-texte" (click)="remises.set({})">Annuler</button>
+                  <button type="button" class="me-bouton-principal" (click)="enregistrerFournitures()" [disabled]="!!action()">
+                    @if (action() === 'fournitures') { <ion-spinner name="dots"></ion-spinner> } @else { Enregistrer }
+                  </button>
+                </div>
+              }
+            </section>
+          }
+        </div>
+
+        <!-- ================= Colonne laterale ================= -->
+        <div class="colonne">
+          <section class="me-carte bloc">
+            <div class="entete-bloc">
+              <h2><ion-icon name="school-outline"></ion-icon> Classe</h2>
+              <button type="button" class="me-bouton-texte" (click)="ouvrirClasses()">
+                <ion-icon name="swap-horizontal-outline"></ion-icon> {{ d.classe ? 'Changer' : 'Placer' }}
+              </button>
+            </div>
+            @if (d.classe_detail; as c) {
+              <div class="classe-actuelle">
+                <strong>{{ c.libelle }}</strong>
+                <span>{{ c.effectif }}{{ c.limite ? ' / ' + c.limite : '' }} élèves · {{ c.garcons }} G · {{ c.filles }} F</span>
+                @if (c.limite) {
+                  <span class="jauge"><span [style.width.%]="remplissage(c)" [class.pleine]="remplissage(c) >= 100"></span></span>
+                }
+              </div>
+            } @else {
+              <p class="me-note attention">
+                <ion-icon name="alert-circle-outline"></ion-icon>
+                <span>{{ d.niveau?.libelle }} : pas encore de classe.</span>
+              </p>
+            }
+            <dl class="infos compacte">
+              <div><dt>Niveau</dt><dd>{{ d.niveau?.libelle || '—' }}</dd></div>
+              <div><dt>LV2</dt><dd>{{ d.langue_vivante_2 || 'Aucune' }}</dd></div>
+              <div><dt>Statut</dt><dd>{{ d.affecte ? 'Affecté(e)' : 'Non affecté(e)' }}</dd></div>
+              <div><dt>Redoublant(e)</dt><dd>{{ d.redoublant ? 'Oui' : 'Non' }}</dd></div>
+              <div><dt>Boursier(ère)</dt><dd>{{ d.boursier ? 'Oui' : 'Non' }}</dd></div>
+              @if (d.precedente; as p) {
+                <div><dt>{{ p.annee }}</dt><dd>{{ p.classe || p.niveau }} · {{ p.decision_finale ? libellesDecision[p.decision_finale] || p.decision_finale : 'décision non saisie' }}</dd></div>
+              } @else if (d.etablissement_origine || d.classe_origine || d.decision_origine) {
+                <div class="large"><dt>Provenance</dt><dd>{{ provenance(d) }}</dd></div>
+              }
+            </dl>
+          </section>
+
+          @if (d.inscrit_en_ligne) {
+            <section class="me-carte bloc">
+              <h2><ion-icon name="globe-outline"></ion-icon> Inscription en ligne</h2>
+              @if (d.inscription_en_ligne; as r) {
+                <dl class="infos compacte">
+                  <div><dt>Reçu n°</dt><dd>{{ r.numero_recu || '—' }}</dd></div>
+                  <div><dt>Payé en ligne</dt><dd>{{ r.somme_payee ? montant(r.somme_payee) : '—' }}</dd></div>
+                  <div><dt>Date</dt><dd>{{ dateFr(r.date_paiement) }}</dd></div>
+                  <div><dt>Statut État</dt><dd>{{ r.statut || '—' }}</dd></div>
+                  @if (r.decision) {
+                    <div><dt>Décision</dt><dd>{{ libellesDecision[r.decision] || r.decision }}{{ r.moyenne ? ' · MGA ' + r.moyenne : '' }}</dd></div>
+                  }
+                </dl>
+              } @else {
+                <p class="texte-doux">Préinscrit(e) en ligne.</p>
+              }
+            </section>
+          }
+
+          <section class="me-carte bloc">
+            <h2><ion-icon name="person-outline"></ion-icon> Parents</h2>
+            <ul class="parents">
+              @for (p of d.eleve.parents; track p.lien_parente) {
+                <li>
+                  <span>
+                    <strong>{{ p.nom_complet || '—' }}</strong>
+                    <small>
+                      {{ liens[p.lien_parente] }}{{ p.profession ? ' · ' + p.profession : '' }}
+                      @if (p.is_contact_principal) { <span class="me-badge info">Contact</span> }
+                      @if (p.is_payeur) { <span class="me-badge succes">Payeur</span> }
+                    </small>
+                  </span>
+                  @if (p.telephone) {
+                    <a class="telephone" [href]="'tel:' + p.telephone"><ion-icon name="call-outline"></ion-icon> {{ p.telephone }}</a>
+                  }
+                </li>
+              } @empty {
+                <li class="vide">Aucun parent renseigné.</li>
+              }
+            </ul>
+          </section>
+
+          <p class="trace">Inscrit(e) le {{ dateFr(d.date_inscription) }}{{ d.enregistre_par ? ' par ' + d.enregistre_par : '' }}</p>
+        </div>
+      </div>
+    }
+  </div>
+</ion-content>
+
+<!-- ================= Choix de la classe ================= -->
+<ion-modal class="me-modale-formulaire auto" [isOpen]="modaleClasse()" (didDismiss)="modaleClasse.set(false)">
+  <ng-template>
+    @if (detail(); as d) {
+      <div class="me-modale">
+        <header>
+          <span class="me-pastille teinte-cyan"><ion-icon name="school-outline"></ion-icon></span>
+          <div>
+            <h1>{{ d.classe ? 'Changer de classe' : 'Placer dans une classe' }}</h1>
+            <p>{{ d.eleve.nom }} {{ d.eleve.prenoms }} · {{ d.niveau?.libelle }}</p>
+          </div>
+          <button type="button" class="me-fermer" (click)="modaleClasse.set(false)" aria-label="Fermer">
+            <ion-icon name="close-outline"></ion-icon>
+          </button>
+        </header>
+        <div class="corps">
+          <section>
+            <h2>Classes de {{ d.niveau?.libelle }}</h2>
+            @if (optionsClasses().length) {
+              <div class="me-champ">
+                <span class="libelle">Classe</span>
+                <app-selecteur idChamp="d-classe" icone="school-outline" placeholder="Choisir la classe…" [options]="optionsClasses()" [valeur]="classeChoisie()" (valeurChange)="classeChoisie.set($event)"></app-selecteur>
+              </div>
+              @if (classeSelectionnee(); as c) {
+                <div class="effectif-classe" aria-live="polite">
+                  <div class="chiffre"><strong>{{ c.effectif }}</strong><small>élève{{ c.effectif > 1 ? 's' : '' }}{{ c.limite ? ' / ' + c.limite : '' }}</small></div>
+                  <div class="chiffre"><strong>{{ c.filles }}</strong><small>fille{{ c.filles > 1 ? 's' : '' }}</small></div>
+                  <div class="chiffre"><strong>{{ c.garcons }}</strong><small>garçon{{ c.garcons > 1 ? 's' : '' }}</small></div>
+                  @if (c.limite) {
+                    <span class="jauge"><span [style.width.%]="remplissage(c)" [class.pleine]="remplissage(c) >= 100"></span></span>
+                  }
+                </div>
+              }
+            } @else {
+              <p class="texte-doux">Aucune classe pour ce niveau.</p>
+            }
+            <p class="me-aide-champ">Pour changer de niveau, modifiez l'inscription (possible tant qu'aucun paiement n'est enregistré).</p>
+          </section>
+        </div>
+        <footer>
+          <button type="button" class="me-bouton-texte" (click)="modaleClasse.set(false)">Fermer</button>
+          <button type="button" class="me-bouton-principal" (click)="validerClasse()" [disabled]="!classeChoisie() || classeChoisie() === d.classe?.id || action() === 'classe'">
+            @if (action() === 'classe') { <ion-spinner name="dots"></ion-spinner> } @else { Valider }
+          </button>
+        </footer>
+      </div>
+    }
+  </ng-template>
+</ion-modal>
+
+<!-- ================= Mise a jour depuis l'inscription en ligne ================= -->
+<ion-modal class="me-modale-formulaire" [isOpen]="modaleEnLigne()" (didDismiss)="modaleEnLigne.set(false)">
+  <ng-template>
+    @if (detail(); as d) {
+      <div class="me-modale">
+        <header>
+          <span class="me-pastille teinte-cyan"><ion-icon name="globe-outline"></ion-icon></span>
+          <div>
+            <h1>Inscription en ligne</h1>
+            <p>{{ d.eleve.nom }} {{ d.eleve.prenoms }} · {{ d.eleve.matricule }}</p>
+          </div>
+          <button type="button" class="me-fermer" (click)="modaleEnLigne.set(false)" aria-label="Fermer">
+            <ion-icon name="close-outline"></ion-icon>
+          </button>
+        </header>
+        <div class="corps">
+          <section class="en-ligne">
+            @if (rechercheEnLigne()) {
+              <p class="texte-doux"><ion-spinner name="dots"></ion-spinner> Consultation du site de l'État…</p>
+            } @else if (enLigne()) {
+              @let r = enLigne()!;
+              @if (r.trouve) {
+                <p class="texte-doux">Préinscrit(e) en ligne pour {{ r.donnees?.annee }} · reçu n° {{ r.donnees?.numero_recu }}</p>
+                <app-recu-en-ligne [resultat]="r" [ecarts]="ecarts()" [choisis]="ecartsChoisis()" (basculer)="basculerEcart($event)"></app-recu-en-ligne>
+                <p class="me-aide-champ">Continuez vers la modification : la fiche est pré-remplie avec les informations cochées (et la photo en ligne si elle existe), à vérifier avant d'enregistrer.</p>
+              } @else if (r.erreur) {
+                <p class="me-note attention">
+                  <ion-icon name="alert-circle-outline"></ion-icon>
+                  <span>{{ r.erreur }}</span>
+                </p>
+              } @else {
+                <p class="me-note">
+                  <ion-icon name="information-circle-outline"></ion-icon>
+                  <span>Aucune inscription en ligne trouvée pour ce matricule sur le site de l'État.</span>
+                </p>
+              }
+            }
+          </section>
+        </div>
+        <footer>
+          @if (enLigne()?.erreur && !rechercheEnLigne()) {
+            <button type="button" class="me-bouton-texte" (click)="verifierEnLigne()">Réessayer</button>
+          }
+          <button type="button" class="me-bouton-texte" (click)="modaleEnLigne.set(false)">Fermer</button>
+          <button type="button" class="me-bouton-principal" (click)="continuerEnLigne()" [disabled]="!enLigne()?.trouve">
+            Continuer vers la modification <ion-icon name="chevron-forward-outline"></ion-icon>
+          </button>
+        </footer>
+      </div>
+    }
+  </ng-template>
+</ion-modal>

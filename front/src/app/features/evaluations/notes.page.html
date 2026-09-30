@@ -1,0 +1,211 @@
+<ion-content class="me-page-admin">
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <h1>Évaluations</h1>
+        <p>Notes des évaluations, moyennes par matière et résultats de classe.</p>
+      </div>
+    </header>
+
+    @if (peutVoirResultats()) {
+      <nav class="onglets me-segments" aria-label="Évaluations">
+        <button type="button" class="actif">Saisie des notes</button>
+        <button type="button" (click)="router.navigateByUrl('/tabs/evaluations/resultats')">Résultats et bulletins</button>
+      </nav>
+    }
+
+    @if (erreurOptions()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les classes</strong>
+          <button type="button" class="me-lien" (click)="ionViewWillEnter()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (!options()) {
+      <section class="me-carte"><ion-skeleton-text [animated]="true" style="width: 100%; height: 44px"></ion-skeleton-text></section>
+    } @else if (!options()!.classes.length) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="school-outline"></ion-icon>
+          <strong>Aucune classe à noter</strong>
+          <span>Un professeur voit les classes et matières qui lui sont attribuées (Classes › liste de classe › Professeurs).</span>
+        </div>
+      </section>
+    } @else {
+      <!-- ================= Choix ================= -->
+      <section class="me-carte choix">
+        <div class="me-champ">
+          <label for="n-periode">Période</label>
+          <app-selecteur idChamp="n-periode" icone="calendar-outline" [options]="optionsPeriode()" [valeur]="periodeId() || null" (valeurChange)="choisirPeriode($event)"></app-selecteur>
+        </div>
+        <div class="me-champ">
+          <label for="n-classe">Classe</label>
+          <app-selecteur idChamp="n-classe" icone="school-outline" [options]="optionsClasse()" [valeur]="classeId() || null" (valeurChange)="choisirClasse($event)"></app-selecteur>
+        </div>
+        <div class="me-champ">
+          <label for="n-matiere">Matière</label>
+          <app-selecteur idChamp="n-matiere" icone="book-outline" placeholder="Aucune matière" [options]="optionsMatiere()" [valeur]="matiereId() || null" (valeurChange)="choisirMatiere($event)"></app-selecteur>
+        </div>
+      </section>
+
+      @if (!optionsMatiere().length) {
+        <p class="me-note">
+          <ion-icon name="information-circle-outline"></ion-icon>
+          <span>Aucune matière pour cette classe : fixez les coefficients du niveau dans Paramètres › Matières.</span>
+        </p>
+      } @else if (chargement() && !grille()) {
+        <section class="me-carte"><ion-skeleton-text [animated]="true" style="width: 100%; height: 160px"></ion-skeleton-text></section>
+      } @else if (erreur()) {
+        <section class="me-carte">
+          <div class="me-etat-vide">
+            <ion-icon name="cloud-offline-outline"></ion-icon>
+            <strong>Impossible de charger les notes</strong>
+            <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+          </div>
+        </section>
+      } @else if (grille()) {
+        @let g = grille()!;
+        <section class="me-carte liste" [class.attenue]="chargement()">
+          <div class="titre-tableau">
+            <div>
+              <h2>{{ g.matiere.libelle }} · {{ g.classe.libelle }} · {{ g.periode.libelle }}</h2>
+              <p>
+                {{ g.evaluations.length }} évaluation{{ g.evaluations.length > 1 ? 's' : '' }} · coefficient {{ g.matiere.coefficient }}
+                · moyenne de classe {{ n(g.moyenne_classe) }}
+                @if (g.matiere.langue) { · élèves qui suivent {{ g.matiere.langue }} }
+                @if (g.arretee) { <span class="me-badge succes" title="Notes arrêtées par le directeur : elles ne peuvent plus être modifiées"><ion-icon name="lock-closed-outline"></ion-icon> Notes arrêtées</span> }
+                @if (g.periode.cloturee) { <span class="me-badge attention">Période clôturée</span> }
+              </p>
+            </div>
+            <div class="boutons">
+              @if (g.peut_arreter) {
+                <button type="button" class="me-bouton-secondaire" (click)="router.navigate(['/tabs/parametres/arret-notes'], { queryParams: { periode: g.periode.id } })"><ion-icon name="lock-closed-outline"></ion-icon> Arrêt des notes</button>
+              }
+              @if (g.peut_saisir) {
+                <button type="button" class="me-bouton-principal" (click)="nouvelle()"><ion-icon name="add-outline"></ion-icon> Nouvelle évaluation</button>
+              }
+            </div>
+          </div>
+
+          <div class="defilant">
+            <table class="grille">
+              <thead>
+                <tr>
+                  <th class="num">N°</th>
+                  <th class="eleve">Élève</th>
+                  @for (e of g.evaluations; track e.numero) {
+                    <th class="eval">
+                      <span>Éval. {{ e.numero }}</span>
+                      <small>/{{ e.bareme }}{{ e.date ? ' · ' + dateFr(e.date) : '' }}</small>
+                      @if (g.peut_saisir) {
+                        <span class="actions-eval">
+                          <button type="button" class="me-action" title="Modifier" [attr.aria-label]="'Modifier l\'évaluation ' + e.numero" (click)="modifier(e.numero)"><ion-icon name="create-outline"></ion-icon></button>
+                          <button type="button" class="me-action danger" title="Supprimer" [attr.aria-label]="'Supprimer l\'évaluation ' + e.numero" (click)="supprimer(e.numero)"><ion-icon name="trash-outline"></ion-icon></button>
+                        </span>
+                      }
+                    </th>
+                  }
+                  <th class="moy">Moyenne</th>
+                  <th>Rang</th>
+                  <th class="appr">Appréciation</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (l of elevesPage(); track l.eleve_id; let i = $index) {
+                  <tr>
+                    <td class="num">{{ (page() - 1) * taille() + i + 1 }}</td>
+                    <td class="eleve"><strong>{{ l.nom }}</strong> {{ l.prenoms }}<small>{{ l.matricule }}</small></td>
+                    @for (e of g.evaluations; track e.numero) {
+                      <td class="eval">{{ note(l.notes[e.numero]) }}</td>
+                    }
+                    <td class="moy" [class.faible]="l.moyenne !== null && l.moyenne < 10">{{ n(l.moyenne) }} @if (l.arretee) { <ion-icon name="lock-closed-outline" title="Arrêtée"></ion-icon> }</td>
+                    <td>{{ rang(l.rang, l.rang_ex_aequo) }}</td>
+                    <td class="appr">{{ l.appreciation ?? '' }}</td>
+                  </tr>
+                } @empty {
+                  <tr><td [attr.colspan]="5 + g.evaluations.length" class="vide">Aucun élève dans cette classe.</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <app-pagination [total]="g.eleves.length" [page]="page()" [taille]="taille()" (pageChange)="page.set($event)" (tailleChange)="taille.set($event); page.set(1)"></app-pagination>
+          @if (!g.evaluations.length && g.eleves.length) {
+            <div class="me-etat-vide">
+              <ion-icon name="create-outline"></ion-icon>
+              <strong>Aucune évaluation pour l'instant</strong>
+              @if (g.peut_saisir) {
+                <button type="button" class="me-bouton-principal" (click)="nouvelle()"><ion-icon name="add-outline"></ion-icon> Nouvelle évaluation</button>
+              }
+            </div>
+          }
+        </section>
+      }
+    }
+  </div>
+</ion-content>
+
+<!-- ================= Saisie d'une evaluation ================= -->
+<ion-modal class="me-modale-formulaire" [isOpen]="modale()" (didDismiss)="modale.set(false)">
+  <ng-template>
+    <div class="me-modale">
+      <header>
+        <span class="me-pastille teinte-violet"><ion-icon name="create-outline"></ion-icon></span>
+        <div>
+          <h1>{{ numero() ? 'Évaluation n°' + numero() : 'Nouvelle évaluation' }}</h1>
+          <p>{{ grille()?.matiere?.libelle }} · {{ grille()?.classe?.libelle }} · {{ grille()?.periode?.libelle }}</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="modale.set(false)" aria-label="Fermer"><ion-icon name="close-outline"></ion-icon></button>
+      </header>
+      <div class="corps">
+        <section class="entete-saisie">
+          <div class="me-champ">
+            <span class="libelle">Notée sur</span>
+            <div class="me-segments" role="radiogroup" aria-label="Barème">
+              @for (b of options()?.baremes ?? [10, 20, 40]; track b) {
+                <button type="button" role="radio" [attr.aria-checked]="bareme() === b" [class.actif]="bareme() === b" (click)="bareme.set(b)">{{ b }}</button>
+              }
+            </div>
+          </div>
+          <div class="me-champ">
+            <label for="n-date">Date</label>
+            <input id="n-date" class="me-saisie" type="date" [value]="date()" (change)="date.set(valeurTexte($event))" />
+          </div>
+        </section>
+        <p class="compteur-saisie">{{ saisies() }} / {{ grille()?.eleves?.length }} notes saisies · laissez vide pour un élève non noté (absent).</p>
+        @for (m of erreursServeur(); track $index) {
+          <p class="me-erreur-champ">{{ m }}</p>
+        }
+        <ul class="saisie-notes">
+          @for (l of grille()?.eleves ?? []; track l.eleve_id; let i = $index) {
+            <li>
+              <label [for]="'note-' + i"><span class="rang-saisie">{{ i + 1 }}</span><strong>{{ l.nom }}</strong> {{ l.prenoms }}</label>
+              <div class="me-montant" [attr.data-unite]="'/' + bareme()">
+                <input
+                  [id]="'note-' + i"
+                  class="me-saisie"
+                  type="text"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  [class.invalide]="invalides().has(l.eleve_id)"
+                  [value]="valeurs()[l.eleve_id] ?? ''"
+                  (input)="saisir(l.eleve_id, valeurTexte($event))"
+                  (keydown.enter)="suivant($event, i)"
+                />
+              </div>
+            </li>
+          }
+        </ul>
+      </div>
+      <footer>
+        @if (invalides().size) {
+          <span class="me-erreur-champ">{{ invalides().size }} note{{ invalides().size > 1 ? 's' : '' }} hors barème (0 à {{ bareme() }}).</span>
+        }
+        <button type="button" class="me-bouton-texte" (click)="modale.set(false)" [disabled]="enregistrement()">Annuler</button>
+        <button type="button" class="me-bouton-principal" (click)="enregistrer()" [disabled]="enregistrement() || invalides().size > 0">
+          @if (enregistrement()) { <ion-spinner name="dots"></ion-spinner> } @else { Enregistrer }
+        </button>
+      </footer>
+    </div>
+  </ng-template>
+</ion-modal>

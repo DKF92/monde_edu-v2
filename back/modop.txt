@@ -1,3 +1,9 @@
 $env:Path = "C:\laragon\bin\php\php-8.3.33-Win32-vs16-x64;" + $env:Path
 cd C:\laragon\www\monde_edu\monde_edu-v2\back
 php artisan serve --host=0.0.0.0 --port=8000
+
+
+front 
+$env:Path = "C:\laragon\bin\nodejs\node-v22;" + $env:Path
+cd C:\laragon\www\monde_edu\monde_edu-v2\front
+npm start -- --host 0.0.0.0

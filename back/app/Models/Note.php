@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'eleve_id', 'classe_id', 'matiere_id', 'periode_id', 'type_examen_id',
-    'personnel_id', 'valeur', 'coefficient', 'date_evaluation',
+    'eleve_id', 'classe_id', 'matiere_id', 'periode_id', 'numero', 'bareme', 'type_examen_id',
+    'personnel_id', 'saisi_par_id', 'valeur', 'coefficient', 'date_evaluation',
 ])]
 class Note extends Model
 {

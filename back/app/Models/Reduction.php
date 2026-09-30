@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * ecriture ici recalcule automatiquement le montant_reduit (en cache) du
  * frais_eleve/de la dette concerne, et le total de l'inscription.
  */
-#[Fillable(['etablissement_id', 'frais_eleve_id', 'dette_id', 'montant', 'motif', 'accorde_par_id', 'is_active'])]
+#[Fillable(['etablissement_id', 'lot', 'type_reduction_id', 'frais_eleve_id', 'dette_id', 'montant', 'motif', 'accorde_par_id', 'is_active'])]
 class Reduction extends Model
 {
     use BelongsToEtablissement;
@@ -28,6 +28,11 @@ class Reduction extends Model
         static::created(fn (self $reduction) => $reduction->recalculerCibles());
         static::updated(fn (self $reduction) => $reduction->recalculerCibles());
         static::deleted(fn (self $reduction) => $reduction->recalculerCibles());
+    }
+
+    public function typeReduction(): BelongsTo
+    {
+        return $this->belongsTo(TypeReduction::class);
     }
 
     public function fraisEleve(): BelongsTo

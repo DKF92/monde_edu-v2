@@ -1,0 +1,634 @@
+$bureau: 992px;
+// Largeur de la carte-liste (et non de l'ecran, le menu lateral en prend une
+// partie) a partir de laquelle les lignes s'affichent en tableau.
+$tableau: 880px;
+
+.page-utilisateurs {
+  --background: var(--me-fond);
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 18px 16px 32px;
+
+  @media (min-width: $bureau) {
+    gap: 22px;
+    padding: 28px 28px 40px;
+  }
+}
+
+// ============================ En-tete ============================
+
+.entete-page {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+
+  h1 {
+    margin: 0 0 4px;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--me-texte);
+  }
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--me-texte-doux);
+  }
+}
+
+.bouton-principal {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 12px;
+  background: var(--me-marine);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+
+  ion-icon {
+    font-size: 20px;
+  }
+
+  &:hover {
+    background: var(--me-marine-fonce);
+  }
+}
+
+// ============================ Compteurs ============================
+
+.compteurs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+
+  @media (min-width: 760px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+.compteur {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  font: inherit;
+  text-align: left;
+  color: var(--me-texte);
+
+  &:is(button) {
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+
+    &:hover {
+      border-color: #b9c6ea;
+    }
+  }
+
+  &.actif:is(button) {
+    border-color: var(--ion-color-primary);
+  }
+
+  > span:last-child {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  strong {
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+}
+
+// ============================ Filtres ============================
+
+.liste {
+  padding: 0;
+  container-type: inline-size;
+}
+
+.filtres {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--me-bordure);
+
+  @media (min-width: 760px) {
+    grid-template-columns: minmax(0, 1fr) 220px 200px;
+  }
+}
+
+.recherche {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 50px;
+  padding: 0 14px;
+  border: 1.5px solid var(--me-bordure);
+  border-radius: 12px;
+  background: var(--me-surface);
+  color: var(--me-texte-leger);
+  cursor: text;
+
+  &:focus-within {
+    border-color: var(--ion-color-primary);
+    box-shadow: 0 0 0 4px rgba(var(--ion-color-primary-rgb), 0.12);
+  }
+
+  ion-icon {
+    flex-shrink: 0;
+    font-size: 18px;
+  }
+
+  input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: none;
+    font: inherit;
+    font-size: 14px;
+    color: var(--me-texte);
+  }
+}
+
+.resultat {
+  margin: 0;
+  padding: 12px 20px 4px;
+  font-size: 12px;
+  color: var(--me-texte-leger);
+}
+
+.squelette {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+}
+
+.squelette-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+// ============================ Tableau / cartes ============================
+
+.tableau {
+  padding: 4px 8px 10px;
+}
+
+// Cartes (mobile / tablette) : une colonne, une carte sur deux teintee
+// (.me-ligne-alternee), les actions en bas a droite.
+.ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 12px;
+  padding: 14px 12px;
+  border-radius: 12px;
+
+  &.inactif {
+    .cellule-utilisateur,
+    .cellule:not(.actions) {
+      opacity: 0.55;
+    }
+  }
+
+  @container (min-width: #{$tableau}) {
+    grid-template-columns:
+      minmax(220px, 2.2fr) 112px minmax(160px, 2fr)
+      minmax(116px, 1fr) 132px 120px;
+    align-items: center;
+    gap: 12px;
+    border-radius: 10px;
+
+    &:not(.entete-tableau):hover {
+      background: var(--me-survol);
+    }
+  }
+}
+
+.entete-tableau {
+  display: none;
+
+  @container (min-width: #{$tableau}) {
+    display: grid;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--me-texte-leger);
+  }
+}
+
+.a-droite {
+  text-align: right;
+}
+
+.cellule-utilisateur {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--me-bleu-fond);
+  color: var(--me-marine);
+  font-size: 13px;
+  font-weight: 800;
+
+  &.feminin {
+    background: var(--me-violet-fond);
+    color: var(--me-violet);
+  }
+}
+
+.identite {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  strong {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--me-texte);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.moi {
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--me-actif);
+  color: var(--me-marine);
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+// Cartes (mobile / tablette) : chaque cellule sur sa ligne, avec son libelle.
+.cellule {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--me-texte);
+
+  &::before {
+    content: attr(data-libelle);
+    flex: 0 0 120px;
+    font-size: 12px;
+    color: var(--me-texte-leger);
+  }
+
+  @container (min-width: #{$tableau}) {
+    grid-column: auto;
+
+    &::before {
+      content: none;
+    }
+  }
+}
+
+.matricule {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+
+.connexion {
+  color: var(--me-texte-doux);
+}
+
+.connexion-texte {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.provisoire {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #b35c00;
+
+  ion-icon {
+    font-size: 12px;
+  }
+}
+
+// Pastilles de postes : restent groupees a droite du libelle sur mobile.
+.puces {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.puce-poste {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--me-fond);
+  border: 1px solid var(--me-bordure);
+  font-size: 12px;
+  font-weight: 600;
+
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  ion-icon {
+    font-size: 11px;
+  }
+
+  // Poste protege (caisse, comptabilite, Fondateur...).
+  &.sensible {
+    background: var(--me-orange-fond);
+    border-color: transparent;
+    color: #b35c00;
+  }
+}
+
+.aucun {
+  font-size: 12px;
+  color: var(--ion-color-danger);
+}
+
+.badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+
+  &.succes {
+    background: var(--me-vert-fond);
+    color: var(--me-vert);
+  }
+
+  &.attention {
+    background: var(--me-orange-fond);
+    color: #b35c00;
+  }
+
+  &.neutre {
+    background: var(--me-fond);
+    color: var(--me-texte-doux);
+  }
+}
+
+// Sur carte : les actions alignees a droite sous les informations
+// (Modifier, Mot de passe, Activer/Desactiver).
+.actions {
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--me-bordure);
+
+  &::before {
+    content: none;
+  }
+
+  .action {
+    border: 1px solid var(--me-bordure);
+    background: var(--me-surface);
+  }
+
+  @container (min-width: #{$tableau}) {
+    gap: 6px;
+    padding-top: 0;
+    border-top: none;
+
+    .action {
+      border-color: transparent;
+      background: none;
+    }
+  }
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--me-texte-doux);
+  font-size: 19px;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--me-actif);
+    color: var(--me-marine);
+  }
+
+  &.danger:hover:not(:disabled) {
+    background: #fff0f0;
+    color: var(--ion-color-danger);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+}
+
+.protege {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--me-texte-leger);
+}
+
+// ============================ Mot de passe provisoire ============================
+
+.modale-mdp {
+  --width: min(92vw, 440px);
+  --height: auto;
+  --border-radius: 22px;
+  --box-shadow: var(--me-ombre-forte);
+  --backdrop-opacity: 0.55;
+}
+
+.contenu-mdp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 24px 22px;
+  text-align: center;
+  background: var(--me-surface);
+
+  .grande {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    font-size: 28px;
+  }
+
+  h1 {
+    margin: 14px 0 6px;
+    font-size: 19px;
+    font-weight: 800;
+  }
+
+  > p {
+    margin: 0 0 18px;
+    font-size: 14px;
+    color: var(--me-texte-doux);
+  }
+}
+
+.identifiants {
+  width: 100%;
+  margin: 0 0 16px;
+  padding: 4px 16px;
+  border-radius: 14px;
+  background: var(--me-fond);
+  text-align: left;
+
+  div {
+    padding: 10px 0;
+
+    & + div {
+      border-top: 1px solid var(--me-bordure);
+    }
+  }
+
+  dt {
+    font-size: 12px;
+    color: var(--me-texte-leger);
+  }
+
+  dd {
+    margin: 2px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+    word-break: break-all;
+  }
+}
+
+.mdp {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--me-marine);
+    user-select: all;
+  }
+}
+
+.copier {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border: 1px solid var(--me-bordure);
+  border-radius: 999px;
+  background: var(--me-surface);
+  color: var(--me-texte);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--ion-color-primary);
+    color: var(--ion-color-primary);
+  }
+}
+
+.avertissement {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--me-orange-fond);
+  color: #8a4b00;
+  font-size: 12px;
+  text-align: left;
+
+  ion-icon {
+    flex-shrink: 0;
+    font-size: 16px;
+    margin-top: 1px;
+  }
+}
+
+.bouton-confirmer {
+  width: 100%;
+  height: 46px;
+  border: none;
+  border-radius: 12px;
+  background: var(--me-marine);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--me-marine-fonce);
+  }
+}

@@ -1,0 +1,210 @@
+<ion-content class="me-page-admin">
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <h1>Réductions</h1>
+        <p>Réductions et cas sociaux accordés{{ donnees()?.annee ? ' en ' + donnees()!.annee : '' }}.</p>
+      </div>
+      <div class="boutons-entete">
+        <button type="button" class="me-bouton-secondaire" (click)="ouvrirMatricule('dette')">
+          <ion-icon name="alert-circle-outline"></ion-icon> Réduction dette
+        </button>
+        <button type="button" class="me-bouton-principal" (click)="ouvrirMatricule('inscription')">
+          <ion-icon name="pricetag-outline"></ion-icon> Réduction inscription
+        </button>
+      </div>
+    </header>
+
+    <!-- ================= Totaux ================= -->
+    @if (donnees(); as d) {
+      <section class="totaux" aria-label="Totaux">
+        <div class="me-carte total"><span class="me-pastille teinte-violet"><ion-icon name="pricetag-outline"></ion-icon></span><span><strong>{{ f(d.totaux.montant) }}</strong><small>{{ d.totaux.nombre }} réduction{{ d.totaux.nombre > 1 ? 's' : '' }} · {{ d.totaux.eleves }} élève{{ d.totaux.eleves > 1 ? 's' : '' }}</small></span></div>
+        <div class="me-carte total"><span class="me-pastille teinte-bleu"><ion-icon name="person-add-outline"></ion-icon></span><span><strong>{{ f(d.totaux.inscription) }}</strong><small>Sur les frais de l'année</small></span></div>
+        <div class="me-carte total"><span class="me-pastille teinte-rose"><ion-icon name="heart-outline"></ion-icon></span><span><strong>{{ f(d.totaux.cas) }}</strong><small>Dont cas sociaux</small></span></div>
+        <div class="me-carte total"><span class="me-pastille teinte-orange"><ion-icon name="alert-circle-outline"></ion-icon></span><span><strong>{{ f(d.totaux.dette) }}</strong><small>Sur les dettes</small></span></div>
+      </section>
+    }
+
+    <!-- ================= Liste ================= -->
+    <section class="me-carte liste">
+      <div class="barre">
+        <label class="me-recherche">
+          <ion-icon name="search-outline"></ion-icon>
+          <input type="search" placeholder="Rechercher (nom, matricule)" aria-label="Rechercher une réduction" [value]="recherche()" (input)="rechercher(valeurTexte($event))" />
+        </label>
+        <div class="boutons">
+          <button type="button" class="me-bouton-secondaire" (click)="modaleFiltres.set(true)">
+            <ion-icon name="options-outline"></ion-icon> Filtres
+            @if (nombreFiltres()) { <span class="me-badge info">{{ nombreFiltres() }}</span> }
+          </button>
+          <button type="button" class="me-bouton-secondaire" (click)="imprimer()" [disabled]="!donnees() || !!impression()">
+            @if (impression() === 'liste') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer }
+          </button>
+          <button type="button" class="me-bouton-secondaire" (click)="imprimer(true)" [disabled]="!donnees() || !!impression()">
+            @if (impression() === 'general') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="documents-outline"></ion-icon> Impression générale }
+          </button>
+        </div>
+      </div>
+      @if (resumeFiltres()) {
+        <p class="resume-filtres"><ion-icon name="options-outline"></ion-icon> {{ resumeFiltres() }} <button type="button" class="me-lien" (click)="effacerFiltres()">Effacer</button></p>
+      }
+
+      @if (chargement() && !donnees()) {
+        @for (i of [1, 2, 3]; track i) {
+          <div class="squelette"><ion-skeleton-text [animated]="true" style="width: 60%"></ion-skeleton-text></div>
+        }
+      } @else if (erreur()) {
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les réductions</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      } @else if (donnees()) {
+        <div class="tableau" role="table" aria-label="Réductions" [class.attenue]="chargement()">
+          <div class="ligne entete-tableau" role="row">
+            <span role="columnheader">Élève</span>
+            <span role="columnheader">Classe</span>
+            <span role="columnheader">Réduction</span>
+            <span role="columnheader" class="a-droite">Montant</span>
+            <span role="columnheader">Date</span>
+            <span role="columnheader">Donneur d'ordre</span>
+            <span role="columnheader" class="a-droite">Actions</span>
+          </div>
+          @for (r of lignesPage(); track r.lot; let impaire = $odd) {
+            <div class="ligne" role="row" [class.me-ligne-alternee]="impaire">
+              <span class="eleve" role="cell"><strong>{{ r.nom }} {{ r.prenoms }}</strong><small class="matricule">{{ r.matricule }}</small></span>
+              <span class="cellule" role="cell" data-libelle="Classe">{{ r.classe ?? r.niveau }} <small>· {{ r.affecte ? 'AFF' : 'NAFF' }}</small></span>
+              <span class="cellule" role="cell" data-libelle="Réduction">
+                <span class="me-badge" [class.violet]="r.code === 'CAS'" [class.attention]="r.cible === 'dette'" [class.info]="r.cible === 'inscription' && r.code !== 'CAS'">{{ r.type }}</span>
+                @if (r.dette_annulee) { <small> annulée</small> }
+              </span>
+              <span class="cellule montant" role="cell" data-libelle="Montant">{{ f(r.montant) }}</span>
+              <span class="cellule" role="cell" data-libelle="Date">{{ dateFr(r.date) }}</span>
+              <span class="cellule" role="cell" data-libelle="Donneur d'ordre">{{ r.motif || '—' }}@if (r.accorde_par) {<small> · saisie {{ r.accorde_par }}</small>}</span>
+              <span class="cellule actions" role="cell">
+                <button type="button" class="me-action" title="Voir l'élève" aria-label="Voir l'élève" (click)="voirEleve(r)"><ion-icon name="eye-outline"></ion-icon></button>
+                <button type="button" class="me-action danger" title="Supprimer" aria-label="Supprimer la réduction" [disabled]="suppression() === r.lot" (click)="supprimer(r)">
+                  @if (suppression() === r.lot) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="trash-outline"></ion-icon> }
+                </button>
+              </span>
+            </div>
+          } @empty {
+            <div class="me-etat-vide">
+              <ion-icon name="pricetag-outline"></ion-icon>
+              <strong>Aucune réduction{{ nombreFiltres() || recherche() ? ' pour ces critères' : ' cette année' }}</strong>
+              <button type="button" class="me-bouton-principal" (click)="ouvrirMatricule('inscription')"><ion-icon name="pricetag-outline"></ion-icon> Réduction inscription</button>
+            </div>
+          }
+        </div>
+        <app-pagination [total]="donnees()!.data.length" [page]="page()" [taille]="taille()" (pageChange)="page.set($event)" (tailleChange)="taille.set($event); page.set(1)"></app-pagination>
+      }
+    </section>
+  </div>
+</ion-content>
+
+<!-- ================= Matricule (reduction dette / inscription) ================= -->
+<ion-modal class="me-modale-formulaire auto" [isOpen]="!!cible()" [backdropDismiss]="!verification()" (didDismiss)="cible.set(null)">
+  <ng-template>
+    <form class="me-modale" (submit)="$event.preventDefault(); verifierMatricule()" novalidate>
+      <header>
+        <span class="me-pastille" [class.teinte-orange]="cible() === 'dette'" [class.teinte-violet]="cible() === 'inscription'"><ion-icon [name]="cible() === 'dette' ? 'alert-circle-outline' : 'pricetag-outline'"></ion-icon></span>
+        <div>
+          <h1>{{ cible() === 'dette' ? 'Réduction de dette' : 'Réduction d\'inscription' }}</h1>
+          <p>{{ cible() === 'dette' ? 'Dette des années précédentes de l\'élève.' : 'Réduction ou cas social sur les frais de l\'année.' }}</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="cible.set(null)" aria-label="Fermer"><ion-icon name="close-outline"></ion-icon></button>
+      </header>
+      <div class="corps">
+        <div class="me-champ">
+          <label for="r-matricule">Matricule de l'élève <span class="me-requis">*</span></label>
+          <input id="r-matricule" class="me-saisie matricule-saisie" type="text" placeholder="Ex : 18583394P" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="20"
+            [class.invalide]="erreurMatricule()" [value]="matricule()" (input)="matricule.set(valeurTexte($event).toUpperCase()); erreurMatricule.set(null)" />
+          @if (erreurMatricule(); as e) { <p class="me-erreur-champ">{{ e }}</p> }
+        </div>
+      </div>
+      <footer>
+        <button type="button" class="me-bouton-texte" (click)="cible.set(null)" [disabled]="verification()">Annuler</button>
+        <button type="submit" class="me-bouton-principal" [disabled]="verification()">
+          @if (verification()) { <ion-spinner name="dots"></ion-spinner> } @else { Continuer <ion-icon name="arrow-forward-outline"></ion-icon> }
+        </button>
+      </footer>
+    </form>
+  </ng-template>
+</ion-modal>
+
+<!-- ================= Filtres ================= -->
+<ion-modal class="me-modale-formulaire tres-large auto" [isOpen]="modaleFiltres()" (didDismiss)="modaleFiltres.set(false)">
+  <ng-template>
+    <div class="me-modale">
+      <header>
+        <span class="me-pastille teinte-cyan"><ion-icon name="options-outline"></ion-icon></span>
+        <div>
+          <h1>Filtres des réductions</h1>
+          <p>{{ donnees()?.totaux?.nombre ?? 0 }} réduction(s) affichée(s)</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="modaleFiltres.set(false)" aria-label="Fermer"><ion-icon name="close-outline"></ion-icon></button>
+      </header>
+      <div class="corps filtres-reductions">
+        <section>
+          <h2>Réduction</h2>
+          <div class="grille-filtres">
+            <div class="me-champ">
+              <span class="libelle">Porte sur</span>
+              <app-selecteur idChamp="rf-cible" icone="wallet-outline" [options]="optionsCible" [valeur]="valeurCible()" (valeurChange)="choisirCible($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Type</span>
+              <app-selecteur idChamp="rf-type" icone="pricetag-outline" [options]="optionsType()" [valeur]="filtres().type_reduction_id ?? 0" [desactive]="filtres().cible === 'dette'" (valeurChange)="choisirType($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <label for="rf-du">Accordée du</label>
+              <input id="rf-du" class="me-saisie" type="date" [value]="du()" (input)="du.set(valeurTexte($event))" />
+            </div>
+            <div class="me-champ">
+              <label for="rf-au">au</label>
+              <input id="rf-au" class="me-saisie" type="date" [value]="au()" (input)="au.set(valeurTexte($event))" />
+            </div>
+            <button type="button" class="me-bouton-secondaire appliquer" (click)="appliquerDates()"><ion-icon name="calendar-outline"></ion-icon> Appliquer les dates</button>
+          </div>
+        </section>
+        <section>
+          <h2>Élèves</h2>
+          <div class="grille-filtres">
+            <div class="me-champ">
+              <span class="libelle">Statut</span>
+              <app-selecteur idChamp="rf-statut" icone="people-outline" [options]="optionsStatut" [valeur]="valeurStatut()" (valeurChange)="choisirStatut($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Genre</span>
+              <app-selecteur idChamp="rf-sexe" icone="male-female-outline" [options]="optionsSexe" [valeur]="valeurSexe()" (valeurChange)="choisirSexe($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Redoublant</span>
+              <app-selecteur idChamp="rf-redoublant" icone="repeat-outline" [options]="optionsRedoublant" [valeur]="valeurRedoublant()" (valeurChange)="choisirRedoublant($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Cycle</span>
+              <app-selecteur idChamp="rf-cycle" icone="layers-outline" [options]="optionsCycle()" [valeur]="valeurCycle()" [desactive]="!!filtres().niveau_id || !!filtres().classe_id" (valeurChange)="choisirCycle($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Niveau</span>
+              <app-selecteur idChamp="rf-niveau" icone="school-outline" [options]="optionsNiveau()" [valeur]="filtres().niveau_id ?? 0" [desactive]="!!filtres().cycle || !!filtres().classe_id" (valeurChange)="choisirNiveau($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Classe</span>
+              <app-selecteur idChamp="rf-classe" icone="people-outline" [options]="optionsClasse()" [valeur]="filtres().classe_id ?? 0" [desactive]="!!filtres().cycle || !!filtres().niveau_id" (valeurChange)="choisirClasse($event)"></app-selecteur>
+            </div>
+          </div>
+        </section>
+      </div>
+      <footer>
+        @if (nombreFiltres()) {
+          <button type="button" class="me-bouton-texte" (click)="effacerFiltres()">Effacer les filtres</button>
+        }
+        <button type="button" class="me-bouton-principal" (click)="modaleFiltres.set(false)">
+          @if (chargement()) { <ion-spinner name="dots"></ion-spinner> } @else { Voir les réductions }
+        </button>
+      </footer>
+    </div>
+  </ng-template>
+</ion-modal>

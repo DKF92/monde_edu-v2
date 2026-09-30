@@ -1,0 +1,84 @@
+@import '../../../../theme/auth';
+
+.formulaire {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.cache {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bouton-oeil {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-right: -6px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--me-texte-leger);
+  font-size: 19px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--me-survol);
+    color: var(--me-texte);
+  }
+}
+
+.regles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--me-texte-doux);
+
+    ion-icon {
+      flex-shrink: 0;
+      font-size: 15px;
+      color: var(--me-texte-leger);
+    }
+
+    &.ok {
+      color: var(--me-texte);
+
+      ion-icon {
+        color: var(--ion-color-success);
+      }
+    }
+  }
+}
+
+.bouton-principal {
+  margin-top: 4px;
+}
+
+.lien-deconnexion {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ion-color-primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

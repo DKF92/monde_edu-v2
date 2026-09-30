@@ -1,0 +1,255 @@
+<ion-content class="page-utilisateurs">
+  <ion-refresher slot="fixed" (ionRefresh)="charger($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="page">
+    <!-- ================= En-tete ================= -->
+    <header class="entete-page">
+      <div>
+        <h1>Utilisateurs</h1>
+        <p>Comptes de connexion et postes du personnel de {{ etablissement()?.nom }}.</p>
+      </div>
+      <button type="button" class="bouton-principal" (click)="nouveau()">
+        <ion-icon name="add-outline"></ion-icon>
+        <span>Nouvel utilisateur</span>
+      </button>
+    </header>
+
+    <!-- ================= Chiffres ================= -->
+    <section class="compteurs" aria-label="Chiffres clés">
+      <button type="button" class="me-carte compteur" [class.actif]="!filtreStatut()" (click)="filtreStatut.set(0)">
+        <span class="me-pastille teinte-bleu"><ion-icon name="people-outline"></ion-icon></span>
+        <span><strong>{{ compteurs().total }}</strong><small>Comptes</small></span>
+      </button>
+      <button type="button" class="me-carte compteur" [class.actif]="filtreStatut() === 1" (click)="filtreStatut.set(filtreStatut() === 1 ? 0 : 1)">
+        <span class="me-pastille teinte-vert"><ion-icon name="checkmark-circle-outline"></ion-icon></span>
+        <span><strong>{{ compteurs().actifs }}</strong><small>Actifs</small></span>
+      </button>
+      <button type="button" class="me-carte compteur" [class.actif]="filtreStatut() === 2" (click)="filtreStatut.set(filtreStatut() === 2 ? 0 : 2)">
+        <span class="me-pastille teinte-rose"><ion-icon name="close-circle-outline"></ion-icon></span>
+        <span><strong>{{ compteurs().inactifs }}</strong><small>Désactivés</small></span>
+      </button>
+      <div class="me-carte compteur info">
+        <span class="me-pastille teinte-orange"><ion-icon name="time-outline"></ion-icon></span>
+        <span><strong>{{ compteurs().premiereConnexion }}</strong><small>Mot de passe provisoire</small></span>
+      </div>
+    </section>
+
+    <!-- ================= Liste ================= -->
+    <section class="me-carte liste">
+      <div class="filtres">
+        <label class="recherche">
+          <ion-icon name="search-outline"></ion-icon>
+          <input
+            type="search"
+            placeholder="Rechercher (nom, e-mail, matricule, téléphone…)"
+            aria-label="Rechercher un utilisateur"
+            [value]="recherche()"
+            (input)="recherche.set($any($event.target).value)"
+          />
+        </label>
+        <app-selecteur
+          class="filtre"
+          idChamp="filtre-poste"
+          icone="briefcase-outline"
+          [options]="optionsPostes()"
+          [valeur]="filtrePoste()"
+          (valeurChange)="filtrePoste.set($event)"
+        ></app-selecteur>
+        <app-selecteur
+          class="filtre"
+          idChamp="filtre-statut"
+          icone="ellipse-outline"
+          [options]="optionsStatuts"
+          [valeur]="filtreStatut()"
+          (valeurChange)="filtreStatut.set($event)"
+        ></app-selecteur>
+      </div>
+
+      @if (chargement()) {
+        @for (i of [1, 2, 3, 4]; track i) {
+          <div class="squelette">
+            <ion-skeleton-text [animated]="true" class="squelette-avatar"></ion-skeleton-text>
+            <ion-skeleton-text [animated]="true" style="width: 40%"></ion-skeleton-text>
+          </div>
+        }
+      } @else if (erreur()) {
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les utilisateurs</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      } @else {
+        <p class="resultat">
+          {{ utilisateursFiltres().length }} utilisateur{{ utilisateursFiltres().length > 1 ? 's' : '' }}
+          @if (filtresActifs()) {
+            sur {{ compteurs().total }} ·
+            <button type="button" class="me-lien" (click)="reinitialiserFiltres()">Effacer les filtres</button>
+          }
+        </p>
+
+        <div class="tableau" role="table" aria-label="Utilisateurs">
+          <div class="ligne entete-tableau" role="row">
+            <span role="columnheader">Utilisateur</span>
+            <span role="columnheader">Matricule</span>
+            <span role="columnheader">Postes</span>
+            <span role="columnheader">Statut</span>
+            <span role="columnheader">Dernière connexion</span>
+            <span role="columnheader" class="a-droite">Actions</span>
+          </div>
+
+          @for (u of utilisateursPage(); track u.id; let impaire = $odd) {
+            <div class="ligne" role="row" [class.inactif]="u.statut === 'inactif'" [class.me-ligne-alternee]="impaire">
+              <div class="cellule-utilisateur" role="cell">
+                <span class="avatar" [class.feminin]="u.sexe === 'F'">{{ initiales(u) }}</span>
+                <span class="identite">
+                  <strong>
+                    {{ nomComplet(u) }}
+                    @if (u.est_moi) {
+                      <span class="moi">Vous</span>
+                    }
+                  </strong>
+                  <small>{{ u.email }}</small>
+                  @if (u.telephone) {
+                    <small>{{ u.telephone }}</small>
+                  }
+                </span>
+              </div>
+              <span class="cellule" role="cell" data-libelle="Matricule"><span class="matricule">{{ u.matricule || '—' }}</span></span>
+              <span class="cellule postes" role="cell" data-libelle="Postes">
+                <span class="puces">
+                @for (p of u.postes; track p.id) {
+                  <span class="puce-poste" [class.sensible]="p.est_sensible" [attr.title]="p.est_sensible ? 'Poste protégé : attribué par le Super admin' : null">
+                    @if (p.est_sensible) {
+                      <ion-icon name="lock-closed"></ion-icon>
+                    }
+                    {{ p.nom }}
+                  </span>
+                } @empty {
+                  <span class="aucun">Aucun poste</span>
+                }
+                </span>
+              </span>
+              <span class="cellule" role="cell" data-libelle="Statut">
+                @if (u.statut === 'actif') {
+                  <span class="badge succes">Actif</span>
+                } @else {
+                  <span class="badge neutre">Désactivé</span>
+                }
+              </span>
+              <span class="cellule connexion" role="cell" data-libelle="Dernière connexion">
+                <span class="connexion-texte">
+                  {{ derniereConnexion(u) }}
+                  <!-- Mot de passe provisoire : information de connexion, pas un statut du compte. -->
+                  @if (u.statut === 'actif' && u.doit_changer_mot_de_passe) {
+                    <small class="provisoire" title="Compte créé ou mot de passe réinitialisé : l'utilisateur doit encore choisir son mot de passe">
+                      <ion-icon name="key-outline"></ion-icon> Mot de passe provisoire
+                    </small>
+                  }
+                </span>
+              </span>
+              <span class="cellule actions" role="cell">
+                @if (peutGerer(u)) {
+                  <button type="button" class="action" title="Modifier" aria-label="Modifier" (click)="modifier(u)" [disabled]="actionEnCours() === u.id">
+                    <ion-icon name="create-outline"></ion-icon>
+                  </button>
+                  @if (!u.est_moi) {
+                    <button type="button" class="action" title="Réinitialiser le mot de passe" aria-label="Réinitialiser le mot de passe" (click)="reinitialiserMotDePasse(u)" [disabled]="actionEnCours() === u.id || u.statut === 'inactif'">
+                      <ion-icon name="key-outline"></ion-icon>
+                    </button>
+                    <button
+                      type="button"
+                      class="action"
+                      [class.danger]="u.statut === 'actif'"
+                      [title]="u.statut === 'actif' ? 'Désactiver le compte' : 'Réactiver le compte'"
+                      [attr.aria-label]="u.statut === 'actif' ? 'Désactiver le compte' : 'Réactiver le compte'"
+                      (click)="basculerStatut(u)"
+                      [disabled]="actionEnCours() === u.id"
+                    >
+                      <ion-icon [name]="u.statut === 'actif' ? 'power-outline' : 'refresh-outline'"></ion-icon>
+                    </button>
+                  }
+                } @else {
+                  <span class="protege" title="Ce compte a un poste protégé : seul le Super admin peut le modifier">
+                    <ion-icon name="shield-checkmark-outline"></ion-icon> Protégé
+                  </span>
+                }
+              </span>
+            </div>
+          } @empty {
+            <div class="me-etat-vide">
+              <ion-icon name="people-outline"></ion-icon>
+              @if (filtresActifs()) {
+                <strong>Aucun utilisateur ne correspond</strong>
+                <button type="button" class="me-lien" (click)="reinitialiserFiltres()">Effacer les filtres</button>
+              } @else {
+                <strong>Aucun utilisateur</strong>
+                <span>Créez le premier compte du personnel.</span>
+              }
+            </div>
+          }
+        </div>
+        <app-pagination
+          [total]="utilisateursFiltres().length"
+          [page]="page()"
+          [taille]="taille()"
+          (pageChange)="page.set($event)"
+          (tailleChange)="taille.set($event)"
+        ></app-pagination>
+      }
+    </section>
+  </div>
+</ion-content>
+
+<app-utilisateur-formulaire
+  [isOpen]="formulaireOuvert()"
+  [utilisateur]="utilisateurEdite()"
+  [options]="options()"
+  (ferme)="formulaireOuvert.set(false)"
+  (modifie)="surModification($event)"
+  (cree)="surCreation($event)"
+></app-utilisateur-formulaire>
+
+<!-- Mot de passe provisoire : affiche une seule fois -->
+<ion-modal class="modale-mdp" [isOpen]="!!motDePasse()" [backdropDismiss]="false" (didDismiss)="motDePasse.set(null)">
+  <ng-template>
+    @if (motDePasse(); as m) {
+      <div class="contenu-mdp">
+        <span class="me-pastille teinte-vert grande"><ion-icon name="key-outline"></ion-icon></span>
+        <h1>{{ m.contexte === 'creation' ? 'Compte créé' : 'Mot de passe réinitialisé' }}</h1>
+        <p>Communiquez ces identifiants à <strong>{{ nomComplet(m.utilisateur) }}</strong>.</p>
+
+        <dl class="identifiants">
+          <div>
+            <dt>Identifiant (e-mail)</dt>
+            <dd>{{ m.utilisateur.email }}</dd>
+          </div>
+          @if (m.utilisateur.matricule) {
+            <div>
+              <dt>Matricule</dt>
+              <dd>{{ m.utilisateur.matricule }}</dd>
+            </div>
+          }
+          <div>
+            <dt>Mot de passe provisoire</dt>
+            <dd class="mdp">
+              <code>{{ m.motDePasse }}</code>
+              <button type="button" class="copier" (click)="copierMotDePasse()">
+                <ion-icon [name]="copie() ? 'checkmark-outline' : 'copy-outline'"></ion-icon>
+                {{ copie() ? 'Copié' : 'Copier' }}
+              </button>
+            </dd>
+          </div>
+        </dl>
+
+        <p class="avertissement">
+          <ion-icon name="time-outline"></ion-icon>
+          Ce mot de passe ne sera plus affiché. L'utilisateur devra le changer à sa première connexion.
+        </p>
+
+        <button type="button" class="bouton-confirmer" (click)="motDePasse.set(null)">J'ai noté le mot de passe</button>
+      </div>
+    }
+  </ng-template>
+</ion-modal>

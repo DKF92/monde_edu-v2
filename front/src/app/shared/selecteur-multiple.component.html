@@ -1,0 +1,56 @@
+<div class="selecteur" [class.ouvert]="ouvert()" [class.grise]="grise" [class.invalide]="invalide" [class.vers-le-haut]="versLeHaut()">
+  <button
+    type="button"
+    class="declencheur"
+    [id]="idChamp"
+    [disabled]="grise"
+    aria-haspopup="listbox"
+    [attr.aria-expanded]="ouvert()"
+    [attr.aria-controls]="idListe"
+    [attr.aria-activedescendant]="ouvert() && indexActif() >= 0 ? idChamp + '-option-' + indexActif() : null"
+    (click)="basculer()"
+    (keydown)="clavier($event)"
+  >
+    @if (icone) {
+      <ion-icon [name]="icone" class="icone"></ion-icon>
+    }
+    <span class="valeur" [class.vide]="!resume">{{ resume ?? placeholder }}</span>
+    @if (valeurs.length && !grise) {
+      <span class="vider" role="button" tabindex="-1" aria-label="Tout retirer" title="Tout retirer" (click)="vider($event)">
+        <ion-icon name="close-circle"></ion-icon>
+      </span>
+    }
+    <ion-icon name="chevron-down-outline" class="chevron"></ion-icon>
+  </button>
+
+  @if (ouvert()) {
+    <div class="liste liste-multiple" [id]="idListe">
+      <button type="button" class="tout" (click)="toutCocher()">
+        {{ valeurs.length === options.length ? 'Tout décocher' : 'Tout cocher' }}
+        <span>{{ valeurs.length }} / {{ options.length }}</span>
+      </button>
+      <ul role="listbox" aria-multiselectable="true" [attr.aria-labelledby]="idChamp">
+        @for (option of options; track option.valeur; let i = $index) {
+          <li
+            role="option"
+            [id]="idChamp + '-option-' + i"
+            class="option"
+            [class.choisie]="estChoisie(option)"
+            [class.active]="i === indexActif()"
+            [attr.aria-selected]="estChoisie(option)"
+            (click)="cocher(option)"
+            (mouseenter)="indexActif.set(i)"
+          >
+            <ion-icon class="coche" [name]="estChoisie(option) ? 'checkbox' : 'square-outline'"></ion-icon>
+            <span class="option-texte">
+              <strong>{{ option.libelle }}</strong>
+              @if (option.detail) {
+                <small>{{ option.detail }}</small>
+              }
+            </span>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+</div>

@@ -1,0 +1,225 @@
+<ion-content class="me-page-admin">
+  <ion-refresher slot="fixed" (ionRefresh)="charger($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        @if (dettes) {
+          <h1>Liste des dettes {{ infos()?.annee || '' }}</h1>
+          <p>Élèves inscrits cette année qui ont une dette des années précédentes.</p>
+        } @else {
+          <h1>Reste à payer {{ infos()?.annee || '' }}</h1>
+          <p>Situation financière de tous les élèves inscrits : frais de l'année et dettes.</p>
+        }
+      </div>
+      <div class="boutons-entete">
+        <button type="button" class="me-bouton-secondaire" (click)="modaleFiltres.set(true)">
+          <ion-icon name="options-outline"></ion-icon> Filtres
+          @if (nombreCriteres()) { <span class="me-badge info">{{ nombreCriteres() }}</span> }
+        </button>
+        <button type="button" class="me-bouton-secondaire" (click)="imprimer(false)" [disabled]="!!impression()">
+          @if (impression() === 'liste') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer }
+        </button>
+        <button type="button" class="me-bouton-principal" (click)="imprimer(true)" [disabled]="!!impression()">
+          @if (impression() === 'stats') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="documents-outline"></ion-icon> Imprimer avec stats }
+        </button>
+      </div>
+    </header>
+
+    <!-- ================= Compteurs (etapes de paiement) ================= -->
+    <section class="compteurs" [class.deux]="dettes" [attr.aria-label]="dettes ? 'Élèves par état de la dette' : 'Élèves par étape de paiement'">
+      <button type="button" class="me-carte compteur" [class.actif]="statut() === null" (click)="basculerStatut(null)">
+        <span class="me-pastille teinte-cyan"><ion-icon name="people-outline"></ion-icon></span>
+        <span><strong>{{ totalEleves() }}</strong><small>Tous</small></span>
+      </button>
+      @for (c of cartes; track c.statut) {
+        <button type="button" class="me-carte compteur" [class.actif]="statut() === c.statut" (click)="basculerStatut(c.statut)">
+          <span [class]="'me-pastille teinte-' + c.teinte"><ion-icon [name]="c.icone"></ion-icon></span>
+          <span><strong>{{ compteurs()[c.statut] }}</strong><small>{{ c.libelle }}</small></span>
+        </button>
+      }
+    </section>
+
+    <!-- ================= Liste ================= -->
+    <section class="me-carte liste">
+      <div class="filtres">
+        <label class="me-recherche">
+          <ion-icon name="search-outline"></ion-icon>
+          <input type="search" placeholder="Rechercher (nom, prénoms, matricule…)" aria-label="Rechercher un élève" [value]="recherche()" (input)="rechercher(valeurTexte($event))" />
+          @if (liste.actualisation() && !liste.chargementInitial()) {
+            <ion-spinner name="crescent" class="attente-recherche"></ion-spinner>
+          }
+        </label>
+        @if (infos(); as i) {
+          @if (dettes) {
+            <div class="totaux">
+              <span><small>Dettes</small><strong>{{ f(i.totaux.dette) }}</strong></span>
+              <span><small>Réductions</small><strong>{{ f(i.totaux.dette_reduite) }}</strong></span>
+              <span><small>Payé</small><strong>{{ f(i.totaux.dette_payee) }}</strong></span>
+              <span class="reste"><small>Reste dettes</small><strong>{{ f(i.totaux.reste_dette) }}</strong></span>
+            </div>
+          } @else {
+          <div class="totaux">
+            <span><small>À payer</small><strong>{{ f(i.totaux.a_payer) }}</strong></span>
+            <span><small>Payé</small><strong>{{ f(i.totaux.paye) }}</strong></span>
+            <span><small>Dettes</small><strong>{{ f(i.totaux.reste_dette) }}</strong></span>
+            <span class="reste"><small>Reste total</small><strong>{{ f(i.totaux.reste) }}</strong></span>
+          </div>
+          }
+        }
+      </div>
+
+      @if (liste.chargementInitial()) {
+        @for (i of [1, 2, 3, 4]; track i) {
+          <div class="squelette"><ion-skeleton-text [animated]="true" style="width: 55%"></ion-skeleton-text></div>
+        }
+      } @else if (liste.erreur()) {
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger {{ dettes ? 'la liste des dettes' : 'le reste à payer' }}</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      } @else {
+        <div class="titre-tableau">
+          <h2>{{ titre() }}</h2>
+          <span class="etat-chargement">
+            @if (liste.chargementFond()) {
+              <ion-spinner name="dots"></ion-spinner> {{ liste.charges() }} / {{ liste.total() }} chargés
+            }
+            @if (filtresActifs()) {
+              <button type="button" class="me-lien" (click)="reinitialiser()">Effacer les filtres</button>
+            }
+          </span>
+        </div>
+
+        <div class="tableau" role="table" [attr.aria-label]="dettes ? 'Liste des dettes' : 'Reste à payer'" [class.attenue]="liste.actualisation()">
+          @if (dettes) {
+          <div class="ligne entete-tableau" role="row">
+            <span role="columnheader">Élève</span>
+            <span role="columnheader" class="c">Sexe</span>
+            <span role="columnheader" class="c">Statut</span>
+            <span role="columnheader" class="c">Redoublant</span>
+            <span role="columnheader" class="c">Année(s)</span>
+            <span role="columnheader" class="a-droite">Dette</span>
+            <span role="columnheader" class="a-droite">Réduction</span>
+            <span role="columnheader" class="a-droite">Payé</span>
+            <span role="columnheader" class="a-droite">Reste dette</span>
+          </div>
+          } @else {
+          <div class="ligne entete-tableau" role="row">
+            <span role="columnheader">Élève</span>
+            <span role="columnheader" class="c">Sexe</span>
+            <span role="columnheader" class="c">Statut</span>
+            <span role="columnheader" class="c">Redoublant</span>
+            <span role="columnheader" class="c">Assistance</span>
+            <span role="columnheader" class="a-droite">Montant à payer</span>
+            <span role="columnheader" class="a-droite">Inscription</span>
+            <span role="columnheader" class="a-droite">Dette</span>
+            <span role="columnheader" class="a-droite">Reste</span>
+          </div>
+          }
+
+          @if (pageEnAttente() && !lignesPage().length) {
+            @for (i of [1, 2, 3]; track i) {
+              <div class="squelette"><ion-skeleton-text [animated]="true" style="width: 55%"></ion-skeleton-text></div>
+            }
+          }
+
+          @for (l of lignesPage(); track l.id; let impaire = $odd) {
+            <div class="ligne cliquable" role="row" [class.me-ligne-alternee]="impaire" (click)="ouvrir(l)">
+              <div class="cellule-eleve" role="cell">
+                <span class="avatar" [class.feminin]="l.sexe === 'F'">{{ initiales(l) }}</span>
+                <span class="identite">
+                  <strong>{{ l.nom }} {{ l.prenoms }}</strong>
+                  <small><span class="matricule">{{ l.matricule }}</span> · {{ l.classe || (l.niveau + ' · sans classe') }}</small>
+                </span>
+              </div>
+              <span class="cellule c" role="cell" data-libelle="Sexe">{{ l.sexe === 'F' ? 'F' : l.sexe === 'M' ? 'M' : '—' }}</span>
+              <span class="cellule c" role="cell" data-libelle="Statut">{{ l.affecte ? 'Affecté(e)' : 'Non affecté(e)' }}</span>
+              <span class="cellule c" role="cell" data-libelle="Redoublant">{{ l.redoublant ? 'Oui' : 'Non' }}</span>
+              @if (dettes) {
+              <span class="cellule c" role="cell" data-libelle="Année(s)">{{ l.dette_annees || '—' }}</span>
+              <span class="cellule montant" role="cell" data-libelle="Dette">{{ f(l.dette) }}</span>
+              <span class="cellule montant" role="cell" data-libelle="Réduction">{{ l.dette_reduite ? f(l.dette_reduite) : '—' }}</span>
+              <span class="cellule montant" role="cell" data-libelle="Payé">{{ l.dette_payee ? f(l.dette_payee) : '—' }}</span>
+              <span class="cellule montant fort" role="cell" data-libelle="Reste dette" [class.a-payer]="l.reste_dette > 0" [class.solde]="!l.reste_dette">{{ l.reste_dette ? f(l.reste_dette) : 'Soldée' }}</span>
+              } @else {
+              <span class="cellule c" role="cell" data-libelle="Assistance">
+                @if (l.assistance === 'cas') { <span class="me-badge violet">Cas</span> } @else if (l.assistance === 'reduction') { <span class="me-badge info">Réduction</span> }
+              </span>
+              <span class="cellule montant" role="cell" data-libelle="Montant à payer">{{ f(l.a_payer) }}</span>
+              <span class="cellule montant" role="cell" data-libelle="Inscription" [class.a-payer]="l.reste_inscription > 0">{{ l.reste_inscription ? f(l.reste_inscription) : (l.a_payer ? 'Soldé' : '—') }}</span>
+              <span class="cellule montant" role="cell" data-libelle="Dette" [class.a-payer]="l.reste_dette > 0">{{ l.reste_dette ? f(l.reste_dette) : '—' }}</span>
+              <span class="cellule montant fort" role="cell" data-libelle="Reste" [class.a-payer]="l.reste > 0" [class.solde]="!l.reste && (l.a_payer || l.dette_apres)">{{ l.reste ? f(l.reste) : (l.a_payer || l.dette_apres ? 'Soldé' : '—') }}</span>
+              }
+            </div>
+          } @empty {
+            @if (!pageEnAttente()) {
+              <div class="me-etat-vide">
+                <ion-icon name="wallet-outline"></ion-icon>
+                <strong>{{ dettes ? 'Aucune dette pour ces critères' : 'Aucun élève pour ces critères' }}</strong>
+                @if (filtresActifs()) {
+                  <button type="button" class="me-lien" (click)="reinitialiser()">Effacer les filtres</button>
+                }
+              </div>
+            }
+          }
+        </div>
+        <app-pagination [total]="liste.total()" [page]="page()" [taille]="taille()" (pageChange)="page.set($event)" (tailleChange)="changerTaille($event)"></app-pagination>
+      }
+    </section>
+  </div>
+</ion-content>
+
+<!-- ================= Filtres eleve ================= -->
+<ion-modal class="me-modale-formulaire tres-large auto" [isOpen]="modaleFiltres()" (didDismiss)="modaleFiltres.set(false)">
+  <ng-template>
+    <div class="me-modale">
+      <header>
+        <span class="me-pastille teinte-cyan"><ion-icon name="options-outline"></ion-icon></span>
+        <div>
+          <h1>Filtres</h1>
+          <p>{{ titre() }}</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="modaleFiltres.set(false)" aria-label="Fermer">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </header>
+      <div class="corps">
+        <section>
+          <div class="ligne-filtres">
+            <div class="me-champ">
+              <span class="libelle">Genre</span>
+              <app-selecteur idChamp="r-sexe" icone="male-female-outline" [options]="optionsSexe" [valeur]="valeurSexe()" (valeurChange)="choisirSexe($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Redoublant</span>
+              <app-selecteur idChamp="r-redoublant" icone="repeat-outline" [options]="optionsRedoublant" [valeur]="valeurRedoublant()" (valeurChange)="choisirRedoublant($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Cycle</span>
+              <app-selecteur idChamp="r-cycle" icone="layers-outline" [options]="optionsCycle()" [valeur]="valeurCycle()" [desactive]="!!criteres().niveau_id || !!criteres().classe_id" (valeurChange)="choisirCycle($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Niveau</span>
+              <app-selecteur idChamp="r-niveau" icone="school-outline" [options]="optionsNiveau()" [valeur]="criteres().niveau_id ?? 0" [desactive]="!!criteres().cycle || !!criteres().classe_id" (valeurChange)="choisirNiveau($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Classe</span>
+              <app-selecteur idChamp="r-classe" icone="people-outline" [options]="optionsClasse()" [valeur]="criteres().classe_id ?? 0" [desactive]="!!criteres().cycle || !!criteres().niveau_id" (valeurChange)="choisirClasse($event)"></app-selecteur>
+            </div>
+          </div>
+          <p class="me-aide-champ">Cycle, niveau et classe : un seul à la fois (remettez « Tous » pour changer).</p>
+        </section>
+      </div>
+      <footer>
+        @if (nombreCriteres()) {
+          <button type="button" class="me-bouton-texte" (click)="effacerCriteres()">Effacer les critères</button>
+        }
+        <button type="button" class="me-bouton-principal" (click)="modaleFiltres.set(false)">Voir la liste</button>
+      </footer>
+    </div>
+  </ng-template>
+</ion-modal>

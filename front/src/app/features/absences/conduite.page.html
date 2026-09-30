@@ -1,0 +1,98 @@
+<ion-content class="me-page-admin">
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/absences')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Absences
+        </button>
+        <h1>Conduite</h1>
+        <p>Note de conduite sur 20, comptée coefficient 1 dans la moyenne. Avertissement sous 14, blâme sous 10.</p>
+      </div>
+    </header>
+
+    @if (erreur() && !options()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les classes</strong>
+          <button type="button" class="me-lien" (click)="ionViewWillEnter()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (!options()) {
+      <section class="me-carte"><ion-skeleton-text [animated]="true" style="width: 100%; height: 44px"></ion-skeleton-text></section>
+    } @else {
+      <section class="me-carte choix quatre">
+        <div class="me-champ">
+          <label for="c-periode">Période</label>
+          <app-selecteur idChamp="c-periode" icone="calendar-outline" [options]="optionsPeriode()" [valeur]="periodeId() || null" (valeurChange)="choisirPeriode($event)"></app-selecteur>
+        </div>
+        <div class="me-champ">
+          <label for="c-classe">Classe</label>
+          <app-selecteur idChamp="c-classe" icone="school-outline" [options]="optionsClasse()" [valeur]="classeId() || null" (valeurChange)="choisirClasse($event)"></app-selecteur>
+        </div>
+      </section>
+
+      @if (grille(); as g) {
+        @if (!g.enseignee) {
+          <p class="me-note">
+            <ion-icon name="information-circle-outline"></ion-icon>
+            <span>La conduite n'a pas de coefficient pour ce niveau (Paramètres › Matières) : elle n'apparaîtra pas dans la moyenne.</span>
+          </p>
+        }
+        <section class="me-carte liste" [class.attenue]="chargement()">
+          <div class="titre-tableau">
+            <div>
+              <h2>{{ g.classe.libelle }} · {{ g.periode.libelle }}</h2>
+              <p>{{ g.eleves.length }} élèves · Entrée pour passer à l'élève suivant.</p>
+            </div>
+          </div>
+          <div class="defilant">
+            <table class="grille">
+              <thead>
+                <tr><th class="num">N°</th><th class="eleve">Élève</th><th>Heures non justifiées</th><th>Conduite /20</th></tr>
+              </thead>
+              <tbody>
+                @for (e of g.eleves; track e.eleve_id; let i = $index) {
+                  <tr>
+                    <td class="num">{{ i + 1 }}</td>
+                    <td class="eleve"><strong>{{ e.nom }}</strong> {{ e.prenoms }}<small>{{ e.matricule }}</small></td>
+                    <td [class.faible]="e.heures_non_justifiees > 0">{{ e.heures_non_justifiees ? h(e.heures_non_justifiees) + ' h' : '—' }}</td>
+                    <td class="saisie-cellule">
+                      <input
+                        [id]="'cond-' + i"
+                        class="me-saisie"
+                        type="text"
+                        inputmode="decimal"
+                        autocomplete="off"
+                        [attr.aria-label]="'Conduite de ' + e.nom + ' ' + e.prenoms"
+                        [disabled]="g.periode.cloturee"
+                        [class.invalide]="invalides().has(e.eleve_id)"
+                        [value]="valeurs()[e.eleve_id] ?? ''"
+                        (input)="saisir(e.eleve_id, valeurTexte($event))"
+                        (keydown.enter)="suivant($event, i)"
+                      />
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="me-barre-enregistrer">
+          <span class="etat" [class.modifie]="modifie()">
+            {{ invalides().size ? 'Notes entre 0 et 20.' : modifie() ? 'Modifications non enregistrées' : 'Tout est enregistré' }}
+          </span>
+          @if (modifie()) {
+            <button type="button" class="me-bouton-texte" (click)="annuler()" [disabled]="enregistrement()">Annuler</button>
+          }
+          <button type="button" class="me-bouton-principal" (click)="enregistrer()" [disabled]="!modifie() || invalides().size > 0 || enregistrement() || g.periode.cloturee">
+            @if (enregistrement()) { <ion-spinner name="dots"></ion-spinner> } @else { Enregistrer }
+          </button>
+        </div>
+      } @else if (chargement()) {
+        <section class="me-carte"><ion-skeleton-text [animated]="true" style="width: 100%; height: 160px"></ion-skeleton-text></section>
+      }
+    }
+  </div>
+</ion-content>

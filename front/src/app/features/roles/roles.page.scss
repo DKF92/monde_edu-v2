@@ -1,0 +1,315 @@
+// Largeur de la carte-liste a partir de laquelle les lignes s'affichent en
+// tableau (meme principe que l'ecran Utilisateurs).
+$tableau: 820px;
+
+// ============================ Compteurs ============================
+
+.compteurs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+
+  @media (min-width: 760px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+.compteur {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  font: inherit;
+  text-align: left;
+  color: var(--me-texte);
+
+  &:is(button) {
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+
+    &:hover {
+      border-color: #b9c6ea;
+    }
+  }
+
+  &.actif:is(button) {
+    border-color: var(--ion-color-primary);
+  }
+
+  > span:last-child {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  strong {
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+}
+
+// ============================ Liste ============================
+
+.liste {
+  padding: 0;
+  container-type: inline-size;
+}
+
+.filtres {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--me-bordure);
+
+  @media (min-width: 760px) {
+    grid-template-columns: minmax(0, 1fr) 220px;
+  }
+}
+
+.resultat {
+  margin: 0;
+  padding: 12px 20px 4px;
+  font-size: 12px;
+  color: var(--me-texte-leger);
+}
+
+.squelette {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+}
+
+.squelette-pastille {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.tableau {
+  padding: 4px 8px 10px;
+}
+
+// Cartes (mobile) : une colonne, actions en bas a droite.
+.ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px 12px;
+  padding: 14px 12px;
+  border-radius: 12px;
+
+  &.inactif {
+    .cellule-poste,
+    .cellule:not(.actions) {
+      opacity: 0.55;
+    }
+  }
+
+  @container (min-width: #{$tableau}) {
+    grid-template-columns: minmax(240px, 2.6fr) minmax(150px, 1.3fr) 110px 90px 100px 130px;
+    align-items: center;
+    gap: 12px;
+    border-radius: 10px;
+
+    &:not(.entete-tableau):hover {
+      background: var(--me-survol);
+    }
+  }
+}
+
+.entete-tableau {
+  display: none;
+
+  @container (min-width: #{$tableau}) {
+    display: grid;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--me-texte-leger);
+  }
+}
+
+.a-droite {
+  text-align: right;
+}
+
+.cellule-poste {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.identite {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  strong {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--me-texte);
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+}
+
+.cellule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--me-texte);
+
+  &::before {
+    content: attr(data-libelle);
+    flex: 0 0 110px;
+    font-size: 12px;
+    color: var(--me-texte-leger);
+  }
+
+  @container (min-width: #{$tableau}) {
+    &::before {
+      content: none;
+    }
+  }
+}
+
+.actions {
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--me-bordure);
+
+  &::before {
+    content: none;
+  }
+
+  .me-action {
+    border: 1px solid var(--me-bordure);
+    background: var(--me-surface);
+  }
+
+  @container (min-width: #{$tableau}) {
+    gap: 4px;
+    padding-top: 0;
+    border-top: none;
+
+    .me-action {
+      border-color: transparent;
+      background: none;
+    }
+  }
+}
+
+.protege {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--me-texte-leger);
+}
+
+// ============================ Detail ============================
+
+.etiquettes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.groupe-droits {
+  margin-bottom: 14px;
+
+  h3 {
+    margin: 0 0 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--me-texte);
+  }
+
+  ul {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 4px 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--me-texte-doux);
+
+    ion-icon {
+      flex-shrink: 0;
+      color: var(--me-vert);
+    }
+  }
+}
+
+.comptes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+
+    > span {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    strong {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    small {
+      font-size: 12px;
+      color: var(--me-texte-doux);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    &.inactif > span {
+      opacity: 0.55;
+    }
+
+    &.vide {
+      font-size: 13px;
+      color: var(--me-texte-leger);
+    }
+  }
+}

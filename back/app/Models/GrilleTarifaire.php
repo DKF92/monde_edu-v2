@@ -8,12 +8,20 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['etablissement_id', 'annee_scolaire_id', 'niveau_id', 'montant_minimum_inscription'])]
+#[Fillable(['etablissement_id', 'annee_scolaire_id', 'niveau_id', 'affecte', 'montant_minimum_inscription'])]
 class GrilleTarifaire extends Model
 {
     use BelongsToEtablissement;
 
     protected $table = 'grilles_tarifaires';
+
+    protected function casts(): array
+    {
+        return [
+            'affecte' => 'boolean',
+            'montant_minimum_inscription' => 'integer',
+        ];
+    }
 
     public function anneeScolaire(): BelongsTo
     {

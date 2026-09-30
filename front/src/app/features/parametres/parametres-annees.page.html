@@ -1,0 +1,282 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/parametres')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Paramètres
+        </button>
+        <h1>Années scolaires</h1>
+        <p>Ouverture des années, trimestres ou semestres, et clôture.</p>
+      </div>
+      <button type="button" class="me-bouton-principal" (click)="ouvrirCreation()" [disabled]="chargement()">
+        <ion-icon name="add-outline"></ion-icon> Nouvelle année
+      </button>
+    </header>
+
+    <p class="me-note">
+      <ion-icon name="information-circle-outline"></ion-icon>
+      <span>
+        L'<strong>année en cours</strong> et sa <strong>période en cours</strong> sont proposées par défaut à la connexion.
+        Une année ou une période <strong>clôturée</strong> n'accepte plus de saisie ; elle peut être rouverte. Une année
+        n'est jamais supprimée : elle garde ses inscriptions et paiements.
+      </span>
+    </p>
+
+    @if (chargement()) {
+      <section class="me-carte">
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 80px"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 80px; margin-top: 10px"></ion-skeleton-text>
+      </section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les années</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else {
+      <section class="me-carte bloc liste-annees">
+        @for (a of anneesPage(); track a.id; let impaire = $odd) {
+          <article class="annee" [class.me-ligne-alternee]="impaire" [class.cloturee]="a.is_cloturee">
+            <div class="annee-ligne">
+              <button type="button" class="deplier" (click)="basculer(a.id)" [attr.aria-expanded]="ouvertes().has(a.id)">
+                <ion-icon name="chevron-down-outline" [class.ouvert]="ouvertes().has(a.id)"></ion-icon>
+                <span>
+                  <strong>
+                    {{ a.libelle }}
+                    @if (a.is_active) {
+                      <span class="me-badge succes">En cours</span>
+                    }
+                    @if (a.is_cloturee) {
+                      <span class="me-badge"><ion-icon name="lock-closed-outline"></ion-icon> Clôturée</span>
+                    }
+                  </strong>
+                  <small>
+                    {{ intervalle(a.date_debut, a.date_fin) }} · {{ a.periodes.length }} {{ a.type_decoupage === 'semestre' ? 'semestres' : 'trimestres' }}
+                    · {{ a.nombre_classes }} classe{{ a.nombre_classes > 1 ? 's' : '' }} · {{ a.nombre_inscriptions }} inscription{{ a.nombre_inscriptions > 1 ? 's' : '' }}
+                  </small>
+                </span>
+              </button>
+              <div class="actions-annee">
+                <button type="button" class="me-action" title="Modifier les dates" aria-label="Modifier les dates" (click)="modifierDates('annee', a, 'Année ' + a.libelle)">
+                  <ion-icon name="create-outline"></ion-icon>
+                </button>
+                @if (!a.is_cloturee) {
+                  <button type="button" class="me-action" title="Changer le découpage (trimestres / semestres)" aria-label="Changer le découpage" [disabled]="actionEnCours() === 'a' + a.id" (click)="changerDecoupage(a)">
+                    <ion-icon name="git-compare-outline"></ion-icon>
+                  </button>
+                }
+                @if (!a.is_active && !a.is_cloturee) {
+                  <button type="button" class="me-action" title="Mettre en cours" aria-label="Mettre en cours" [disabled]="actionEnCours() === 'a' + a.id" (click)="activer(a)">
+                    <ion-icon name="play-circle-outline"></ion-icon>
+                  </button>
+                }
+                @if (!a.is_active) {
+                  <button
+                    type="button"
+                    class="me-action"
+                    [class.danger]="!a.is_cloturee"
+                    [title]="a.is_cloturee ? 'Rouvrir l\'année' : 'Clôturer l\'année'"
+                    [attr.aria-label]="a.is_cloturee ? 'Rouvrir l\'année' : 'Clôturer l\'année'"
+                    [disabled]="actionEnCours() === 'a' + a.id"
+                    (click)="cloturer(a)"
+                  >
+                    <ion-icon [name]="a.is_cloturee ? 'lock-open-outline' : 'lock-closed-outline'"></ion-icon>
+                  </button>
+                }
+              </div>
+            </div>
+
+            @if (ouvertes().has(a.id)) {
+              <ul class="periodes">
+                @for (p of a.periodes; track p.id) {
+                  <li [class.cloturee]="p.is_cloturee">
+                    <span class="periode-texte">
+                      <strong>
+                        {{ p.libelle }}
+                        @if (p.is_active) {
+                          <span class="me-badge info">En cours</span>
+                        }
+                        @if (p.is_cloturee) {
+                          <span class="me-badge"><ion-icon name="lock-closed-outline"></ion-icon> Clôturé</span>
+                        }
+                      </strong>
+                      <small>{{ intervalle(p.date_debut, p.date_fin) }}</small>
+                    </span>
+                    <span class="actions-periode">
+                      <button type="button" class="me-action" title="Modifier les dates" aria-label="Modifier les dates" (click)="modifierDates('periode', p, p.libelle + ' ' + a.libelle)">
+                        <ion-icon name="create-outline"></ion-icon>
+                      </button>
+                      @if (!p.is_active && !p.is_cloturee) {
+                        <button type="button" class="me-action" title="Mettre en cours" aria-label="Mettre en cours" [disabled]="actionEnCours() === 'p' + p.id" (click)="activerPeriode(a, p)">
+                          <ion-icon name="play-circle-outline"></ion-icon>
+                        </button>
+                      }
+                      @if (peutCloturer && a.is_active) {
+                        <!-- Mettre fin a une periode : reserve au directeur (Parametres > Arret des notes). -->
+                        <button
+                          type="button"
+                          class="me-action"
+                          [title]="p.is_cloturee ? 'Rouvrir (Arrêt des notes)' : 'Clôturer (Arrêt des notes)'"
+                          [attr.aria-label]="p.is_cloturee ? 'Rouvrir' : 'Clôturer'"
+                          (click)="router.navigate(['/tabs/parametres/arret-notes'], { queryParams: { periode: p.id } })"
+                        >
+                          <ion-icon [name]="p.is_cloturee ? 'lock-open-outline' : 'lock-closed-outline'"></ion-icon>
+                        </button>
+                      }
+                    </span>
+                  </li>
+                } @empty {
+                  <li class="vide">Aucune période (année reprise de l'ancienne version).</li>
+                }
+              </ul>
+            }
+          </article>
+        } @empty {
+          <div class="me-etat-vide">
+            <ion-icon name="calendar-outline"></ion-icon>
+            <strong>Aucune année scolaire</strong>
+            <button type="button" class="me-lien" (click)="ouvrirCreation()">Créer la première année</button>
+          </div>
+        }
+        <app-pagination
+          class="pagination-bloc"
+          [total]="annees().length"
+          [page]="page()"
+          [taille]="taille()"
+          (pageChange)="page.set($event)"
+          (tailleChange)="taille.set($event)"
+        ></app-pagination>
+      </section>
+    }
+  </div>
+</ion-content>
+
+<!-- ================= Nouvelle annee ================= -->
+<ion-modal class="me-modale-formulaire auto" [isOpen]="creationOuverte()" [backdropDismiss]="!creation()" (didDismiss)="creationOuverte.set(false)">
+  <ng-template>
+    <form class="me-modale" (submit)="$event.preventDefault(); creer()" novalidate>
+      <header>
+        <span class="me-pastille teinte-violet"><ion-icon name="calendar-outline"></ion-icon></span>
+        <div>
+          <h1>Nouvelle année scolaire</h1>
+          <p>Les périodes sont créées automatiquement ; la première est mise en cours.</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="creationOuverte.set(false)" aria-label="Fermer">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </header>
+      <div class="corps">
+        <section>
+          <div class="me-grille">
+            <div class="me-champ large">
+              <label for="n-libelle">Année <span class="me-requis">*</span></label>
+              <input id="n-libelle" class="me-saisie" maxlength="9" placeholder="2026-2027" [value]="nouvelle().libelle" [class.invalide]="erreursCreation()['libelle']" (input)="majNouvelle({ libelle: $any($event.target).value })" />
+              @if (erreursCreation()['libelle']; as e) { <p class="me-erreur-champ">{{ e }}</p> }
+            </div>
+            <div class="me-champ">
+              <label for="n-debut">Rentrée</label>
+              <input id="n-debut" class="me-saisie" type="date" [value]="nouvelle().date_debut ?? ''" (input)="majNouvelle({ date_debut: $any($event.target).value })" />
+            </div>
+            <div class="me-champ">
+              <label for="n-fin">Fin d'année</label>
+              <input id="n-fin" class="me-saisie" type="date" [value]="nouvelle().date_fin ?? ''" [class.invalide]="erreursCreation()['date_fin']" (input)="majNouvelle({ date_fin: $any($event.target).value })" />
+              @if (erreursCreation()['date_fin']; as e) { <p class="me-erreur-champ">{{ e }}</p> }
+            </div>
+            <div class="me-champ large">
+              <span class="libelle">Découpage</span>
+              <div class="me-segments" role="radiogroup" aria-label="Découpage de l'année">
+                <button type="button" role="radio" [class.actif]="nouvelle().type_decoupage === 'trimestre'" [attr.aria-checked]="nouvelle().type_decoupage === 'trimestre'" (click)="majNouvelle({ type_decoupage: 'trimestre' })">3 trimestres</button>
+                <button type="button" role="radio" [class.actif]="nouvelle().type_decoupage === 'semestre'" [attr.aria-checked]="nouvelle().type_decoupage === 'semestre'" (click)="majNouvelle({ type_decoupage: 'semestre' })">2 semestres</button>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section>
+          <h2>Reprendre de {{ plusRecente()?.libelle ?? "l'année précédente" }}</h2>
+          <div class="options-annee">
+            <button type="button" class="me-option" [class.choisi]="nouvelle().copier_classes" [disabled]="!plusRecente()" (click)="majNouvelle({ copier_classes: !nouvelle().copier_classes })">
+              <ion-icon [name]="nouvelle().copier_classes ? 'checkbox' : 'square-outline'"></ion-icon>
+              <span>
+                <strong>Copier les classes</strong>
+                <small>{{ plusRecente()?.nombre_classes ?? 0 }} classe(s) avec leur salle et leur effectif maximum, sans professeur principal ni éducateur.</small>
+              </span>
+            </button>
+            <button type="button" class="me-option" [class.choisi]="nouvelle().copier_tarifs" [disabled]="!plusRecente()" (click)="majNouvelle({ copier_tarifs: !nouvelle().copier_tarifs })">
+              <ion-icon [name]="nouvelle().copier_tarifs ? 'checkbox' : 'square-outline'"></ion-icon>
+              <span>
+                <strong>Copier les montants d'inscription</strong>
+                <small>Mêmes montants par niveau, modifiables ensuite dans Paramètres paiements.</small>
+              </span>
+            </button>
+            <button type="button" class="me-option" [class.choisi]="nouvelle().activer" (click)="majNouvelle({ activer: !nouvelle().activer })">
+              <ion-icon [name]="nouvelle().activer ? 'checkbox' : 'square-outline'"></ion-icon>
+              <span>
+                <strong>Mettre en cours tout de suite</strong>
+                <small>Sinon, faites-le le jour de la rentrée depuis la liste.</small>
+              </span>
+            </button>
+          </div>
+        </section>
+      </div>
+      <footer>
+        <button type="button" class="me-bouton-texte" (click)="creationOuverte.set(false)" [disabled]="creation()">Annuler</button>
+        <button type="submit" class="me-bouton-principal" [disabled]="creation()">
+          @if (creation()) {
+            <ion-spinner name="dots"></ion-spinner>
+          } @else {
+            Créer l'année
+          }
+        </button>
+      </footer>
+    </form>
+  </ng-template>
+</ion-modal>
+
+<!-- ================= Dates ================= -->
+<ion-modal class="me-modale-formulaire auto petite" [isOpen]="!!dates()" [backdropDismiss]="!enregistrementDates()" (didDismiss)="dates.set(null)">
+  <ng-template>
+    @if (dates(); as d) {
+      <form class="me-modale" (submit)="$event.preventDefault(); enregistrerDates()" novalidate>
+        <header>
+          <span class="me-pastille teinte-bleu"><ion-icon name="calendar-number-outline"></ion-icon></span>
+          <div>
+            <h1>Dates</h1>
+            <p>{{ d.titre }}</p>
+          </div>
+          <button type="button" class="me-fermer" (click)="dates.set(null)" aria-label="Fermer">
+            <ion-icon name="close-outline"></ion-icon>
+          </button>
+        </header>
+        <div class="corps">
+          <section>
+            <div class="me-grille">
+              <div class="me-champ">
+                <label for="d-debut">Début</label>
+                <input id="d-debut" class="me-saisie" type="date" [value]="d.date_debut" (input)="majDates({ date_debut: $any($event.target).value })" />
+              </div>
+              <div class="me-champ">
+                <label for="d-fin">Fin</label>
+                <input id="d-fin" class="me-saisie" type="date" [value]="d.date_fin" [class.invalide]="erreurDates()" (input)="majDates({ date_fin: $any($event.target).value })" />
+              </div>
+            </div>
+            @if (erreurDates(); as e) {
+              <p class="me-erreur-champ erreur-dates"><ion-icon name="alert-circle-outline"></ion-icon> {{ e }}</p>
+            }
+          </section>
+        </div>
+        <footer>
+          <button type="button" class="me-bouton-texte" (click)="dates.set(null)" [disabled]="enregistrementDates()">Annuler</button>
+          <button type="submit" class="me-bouton-principal" [disabled]="enregistrementDates()">
+            @if (enregistrementDates()) {
+              <ion-spinner name="dots"></ion-spinner>
+            } @else {
+              Enregistrer
+            }
+          </button>
+        </footer>
+      </form>
+    }
+  </ng-template>
+</ion-modal>

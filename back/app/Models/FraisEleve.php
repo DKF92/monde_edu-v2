@@ -12,8 +12,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * montant_reduit et montant_paye sont des totaux mis en cache : ne jamais les
  * modifier a la main, ils sont recalcules par Reduction et ReglementLigne a
  * chaque ecriture (voir recalculerMontantReduit()/recalculerMontantPaye()).
+ *
+ * Frais en nature (V1 craie / rame) : montant_du = 0 et quantite_due = nombre
+ * d'unites a apporter, quantite_remise = ce que l'eleve a deja remis.
  */
-#[Fillable(['inscription_id', 'type_frais_id', 'montant_du'])]
+#[Fillable(['inscription_id', 'type_frais_id', 'montant_du', 'quantite_due', 'quantite_remise'])]
 class FraisEleve extends Model
 {
     public function inscription(): BelongsTo

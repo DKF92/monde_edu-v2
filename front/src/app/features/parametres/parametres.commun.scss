@@ -1,0 +1,262 @@
+// Styles partages par les pages de parametres (classes, inscriptions, paiements).
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.me-note {
+  margin: 0;
+}
+
+.bloc {
+  padding: 20px;
+}
+
+.bloc-entete {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+
+  > div {
+    flex: 1;
+    min-width: 0;
+  }
+
+  h2 {
+    margin: 0 0 2px;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--me-texte);
+  }
+
+  p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--me-texte-doux);
+  }
+}
+
+.champ-limite {
+  max-width: 280px;
+}
+
+.saisie-courte {
+  flex-shrink: 0;
+  width: 150px;
+}
+
+// ============================ Classes ============================
+
+.liste-niveaux {
+  padding-bottom: 12px;
+}
+
+.niveau {
+  margin: 0 -8px;
+  padding: 10px 8px;
+  border-radius: 12px;
+
+  > .me-erreur-champ {
+    text-align: right;
+    margin-top: 4px;
+  }
+}
+
+.niveau-ligne,
+.classe {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.deplier {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--me-texte);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  > ion-icon {
+    flex-shrink: 0;
+    font-size: 18px;
+    color: var(--me-texte-leger);
+    transform: rotate(-90deg);
+    transition: transform 0.15s ease;
+
+    &.ouvert {
+      transform: none;
+    }
+  }
+
+  > span {
+    display: flex;
+    flex-direction: column;
+  }
+
+  strong {
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-leger);
+  }
+}
+
+.classes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0 4px 28px;
+  padding-left: 14px;
+  border-left: 2px solid var(--me-bordure);
+}
+
+.classe-nom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+
+  > ion-icon {
+    flex-shrink: 0;
+    font-size: 18px;
+    color: var(--me-cyan);
+  }
+
+  > span {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  strong {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+
+    &.depasse {
+      color: var(--ion-color-danger);
+      font-weight: 600;
+    }
+
+    ion-icon {
+      vertical-align: -2px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .saisie-courte {
+    width: 124px;
+  }
+
+  .classes {
+    margin-left: 8px;
+  }
+}
+
+// ============================ Inscriptions ============================
+
+.choix-statut {
+  display: grid;
+  gap: 10px;
+}
+
+.carte-choix {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  padding: 16px;
+  border: 1.5px solid var(--me-bordure);
+  border-radius: 14px;
+  background: var(--me-surface);
+  color: var(--me-texte);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: #b9c6ea;
+  }
+
+  > ion-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    font-size: 22px;
+    color: var(--me-bordure);
+  }
+
+  .texte {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  strong {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  small {
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--me-texte-doux);
+  }
+
+  &.choisi {
+    border-color: var(--ion-color-primary);
+    background: #f7f9ff;
+
+    > ion-icon {
+      color: var(--ion-color-primary);
+    }
+  }
+}
+
+.exemple {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--me-texte-leger);
+}
+
+// Pagination en bas d'une carte de parametres.
+.pagination-bloc {
+  display: block;
+  margin-top: 12px;
+}
+
+.choix-numerotation {
+  display: grid;
+  gap: 8px;
+
+  @media (min-width: 560px) {
+    grid-template-columns: 1fr 1fr;
+  }
+}

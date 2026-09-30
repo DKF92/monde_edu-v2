@@ -73,3 +73,54 @@
   --ion-color-light-shade: #d7d8da;
   --ion-color-light-tint: #f5f6f9;
 }
+
+/*
+ * Jetons de la charte "Monde Educatif" (maquette Proposition 1 - Classique &
+ * sobre). A utiliser dans les feuilles de style des pages plutot que des
+ * couleurs en dur, pour garder un rendu coherent d'un ecran a l'autre.
+ */
+:root {
+  --me-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Bleu marine institutionnel : ecrans d'accueil, bandeau, logo. */
+  --me-marine: #1b3a6b;
+  --me-marine-fonce: #132b52;
+
+  /* Fonds et surfaces */
+  --me-fond: #f3f5f9;
+  --me-surface: #ffffff;
+  --me-bordure: #e4e8f0;
+  --me-survol: #f1f4fb;
+  --me-actif: #e3ebfd;
+  /* Une ligne sur deux dans les listes (lignes paires). */
+  --me-ligne-alternee: #f6f8fc;
+
+  /* Textes */
+  --me-texte: #1a2438;
+  --me-texte-doux: #5b6478;
+  --me-texte-leger: #8a92a6;
+
+  /* Ombres et arrondis */
+  --me-ombre: 0 1px 2px rgba(20, 35, 70, 0.04), 0 4px 16px rgba(20, 35, 70, 0.06);
+  --me-ombre-forte: 0 12px 40px rgba(20, 35, 70, 0.14);
+  --me-rayon: 16px;
+  --me-rayon-petit: 10px;
+
+  /* Teintes des modules (tuiles d'acces rapide, pastilles d'icones) :
+     chaque paire = fond pastel + couleur de l'icone. */
+  --me-bleu-fond: #e6eeff;
+  --me-bleu: #3b5bdb;
+  --me-vert-fond: #e2f6ec;
+  --me-vert: #1f9d55;
+  --me-violet-fond: #efe8fd;
+  --me-violet: #7048e8;
+  --me-orange-fond: #fff1dc;
+  --me-orange: #f08c00;
+  --me-rose-fond: #fde8ec;
+  --me-rose: #e03151;
+  --me-cyan-fond: #dff4f8;
+  --me-cyan: #0c8599;
+
+  --ion-font-family: var(--me-font);
+  --ion-text-color: var(--me-texte);
+}

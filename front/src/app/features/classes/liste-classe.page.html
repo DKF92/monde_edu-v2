@@ -1,0 +1,149 @@
+<ion-content class="me-page-admin">
+  <ion-refresher slot="fixed" (ionRefresh)="charger($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/classes')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Classes
+        </button>
+        <h1>{{ donnees() ? 'Liste de classe ' + donnees()!.classe.libelle : 'Liste de classe' }}</h1>
+        <p>
+          Année scolaire {{ donnees()?.annee ?? '' }}
+          @if (donnees()?.classe?.niveau; as n) { · {{ libellesCycle[n.cycle] }} }
+        </p>
+      </div>
+      <div class="boutons-entete">
+        @if (optionsClasses().length > 1) {
+          <app-selecteur class="choix-classe" idChamp="choix-classe" icone="school-outline" [options]="optionsClasses()" [valeur]="donnees()?.classe?.id ?? null" (valeurChange)="changerClasse($event)"></app-selecteur>
+        }
+      </div>
+    </header>
+
+    @if (chargement()) {
+      <section class="me-carte liste">
+        @for (i of [1, 2, 3]; track i) {
+          <div class="squelette"><ion-skeleton-text [animated]="true" style="width: 60%"></ion-skeleton-text></div>
+        }
+      </section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger la liste de classe</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (donnees()) {
+      @let c = donnees()!.classe;
+      <!-- ================= Encadrement ================= -->
+      <section class="me-carte encadrement">
+        <span><ion-icon name="person-outline"></ion-icon><small>Professeur principal</small><strong>{{ c.professeur_principal?.nom ?? '—' }}</strong></span>
+        <span><ion-icon name="person-outline"></ion-icon><small>Éducateur</small><strong>{{ c.educateur?.nom ?? '—' }}</strong></span>
+        <span><ion-icon name="business-outline"></ion-icon><small>Salle</small><strong>{{ c.salle || '—' }}</strong></span>
+        <span><ion-icon name="language-outline"></ion-icon><small>LV2</small><strong>{{ c.langue_vivante_2 || '—' }}</strong></span>
+        <span><ion-icon name="people-outline"></ion-icon><small>Effectif</small><strong [class.depasse]="c.complete">{{ c.effectif }}{{ c.limite ? ' / ' + c.limite : '' }}</strong></span>
+      </section>
+
+      <!-- ================= Professeurs (V1 enseigner) ================= -->
+      @if (enseignants(); as ens) {
+        @if (ens.matieres.length) {
+          <details class="me-carte professeurs">
+            <summary>
+              <span class="me-pastille teinte-violet"><ion-icon name="book-outline"></ion-icon></span>
+              <span class="titre"><strong>Professeurs de la classe</strong><small>{{ ens.matieres.length }} matières · un professeur ne saisit que les notes de ses matières</small></span>
+              <ion-icon name="chevron-forward-outline" class="deplier"></ion-icon>
+            </summary>
+            <ul>
+              @for (m of ens.matieres; track m.id) {
+                <li>
+                  <span class="matiere"><strong>{{ m.libelle }}</strong><small>coef {{ m.coefficient }}</small></span>
+                  @if (peutAffecter()) {
+                    <app-selecteur [idChamp]="'prof-' + m.id" icone="person-outline" [options]="optionsProfesseurs(m.id)" [valeur]="choixEnseignants()[m.id]" (valeurChange)="choisirProfesseur(m.id, $event)"></app-selecteur>
+                  } @else {
+                    <span class="prof">{{ nomProfesseur(m.personnel_id) }}</span>
+                  }
+                </li>
+              }
+            </ul>
+            @if (peutAffecter()) {
+              <div class="pied-professeurs">
+                @if (enseignantsModifies()) {
+                  <button type="button" class="me-bouton-texte" (click)="annulerEnseignants()" [disabled]="enregistrementEnseignants()">Annuler</button>
+                }
+                <button type="button" class="me-bouton-principal" (click)="enregistrerEnseignants()" [disabled]="!enseignantsModifies() || enregistrementEnseignants()">
+                  @if (enregistrementEnseignants()) { <ion-spinner name="dots"></ion-spinner> } @else { Enregistrer }
+                </button>
+              </div>
+            }
+          </details>
+        }
+      }
+
+      <!-- ================= Compteurs (filtres) ================= -->
+      <section class="compteurs" aria-label="Effectifs">
+        @for (k of cartes(); track k.filtre) {
+          <button type="button" class="me-carte compteur" [class.actif]="filtre() === k.filtre" (click)="basculer(k.filtre)">
+            <span [class]="'me-pastille teinte-' + k.teinte"><ion-icon [name]="k.icone"></ion-icon></span>
+            <span><strong>{{ k.nombre }}</strong><small>{{ k.libelle }}</small></span>
+          </button>
+        }
+      </section>
+
+      <!-- ================= Eleves ================= -->
+      <section class="me-carte liste">
+        <div class="filtres">
+          <label class="me-recherche">
+            <ion-icon name="search-outline"></ion-icon>
+            <input type="search" placeholder="Rechercher (nom, prénoms, matricule…)" aria-label="Rechercher un élève" [value]="recherche()" (input)="rechercher(valeurTexte($event))" />
+          </label>
+          <button type="button" class="me-bouton-principal imprimer" (click)="imprimer()" [disabled]="impression()">
+            @if (impression()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer{{ libelleFiltre() ? ' (' + libelleFiltre().toLowerCase() + ')' : '' }} }
+          </button>
+        </div>
+
+        <div class="titre-tableau"><h2>{{ titre() }}</h2></div>
+        <div class="tableau" role="table" [attr.aria-label]="'Élèves de ' + c.libelle">
+          <div class="ligne entete-tableau" role="row">
+            <span role="columnheader">N°</span>
+            <span role="columnheader">Élève</span>
+            <span role="columnheader" class="centre">Sexe</span>
+            <span role="columnheader">Né(e) le</span>
+            <span role="columnheader">Statut</span>
+            <span role="columnheader" class="centre">Redoublant</span>
+            <span role="columnheader">Paiement</span>
+            <span role="columnheader"></span>
+          </div>
+          @for (e of elevesPage(); track e.inscription_id; let impaire = $odd) {
+            <div class="ligne" role="row" [class.cliquable]="peutOuvrir()" [class.me-ligne-alternee]="impaire" (click)="ouvrir(e)">
+              <span class="rang" role="cell">{{ rangs().get(e.inscription_id) }}</span>
+              <span class="cellule-eleve" role="cell">
+                <strong>{{ e.nom }} {{ e.prenoms }}</strong>
+                <small class="matricule">{{ e.matricule }}</small>
+              </span>
+              <span class="cellule centre" role="cell" data-libelle="Sexe">{{ e.sexe === 'F' ? 'Fille' : 'Garçon' }}</span>
+              <span class="cellule" role="cell" data-libelle="Né(e) le">{{ dateFr(e.date_naissance) }}{{ e.lieu_naissance ? ' à ' + e.lieu_naissance : '' }}</span>
+              <span class="cellule" role="cell" data-libelle="Statut"><span class="me-badge" [class.succes]="e.affecte">{{ e.affecte ? 'Affecté' : 'Non affecté' }}</span></span>
+              <span class="cellule centre" role="cell" data-libelle="Redoublant">{{ e.redoublant ? 'Oui' : 'Non' }}</span>
+              <span class="cellule" role="cell" data-libelle="Paiement"><span [class]="'me-badge ' + tons[e.statut]">{{ libellesStatut[e.statut] }}</span></span>
+              <span class="cellule fleche" role="cell">
+                @if (peutOuvrir()) { <ion-icon name="chevron-forward-outline"></ion-icon> }
+              </span>
+            </div>
+          } @empty {
+            <div class="me-etat-vide">
+              <ion-icon name="people-outline"></ion-icon>
+              <strong>{{ donnees()!.eleves.length ? 'Aucun élève ne correspond' : 'Aucun élève dans cette classe' }}</strong>
+              @if (!donnees()!.eleves.length) {
+                <span>Les élèves apparaissent ici dès qu'ils sont inscrits dans la classe.</span>
+              }
+            </div>
+          }
+        </div>
+        <app-pagination [total]="eleves().length" [page]="page()" [taille]="taille()" (pageChange)="page.set($event)" (tailleChange)="changerTaille($event)"></app-pagination>
+      </section>
+    }
+  </div>
+</ion-content>

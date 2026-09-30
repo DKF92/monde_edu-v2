@@ -1,0 +1,164 @@
+@if (catalogue(); as cat) {
+  <h2 class="rubrique">Mes rapports</h2>
+  <section class="catalogue" aria-label="Rapports paramétrables">
+    @for (m of cat.modeles; track m.id) {
+      <div class="me-carte rapport modele">
+        <span class="me-pastille teinte-rose"><ion-icon name="grid-outline"></ion-icon></span>
+        <span class="texte">
+          <strong>{{ m.titre }}</strong>
+          <small>{{ m.colonnes.length }} colonne{{ m.colonnes.length > 1 ? 's' : '' }} · par {{ m.regroupement === 'etablissement' ? 'établissement' : m.regroupement }}</small>
+        </span>
+        <button type="button" class="me-action" title="Imprimer" [attr.aria-label]="'Imprimer ' + m.titre" [disabled]="action() === 'modele-' + m.id" (click)="imprimerModele(m)">
+          @if (action() === 'modele-' + m.id) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> }
+        </button>
+        <button type="button" class="me-action" title="Modifier" [attr.aria-label]="'Modifier ' + m.titre" (click)="modifier(m)"><ion-icon name="create-outline"></ion-icon></button>
+        @if (cat.peut_enregistrer) {
+          <button type="button" class="me-action danger" title="Supprimer" [attr.aria-label]="'Supprimer ' + m.titre" (click)="supprimer(m)"><ion-icon name="trash-outline"></ion-icon></button>
+        }
+      </div>
+    }
+    <div class="me-carte rapport creer" role="button" tabindex="0" (click)="nouveau()" (keydown.enter)="nouveau()">
+      <span class="me-pastille teinte-bleu"><ion-icon name="construct-outline"></ion-icon></span>
+      <span class="texte"><strong>Créer un rapport</strong><small>Choisissez les colonnes (ou donnez vos en-têtes), le regroupement par classe, niveau, cycle ou établissement, et les filtres.</small></span>
+      <ion-icon name="add-outline" class="fleche"></ion-icon>
+    </div>
+  </section>
+}
+
+<!-- ================= Editeur ================= -->
+<ion-modal class="me-modale-formulaire tres-large editeur-perso" [isOpen]="!!config()" (didDismiss)="fermer()">
+  <ng-template>
+    @if (config(); as c) {
+    @let cat = catalogue()!;
+    <div class="me-modale">
+      <header>
+        <span class="me-pastille teinte-bleu"><ion-icon name="construct-outline"></ion-icon></span>
+        <div>
+          <h1>{{ c.id ? 'Modifier le rapport' : 'Nouveau rapport' }}</h1>
+          <p>Une liste d'élèves avec les colonnes de votre choix.</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="fermer()" aria-label="Fermer"><ion-icon name="close-outline"></ion-icon></button>
+      </header>
+      <div class="corps">
+        <section>
+          <div class="me-champ">
+            <label for="rp-titre">Titre du rapport <span class="me-requis">*</span></label>
+            <input id="rp-titre" class="me-saisie" maxlength="150" placeholder="Ex : Liste d'émargement, fiche des contacts parents…" [class.invalide]="erreurs()['titre']" [value]="c.titre" (input)="maj({ titre: valeurTexte($event) })" />
+            @if (erreurs()['titre']; as e) { <p class="me-erreur-champ">{{ e }}</p> }
+          </div>
+        </section>
+
+        <section>
+          <h2>Une liste par</h2>
+          <div class="me-segments" role="radiogroup" aria-label="Regroupement">
+            @for (r of cat.regroupements; track r.valeur) {
+              <button type="button" role="radio" [attr.aria-checked]="c.regroupement === r.valeur" [class.actif]="c.regroupement === r.valeur" (click)="maj({ regroupement: $any(r.valeur) })">{{ r.libelle }}</button>
+            }
+          </div>
+        </section>
+
+        <section>
+          <h2>Colonnes</h2>
+          <ol class="colonnes">
+            @if (c.numeroter) { <li class="fixe"><span class="rang">N°</span><span class="nom">Numéro d'ordre</span></li> }
+            @for (col of c.colonnes; track $index; let i = $index; let premier = $first; let dernier = $last) {
+              <li>
+                <span class="rang">{{ i + 1 }}</span>
+                <span class="nom">
+                  <small>{{ libelleChamp(col) }}</small>
+                  <input class="me-saisie" [attr.aria-label]="'En-tête de la colonne ' + (i + 1)" maxlength="60" [placeholder]="libelleChamp(col)" [value]="col.libelle ?? ''" (change)="renommer(i, valeurTexte($event))" />
+                </span>
+                <button type="button" class="me-action" title="Monter" aria-label="Monter" [disabled]="premier" (click)="deplacer(i, -1)"><ion-icon name="arrow-up-outline"></ion-icon></button>
+                <button type="button" class="me-action" title="Descendre" aria-label="Descendre" [disabled]="dernier" (click)="deplacer(i, 1)"><ion-icon name="arrow-down-outline"></ion-icon></button>
+                <button type="button" class="me-action danger" title="Retirer" aria-label="Retirer la colonne" (click)="retirer(i)"><ion-icon name="close-outline"></ion-icon></button>
+              </li>
+            }
+          </ol>
+          @if (erreurs()['colonnes']; as e) { <p class="me-erreur-champ">{{ e }}</p> }
+          <div class="ajouts">
+            <app-selecteur idChamp="rp-champ" icone="add-outline" [options]="optionsChamp()" [valeur]="0" (valeurChange)="ajouterChamp($event)"></app-selecteur>
+            <form class="libre" (submit)="$event.preventDefault(); ajouterLibre()">
+              <input class="me-saisie" maxlength="60" placeholder="En-tête d'une colonne à remplir (Signature, Observation…)" aria-label="En-tête d'une colonne libre" [value]="libre()" (input)="libre.set(valeurTexte($event))" />
+              <button type="submit" class="me-bouton-secondaire" [disabled]="!libre().trim()"><ion-icon name="text-outline"></ion-icon> Ajouter</button>
+            </form>
+          </div>
+          <p class="me-aide-champ">Les champs sont remplis avec les données de l'élève ; une colonne libre est imprimée vide, avec l'en-tête que vous donnez. Vous pouvez renommer l'en-tête de chaque colonne.</p>
+        </section>
+
+        <section>
+          <h2>Élèves</h2>
+          <div class="grille-filtres">
+            <div class="me-champ"><span class="libelle">Genre</span>
+              <app-selecteur idChamp="rp-sexe" icone="male-female-outline" [options]="optionsSexe" [valeur]="valeurSexe()" (valeurChange)="choisirSexe($event)"></app-selecteur></div>
+            <div class="me-champ"><span class="libelle">Statut</span>
+              <app-selecteur idChamp="rp-statut" icone="checkmark-circle-outline" [options]="optionsStatut" [valeur]="valeurBool(c.filtres.affecte)" (valeurChange)="choisirStatut($event)"></app-selecteur></div>
+            <div class="me-champ"><span class="libelle">Redoublants</span>
+              <app-selecteur idChamp="rp-redoublant" icone="repeat-outline" [options]="optionsRedoublant" [valeur]="valeurBool(c.filtres.redoublant)" (valeurChange)="choisirRedoublant($event)"></app-selecteur></div>
+            <div class="me-champ"><span class="libelle">Cycles</span>
+              <app-selecteur-multiple idChamp="rp-cycles" icone="layers-outline" placeholder="Tous les cycles" nomPluriel="cycles" [options]="optionsCycles()" [valeurs]="cyclesChoisis()" (valeursChange)="choisirCycles($event)"></app-selecteur-multiple></div>
+            <div class="me-champ"><span class="libelle">Niveaux</span>
+              <app-selecteur-multiple idChamp="rp-niveaux" icone="school-outline" placeholder="Tous les niveaux" nomPluriel="niveaux" [options]="optionsNiveaux()" [valeurs]="c.filtres.niveaux ?? []" (valeursChange)="majFiltres({ niveaux: $event })"></app-selecteur-multiple></div>
+            <div class="me-champ"><span class="libelle">Classes</span>
+              <app-selecteur-multiple idChamp="rp-classes" icone="people-outline" placeholder="Toutes les classes" nomPluriel="classes" [options]="optionsClasses()" [valeurs]="c.filtres.classes ?? []" (valeursChange)="majFiltres({ classes: $event })"></app-selecteur-multiple></div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Tri et options</h2>
+          <div class="grille-filtres">
+            <div class="me-champ"><span class="libelle">Trier par</span>
+              <app-selecteur idChamp="rp-tri" icone="swap-vertical-outline" [options]="optionsTri()" [valeur]="rangTri()" (valeurChange)="maj({ tri: $any(cat.tris[$event - 1].valeur) })"></app-selecteur></div>
+            @if (besoinPeriode()) {
+              <div class="me-champ"><span class="libelle">Période des moyennes <span class="me-requis">*</span></span>
+                <app-selecteur idChamp="rp-periode" icone="calendar-outline" [options]="optionsPeriode()" [valeur]="c.periode_id ?? 0" (valeurChange)="maj({ periode_id: $event || null })"></app-selecteur>
+                @if (erreurs()['periode_id']; as e) { <p class="me-erreur-champ">{{ e }}</p> }
+              </div>
+            }
+          </div>
+          <div class="options">
+            <label><button type="button" class="me-interrupteur" role="switch" [class.actif]="c.numeroter" [attr.aria-checked]="c.numeroter" (click)="maj({ numeroter: !c.numeroter })"><span></span></button> Numéroter les élèves</label>
+            @if (c.regroupement !== 'etablissement') {
+              <label><button type="button" class="me-interrupteur" role="switch" [class.actif]="c.saut_page" [attr.aria-checked]="c.saut_page" (click)="maj({ saut_page: !c.saut_page })"><span></span></button> Une page par {{ c.regroupement }}</label>
+            }
+            <label><button type="button" class="me-interrupteur" role="switch" [class.actif]="c.sans_classe" [attr.aria-checked]="c.sans_classe" (click)="maj({ sans_classe: !c.sans_classe })"><span></span></button> Inclure les inscrits sans classe</label>
+          </div>
+        </section>
+
+        @if (apercu(); as a) {
+          <section id="apercu-perso" class="apercu">
+            <h2>Aperçu · {{ a.sous_titre }}</h2>
+            @for (g of a.groupes; track $index) {
+              @if (g.titre) { <h3>{{ g.titre }} <small>{{ g.effectif }} élève{{ g.effectif > 1 ? 's' : '' }} · {{ g.filles }} F · {{ g.garcons }} G</small></h3> }
+              <div class="defilant">
+                <table class="tab">
+                  <thead><tr>@for (col of a.colonnes; track col.cle) {<th>{{ col.libelle }}</th>}</tr></thead>
+                  <tbody>
+                    @for (l of g.lignes; track $index) {
+                      <tr>@for (col of a.colonnes; track col.cle) {<td [class.libre]="col.type === 'libre'" [class.d]="col.type === 'moyenne' || col.type === 'montant' || col.type === 'nombre'">{{ cellule(l, col.cle, col.type) }}</td>}</tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            } @empty {
+              <p class="me-aide-champ">Aucun élève ne correspond aux critères.</p>
+            }
+          </section>
+        }
+      </div>
+      <footer>
+        <button type="button" class="me-bouton-texte" (click)="voirApercu()" [disabled]="!!action()">
+          @if (action() === 'apercu') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="eye-outline"></ion-icon> Aperçu }
+        </button>
+        @if (cat.peut_enregistrer) {
+          <button type="button" class="me-bouton-secondaire" (click)="enregistrer()" [disabled]="!!action()">
+            @if (action() === 'enregistrer') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="save-outline"></ion-icon> Enregistrer }
+          </button>
+        }
+        <button type="button" class="me-bouton-principal" (click)="imprimer()" [disabled]="!!action()">
+          @if (action() === 'imprimer') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer }
+        </button>
+      </footer>
+    </div>
+    }
+  </ng-template>
+</ion-modal>

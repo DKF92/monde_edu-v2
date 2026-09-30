@@ -1,0 +1,42 @@
+.etroite {
+  max-width: 760px;
+}
+
+.bloc {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.me-saisie.zone {
+  height: auto;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+.me-saisie.grand {
+  height: 52px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.dates {
+  display: grid;
+  gap: 12px;
+
+  @media (min-width: 480px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  label small {
+    font-weight: 400;
+    color: var(--me-texte-leger);
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}

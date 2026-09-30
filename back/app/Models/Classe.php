@@ -51,8 +51,33 @@ class Classe extends Model
         return $this->hasMany(EmploiDuTemps::class);
     }
 
+    /** Eleves visibles dans la liste de la classe (voir Inscription::scopeVisiblesEnClasse). */
     public function effectif(): int
     {
-        return $this->inscriptions()->where('statut', 'validee')->count();
+        return $this->inscriptions()->visiblesEnClasse()->count();
+    }
+
+    /**
+     * Effectif maximum de la classe : la limite la plus precise l'emporte
+     * (classe, puis niveau, puis etablissement), null = pas de limite.
+     *
+     * @return array{limite: ?int, source: ?string}
+     */
+    public function effectifLimite(): array
+    {
+        if ($this->capacite) {
+            return ['limite' => (int) $this->capacite, 'source' => 'classe'];
+        }
+
+        $niveau = LimiteEffectifNiveau::where('etablissement_id', $this->etablissement_id)
+            ->where('niveau_id', $this->niveau_id)
+            ->value('effectif_max');
+        if ($niveau) {
+            return ['limite' => (int) $niveau, 'source' => 'niveau'];
+        }
+
+        $general = Etablissement::find($this->etablissement_id)?->parametre('effectif_max_classe');
+
+        return $general ? ['limite' => (int) $general, 'source' => 'etablissement'] : ['limite' => null, 'source' => null];
     }
 }

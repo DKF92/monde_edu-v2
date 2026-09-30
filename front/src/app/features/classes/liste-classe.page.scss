@@ -1,0 +1,387 @@
+$tableau: 860px;
+
+.boutons-entete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+
+  .choix-classe {
+    width: 190px;
+  }
+
+  @media (max-width: 559px) {
+    width: 100%;
+
+    .choix-classe,
+    button {
+      flex: 1 1 calc(50% - 8px);
+      width: auto;
+      justify-content: center;
+    }
+  }
+}
+
+// ============================ Encadrement ============================
+
+.encadrement {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  padding: 14px 18px;
+
+  @media (min-width: 900px) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  > span {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 8px;
+    align-items: center;
+    min-width: 0;
+  }
+
+  ion-icon {
+    grid-row: span 2;
+    font-size: 18px;
+    color: var(--me-texte-leger);
+  }
+
+  small {
+    font-size: 11px;
+    color: var(--me-texte-leger);
+  }
+
+  strong {
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--me-texte);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+
+    &.depasse {
+      color: var(--ion-color-danger);
+    }
+  }
+}
+
+// ============================ Compteurs ============================
+
+.compteurs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+
+  > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  @media (min-width: 900px) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+
+    > :first-child {
+      grid-column: auto;
+    }
+  }
+
+  @media (min-width: 1360px) {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+.compteur {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  font: inherit;
+  text-align: left;
+  color: var(--me-texte);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: #b9c6ea;
+  }
+
+  &.actif {
+    border-color: var(--ion-color-primary);
+  }
+
+  > span:last-child {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  strong {
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+}
+
+// ============================ Liste ============================
+
+.liste {
+  padding: 0;
+  container-type: inline-size;
+}
+
+.filtres {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--me-bordure);
+
+  .me-recherche {
+    flex: 1 1 260px;
+  }
+
+  .imprimer {
+    height: 46px;
+
+    @media (max-width: 559px) {
+      flex: 1 1 100%;
+      justify-content: center;
+    }
+  }
+}
+
+.squelette {
+  padding: 14px 20px;
+}
+
+.titre-tableau {
+  padding: 14px 20px 4px;
+
+  h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--me-texte);
+  }
+}
+
+.tableau {
+  padding: 4px 8px 10px;
+}
+
+.ligne {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 6px 12px;
+  padding: 12px;
+  border-radius: 12px;
+
+  > .cellule,
+  > .cellule-eleve ~ * {
+    grid-column: 2;
+  }
+
+  &.cliquable {
+    cursor: pointer;
+  }
+
+  @container (min-width: #{$tableau}) {
+    grid-template-columns: 40px minmax(220px, 2fr) 70px minmax(150px, 1.3fr) 110px 90px minmax(170px, 1.2fr) 24px;
+    align-items: center;
+    border-radius: 10px;
+
+    > .cellule,
+    > .cellule-eleve ~ * {
+      grid-column: auto;
+    }
+
+    &:not(.entete-tableau).cliquable:hover {
+      background: var(--me-survol);
+    }
+  }
+}
+
+.entete-tableau {
+  display: none;
+
+  @container (min-width: #{$tableau}) {
+    display: grid;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--me-texte-leger);
+  }
+}
+
+.centre {
+  @container (min-width: #{$tableau}) {
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+.rang {
+  align-self: start;
+  padding-top: 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--me-texte-leger);
+  font-variant-numeric: tabular-nums;
+
+  @container (min-width: #{$tableau}) {
+    align-self: center;
+    padding-top: 0;
+  }
+}
+
+.cellule-eleve {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  strong {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--me-texte);
+  }
+
+  .matricule {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--me-texte-doux);
+  }
+}
+
+.cellule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--me-texte);
+
+  &[data-libelle]::before {
+    content: attr(data-libelle);
+    flex: 0 0 90px;
+    font-size: 12px;
+    color: var(--me-texte-leger);
+  }
+
+  @container (min-width: #{$tableau}) {
+    &[data-libelle]::before {
+      content: none;
+    }
+  }
+}
+
+.fleche {
+  display: none;
+  color: var(--me-texte-leger);
+
+  @container (min-width: #{$tableau}) {
+    display: flex;
+  }
+}
+
+// ============================ Professeurs ============================
+
+.professeurs {
+  padding: 0;
+
+  summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    cursor: pointer;
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    .titre {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    strong {
+      font-size: 14.5px;
+      font-weight: 800;
+    }
+
+    small {
+      font-size: 12px;
+      color: var(--me-texte-doux);
+    }
+
+    .deplier {
+      color: var(--me-texte-leger);
+      transition: transform 0.15s ease;
+    }
+  }
+
+  &[open] summary .deplier {
+    transform: rotate(90deg);
+  }
+
+  ul {
+    display: grid;
+    gap: 8px 18px;
+    margin: 0;
+    padding: 4px 18px 14px;
+    list-style: none;
+
+    @media (min-width: 900px) {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  li {
+    display: grid;
+    grid-template-columns: minmax(0, 150px) minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+  }
+
+  .matiere {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+
+    strong {
+      font-size: 13.5px;
+    }
+
+    small {
+      font-size: 11.5px;
+      color: var(--me-texte-leger);
+    }
+  }
+
+  .prof {
+    font-size: 13.5px;
+    color: var(--me-texte);
+  }
+
+  .pied-professeurs {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 0 18px 16px;
+  }
+}

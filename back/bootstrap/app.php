@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Middleware\ExigerMotDePasseDefinitif;
 use App\Http\Middleware\ResolveContexteScolaire;
 use App\Http\Middleware\ResolveEtablissement;
+use App\Http\Middleware\ResolvePoste;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,6 +20,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'etablissement' => ResolveEtablissement::class,
             'contexte-scolaire' => ResolveContexteScolaire::class,
+            'poste' => ResolvePoste::class,
+            'mot-de-passe-definitif' => ExigerMotDePasseDefinitif::class,
         ]);
 
         // API pure: jamais de redirection vers une route web "login" inexistante,

@@ -1,0 +1,183 @@
+<ion-content class="me-page-admin">
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <h1>Caisse</h1>
+        <p>Point de vos encaissements : par type de frais et statut de l'élève.</p>
+      </div>
+      <button type="button" class="me-bouton-principal" (click)="actions.encaisser()">
+        <ion-icon name="cash-outline"></ion-icon>
+        <span>Encaisser</span>
+      </button>
+    </header>
+
+    <!-- ================= Barre : criteres appliques + boutons alignes ================= -->
+    <section class="me-carte barre-caisse">
+      <div class="resume">
+        <span class="puce"><ion-icon name="calendar-outline"></ion-icon> {{ bilan()?.periode?.libelle || '…' }}</span>
+        @if (bilan()?.criteres_libelle) {
+          <span class="puce"><ion-icon name="people-outline"></ion-icon> {{ bilan()!.criteres_libelle }}</span>
+        }
+        @if (filtres().periode !== 'jour') {
+          <button type="button" class="me-lien" (click)="aujourdhuiBilan()">Revenir à aujourd'hui</button>
+        }
+        @if (nombreCriteres()) {
+          <button type="button" class="me-lien" (click)="effacerCriteres()">Effacer les critères</button>
+        }
+      </div>
+      <div class="boutons">
+        <button type="button" class="me-bouton-secondaire bouton-filtres" (click)="modaleFiltres.set(true)">
+          <ion-icon name="options-outline"></ion-icon> Filtres
+          @if (nombreCriteres()) { <span class="me-badge info">{{ nombreCriteres() }}</span> }
+        </button>
+        <button type="button" class="me-bouton-secondaire" (click)="liste()" [disabled]="!bilan()">
+          <ion-icon name="list-outline"></ion-icon> Liste des paiements
+        </button>
+        <button type="button" class="me-bouton-secondaire" (click)="imprimer()" [disabled]="!bilan() || !!impression()">
+          @if (impression() === 'bilan') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer le bilan }
+        </button>
+        <button type="button" class="me-bouton-principal" (click)="imprimer(true)" [disabled]="!bilan() || !!impression()">
+          @if (impression() === 'general') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="documents-outline"></ion-icon> Imprimer le bilan général }
+        </button>
+      </div>
+    </section>
+
+    <!-- ================= Tableau du bilan ================= -->
+    <section class="me-carte bilan" [class.attenue]="chargement() && bilan()">
+      @if (chargement() && !bilan()) {
+        <ion-skeleton-text [animated]="true" style="width: 50%; height: 24px"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 200px; margin-top: 14px"></ion-skeleton-text>
+      } @else if (erreur()) {
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>{{ erreur() }}</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      } @else if (bilan()) {
+        @let b = bilan()!;
+        <div class="titre-bilan">
+          <h2>{{ b.titre }}</h2>
+          <p>{{ b.nombre_paiements }} paiement{{ b.nombre_paiements > 1 ? 's' : '' }} encaissé{{ b.nombre_paiements > 1 ? 's' : '' }} par {{ b.caissier.nom }}</p>
+        </div>
+
+        <div class="tableau-bilan" role="table" [attr.aria-label]="b.titre">
+          <div class="ligne entete" role="row">
+            <span role="columnheader">Types de frais</span>
+            <span role="columnheader">Affectés</span>
+            <span role="columnheader">Non affectés</span>
+            <span role="columnheader">Total</span>
+          </div>
+          @for (l of b.lignes; track l.cle; let i = $index) {
+            @if (i === 0 || groupe(b.lignes[i - 1]) !== groupe(l)) {
+              <div class="groupe" role="row"><span role="cell">{{ groupe(l) }}</span></div>
+            }
+            <div class="ligne" role="row" [class.inactif]="!l.actif">
+              <span class="libelle" role="rowheader">{{ l.libelle }}</span>
+              @for (c of colonnes; track c) {
+                @if (applicable(l, c)) {
+                  <span role="cell" class="cellule" [class.total]="c === 'total'" [class.vide]="!l[c]" [attr.data-libelle]="libellesColonnes[c]">
+                    <span class="montant">{{ f(l[c]) }}</span>
+                    <button type="button" class="me-action oeil" [disabled]="!l[c]" [title]="'Voir les paiements : ' + l.libelle + ' · ' + libellesColonnes[c]" [attr.aria-label]="'Voir les paiements : ' + l.libelle + ' · ' + libellesColonnes[c]" (click)="liste(l, c)"><ion-icon name="eye-outline"></ion-icon></button>
+                  </span>
+                } @else {
+                  <span class="cellule na" role="cell" [attr.data-libelle]="libellesColonnes[c]" title="Non applicable">—</span>
+                }
+              }
+            </div>
+          } @empty {
+            <div class="me-etat-vide"><strong>Aucun type de frais actif.</strong></div>
+          }
+          <div class="ligne ligne-total" role="row">
+            <span class="libelle" role="rowheader">Total</span>
+            <span role="cell" class="cellule" data-libelle="Affectés"><span class="montant">{{ f(b.totaux.affecte) }}</span><button type="button" class="me-action oeil" [disabled]="!b.totaux.affecte" [title]="'Voir les paiements : total affectés'" [attr.aria-label]="'Voir les paiements : total affectés'" (click)="liste(undefined, 'affecte')"><ion-icon name="eye-outline"></ion-icon></button></span>
+            <span role="cell" class="cellule" data-libelle="Non affectés"><span class="montant">{{ f(b.totaux.non_affecte) }}</span><button type="button" class="me-action oeil" [disabled]="!b.totaux.non_affecte" [title]="'Voir les paiements : total non affectés'" [attr.aria-label]="'Voir les paiements : total non affectés'" (click)="liste(undefined, 'non_affecte')"><ion-icon name="eye-outline"></ion-icon></button></span>
+            <span role="cell" class="cellule total" data-libelle="Total"><span class="montant">{{ f(b.totaux.total) }}</span><button type="button" class="me-action oeil" [disabled]="!b.totaux.total" [title]="'Voir tous les paiements de la période'" [attr.aria-label]="'Voir tous les paiements de la période'" (click)="liste()"><ion-icon name="eye-outline"></ion-icon></button></span>
+          </div>
+        </div>
+        <p class="aide">L'œil de chaque case ouvre la liste des paiements qui donnent ce montant (grisé si le montant est nul).</p>
+      }
+    </section>
+  </div>
+</ion-content>
+
+<!-- ================= Filtres ================= -->
+<ion-modal class="me-modale-formulaire tres-large auto filtres-caisse" [isOpen]="modaleFiltres()" (didDismiss)="modaleFiltres.set(false)">
+  <ng-template>
+    <div class="me-modale">
+      <header>
+        <span class="me-pastille teinte-cyan"><ion-icon name="options-outline"></ion-icon></span>
+        <div>
+          <h1>Filtres du bilan</h1>
+          <p>{{ bilan()?.titre }}</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="modaleFiltres.set(false)" aria-label="Fermer">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </header>
+      <div class="corps">
+        <section>
+          <h2>Période</h2>
+          <!-- Ligne 1 : dates, mois, annee scolaire -->
+          <div class="ligne-filtres periode">
+            <div class="me-champ date">
+              <label for="b-du">Du</label>
+              <input id="b-du" class="me-saisie" type="date" [value]="du()" (input)="du.set(valeurTexte($event))" />
+            </div>
+            <div class="me-champ date">
+              <label for="b-au">Au</label>
+              <input id="b-au" class="me-saisie" type="date" [value]="au()" (input)="au.set(valeurTexte($event))" />
+            </div>
+            <button type="button" class="me-bouton-secondaire afficher" [class.actif]="filtres().periode === 'dates' || filtres().periode === 'jour'" (click)="afficherDates()">
+              <ion-icon name="search-outline"></ion-icon> Afficher
+            </button>
+            <div class="me-champ mois">
+              <span class="libelle">Mois</span>
+              <app-selecteur idChamp="b-mois" icone="calendar-outline" [options]="optionsMois()" [valeur]="rangMois()" (valeurChange)="choisirMois($event)"></app-selecteur>
+            </div>
+            <button type="button" class="me-bouton-secondaire annee" [class.actif]="filtres().periode === 'annee'" (click)="anneeScolaire()">
+              <ion-icon name="school-outline"></ion-icon> Année scolaire
+            </button>
+          </div>
+          @if (erreurDates()) {
+            <span class="me-erreur-champ">{{ erreurDates() }}</span>
+          }
+        </section>
+        <section>
+          <h2>Élèves</h2>
+          <!-- Ligne 2 : genre, redoublant, cycle / niveau / classe (un seul des trois) -->
+          <div class="ligne-filtres criteres">
+            <div class="me-champ">
+              <span class="libelle">Genre</span>
+              <app-selecteur idChamp="b-sexe" icone="male-female-outline" [options]="optionsSexe" [valeur]="valeurSexe()" (valeurChange)="choisirSexe($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Redoublant</span>
+              <app-selecteur idChamp="b-redoublant" icone="repeat-outline" [options]="optionsRedoublant" [valeur]="valeurRedoublant()" (valeurChange)="choisirRedoublant($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Cycle</span>
+              <app-selecteur idChamp="b-cycle" icone="layers-outline" [options]="optionsCycle()" [valeur]="valeurCycle()" [desactive]="!!filtres().niveau_id || !!filtres().classe_id" (valeurChange)="choisirCycle($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Niveau</span>
+              <app-selecteur idChamp="b-niveau" icone="school-outline" [options]="optionsNiveau()" [valeur]="filtres().niveau_id ?? 0" [desactive]="!!filtres().cycle || !!filtres().classe_id" (valeurChange)="choisirNiveau($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Classe</span>
+              <app-selecteur idChamp="b-classe" icone="people-outline" [options]="optionsClasse()" [valeur]="filtres().classe_id ?? 0" [desactive]="!!filtres().cycle || !!filtres().niveau_id" (valeurChange)="choisirClasse($event)"></app-selecteur>
+            </div>
+          </div>
+          <p class="me-aide-champ">Cycle, niveau et classe : un seul à la fois (remettez « Tous » pour changer).</p>
+        </section>
+      </div>
+      <footer>
+        @if (nombreCriteres()) {
+          <button type="button" class="me-bouton-texte" (click)="effacerCriteres()">Effacer les critères</button>
+        }
+        <button type="button" class="me-bouton-principal" (click)="modaleFiltres.set(false)">
+          @if (chargement()) { <ion-spinner name="dots"></ion-spinner> } @else { Voir le bilan }
+        </button>
+      </footer>
+    </div>
+  </ng-template>
+</ion-modal>

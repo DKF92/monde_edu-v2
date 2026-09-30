@@ -1,0 +1,260 @@
+<ion-content class="me-page-admin">
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <h1>{{ textes.titre }}</h1>
+        <p>{{ textes.description }}</p>
+      </div>
+    </header>
+
+    <!-- ================= Barre : criteres appliques + boutons ================= -->
+    <section class="me-carte barre-caisse">
+      <div class="resume">
+        <span class="puce"><ion-icon name="calendar-outline"></ion-icon> {{ point()?.periode?.libelle || '…' }}</span>
+        @if (point()?.criteres_libelle) {
+          <span class="puce"><ion-icon name="people-outline"></ion-icon> {{ point()!.criteres_libelle }}</span>
+        }
+        @if (point()?.caissier) {
+          <span class="puce"><ion-icon name="person-outline"></ion-icon> {{ point()!.caissier }}</span>
+        }
+        @if (filtres().periode !== 'annee') {
+          <button type="button" class="me-lien" (click)="anneeScolaire()">Toute l'année</button>
+        }
+        @if (nombreCriteres()) {
+          <button type="button" class="me-lien" (click)="effacerCriteres()">Effacer les critères</button>
+        }
+      </div>
+      <div class="boutons">
+        @if (mode === 'inscriptions') {
+          <button type="button" class="me-bouton-secondaire" (click)="listeInscrits()" [disabled]="!point()">
+            <ion-icon name="list-outline"></ion-icon> Liste des inscrits
+          </button>
+        } @else {
+          <button type="button" class="me-bouton-secondaire" (click)="router.navigateByUrl('/tabs/paiements/dettes')">
+            <ion-icon name="list-outline"></ion-icon> Liste des dettes
+          </button>
+        }
+        <button type="button" class="me-bouton-secondaire bouton-filtres" (click)="modaleFiltres.set(true)">
+          <ion-icon name="options-outline"></ion-icon> Filtres
+          @if (nombreCriteres()) { <span class="me-badge info">{{ nombreCriteres() }}</span> }
+        </button>
+        <button type="button" class="me-bouton-secondaire" (click)="imprimer()" [disabled]="!point() || !!impression()">
+          @if (impression() === 'point') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer le point }
+        </button>
+        <button type="button" class="me-bouton-principal" (click)="imprimer(true)" [disabled]="!point() || !!impression()">
+          @if (impression() === 'general') { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="documents-outline"></ion-icon> Impression générale }
+        </button>
+      </div>
+    </section>
+
+    @if (chargement() && !point()) {
+      <section class="me-carte bilan">
+        <ion-skeleton-text [animated]="true" style="width: 50%; height: 24px"></ion-skeleton-text>
+        <ion-skeleton-text [animated]="true" style="width: 100%; height: 200px; margin-top: 14px"></ion-skeleton-text>
+      </section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>{{ erreur() }}</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (point()) {
+      @let p = point()!;
+      @for (s of p.sections; track s.cle) {
+        <ng-container *ngTemplateOutlet="tableau; context: { $implicit: s, p: p }"></ng-container>
+      }
+      <p class="aide">
+        @if (mode === 'inscriptions') {
+          L'œil de chaque case ouvre la liste des élèves concernés. « Passés à la caisse » : au moins un paiement à la fin de la période ;
+          « Cas sociaux » : élèves qui ont une réduction de type cas social. Le détail par genre, niveau, classe et agent est dans l'impression générale.
+        } @else {
+          L'œil du total encaissé ouvre la liste des paiements de dettes. La situation des dettes à ce jour et le détail par caissier, niveau et classe sont dans l'impression générale.
+        }
+      </p>
+    }
+  </div>
+</ion-content>
+
+<!-- ================= Tableau d'une section ================= -->
+<ng-template #tableau let-s let-p="p">
+  <section class="me-carte bilan" [class.attenue]="chargement()">
+    <div class="titre-bilan">
+      <h2>{{ s.titre }}</h2>
+      @if (s.sous_titre) { <p>{{ s.sous_titre }}</p> }
+    </div>
+    <div class="tableau-bilan" role="table" [attr.aria-label]="s.titre">
+      <div class="ligne entete" role="row">
+        <span role="columnheader"></span>
+        @for (c of colonnes; track c) { <span role="columnheader">{{ p.colonnes[c] }}</span> }
+      </div>
+      @for (l of s.lignes; track l.cle) {
+        <div class="ligne" role="row">
+          <span class="libelle" role="rowheader">{{ l.libelle }}</span>
+          @for (c of colonnes; track c) {
+            <span role="cell" class="cellule" [class.total]="c === 'total'" [class.vide]="!l[c]" [attr.data-libelle]="p.colonnes[c]">
+              <span class="montant">{{ v(p, l, c) }}</span>
+              @if (oeil(s, l)) {
+                <button type="button" class="me-action oeil" [disabled]="!l[c]" [title]="'Voir : ' + l.libelle + ' · ' + p.colonnes[c]" [attr.aria-label]="'Voir : ' + l.libelle + ' · ' + p.colonnes[c]" (click)="ouvrir(s, l, c)"><ion-icon name="eye-outline"></ion-icon></button>
+              }
+            </span>
+          }
+        </div>
+      } @empty {
+        <div class="me-etat-vide"><strong>Aucune donnée sur la période.</strong></div>
+      }
+      @if (s.total) {
+        <div class="ligne ligne-total" role="row">
+          <span class="libelle" role="rowheader">{{ s.total.libelle }}</span>
+          @for (c of colonnes; track c) {
+            <span role="cell" class="cellule" [class.total]="c === 'total'" [attr.data-libelle]="p.colonnes[c]">
+              <span class="montant">{{ v(p, s.total, c) }}{{ c === 'total' && p.unite === 'eleves' && (s.total.unite ?? p.unite) === 'eleves' ? ' élève' + (s.total.total > 1 ? 's' : '') : '' }}</span>
+              @if (oeil(s, null)) {
+                <button type="button" class="me-action oeil" [disabled]="!s.total[c]" [title]="'Voir : ' + s.total.libelle + ' · ' + p.colonnes[c]" [attr.aria-label]="'Voir : ' + s.total.libelle + ' · ' + p.colonnes[c]" (click)="ouvrir(s, null, c)"><ion-icon name="eye-outline"></ion-icon></button>
+              }
+            </span>
+          }
+        </div>
+      }
+    </div>
+  </section>
+</ng-template>
+
+<!-- ================= Liste des eleves d'une case ================= -->
+<ion-modal class="me-modale-formulaire tres-large" [isOpen]="!!liste()" (didDismiss)="liste.set(null)">
+  <ng-template>
+    @let l = liste();
+    <div class="me-modale">
+      <header>
+        <span class="me-pastille teinte-vert"><ion-icon name="people-outline"></ion-icon></span>
+        <div>
+          <h1>{{ l?.titre }}</h1>
+          <p>{{ l?.eleves ? l!.eleves!.length + ' élève' + (l!.eleves!.length > 1 ? 's' : '') : 'Chargement…' }}</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="liste.set(null)" aria-label="Fermer"><ion-icon name="close-outline"></ion-icon></button>
+      </header>
+      <div class="corps liste-eleves">
+        @if (!l?.eleves) {
+          <ion-skeleton-text [animated]="true" style="width: 100%; height: 160px"></ion-skeleton-text>
+        } @else {
+          <div class="defilant">
+            <table class="tab">
+              <thead>
+                <tr><th>N°</th><th>Matricule</th><th>Nom et prénoms</th><th>Classe</th><th>Statut</th><th>Inscrit le</th><th class="d">Payé</th><th class="d">Reste</th></tr>
+              </thead>
+              <tbody>
+                @for (e of elevesPage(); track e.inscription_id; let i = $index) {
+                  <tr (click)="ouvrirEleve(e)" tabindex="0" (keydown.enter)="ouvrirEleve(e)">
+                    <td>{{ (pageListe() - 1) * tailleListe() + i + 1 }}</td>
+                    <td class="matricule">{{ e.matricule }}</td>
+                    <td><strong>{{ e.nom }}</strong> {{ e.prenoms }}</td>
+                    <td>{{ e.classe ?? e.niveau }}</td>
+                    <td>{{ e.affecte ? 'Affecté' : 'Non affecté' }}</td>
+                    <td>{{ e.date_inscription.split('-').reverse().join('/') }}</td>
+                    <td class="d">{{ f(e.paye) }}</td>
+                    <td class="d" [class.reste]="e.reste > 0">{{ f(e.reste) }}</td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="8" class="vide">Aucun élève.</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <app-pagination [total]="l!.eleves!.length" [page]="pageListe()" [taille]="tailleListe()" (pageChange)="pageListe.set($event)" (tailleChange)="tailleListe.set($event); pageListe.set(1)"></app-pagination>
+        }
+      </div>
+      <footer>
+        <button type="button" class="me-bouton-texte" (click)="liste.set(null)">Fermer</button>
+        <button type="button" class="me-bouton-principal" (click)="imprimerListe()" [disabled]="!l?.eleves?.length || impressionListe()">
+          @if (impressionListe()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer la liste }
+        </button>
+      </footer>
+    </div>
+  </ng-template>
+</ion-modal>
+
+<!-- ================= Filtres ================= -->
+<ion-modal class="me-modale-formulaire tres-large auto filtres-caisse" [isOpen]="modaleFiltres()" (didDismiss)="modaleFiltres.set(false)">
+  <ng-template>
+    <div class="me-modale">
+      <header>
+        <span class="me-pastille teinte-cyan"><ion-icon name="options-outline"></ion-icon></span>
+        <div>
+          <h1>Filtres du point</h1>
+          <p>{{ point()?.titre }}</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="modaleFiltres.set(false)" aria-label="Fermer"><ion-icon name="close-outline"></ion-icon></button>
+      </header>
+      <div class="corps">
+        <section>
+          <h2>Période{{ mode === 'inscriptions' ? ' (date d\'inscription)' : ' (date du paiement)' }}</h2>
+          <div class="ligne-filtres periode">
+            <div class="me-champ date">
+              <label for="pt-du">Du</label>
+              <input id="pt-du" class="me-saisie" type="date" [value]="du()" (input)="du.set(valeurTexte($event))" />
+            </div>
+            <div class="me-champ date">
+              <label for="pt-au">Au</label>
+              <input id="pt-au" class="me-saisie" type="date" [value]="au()" (input)="au.set(valeurTexte($event))" />
+            </div>
+            <button type="button" class="me-bouton-secondaire afficher" [class.actif]="filtres().periode === 'dates' || filtres().periode === 'jour'" (click)="afficherDates()">
+              <ion-icon name="search-outline"></ion-icon> Afficher
+            </button>
+            <div class="me-champ mois">
+              <span class="libelle">Mois</span>
+              <app-selecteur idChamp="pt-mois" icone="calendar-outline" [options]="optionsMois()" [valeur]="rangMois()" (valeurChange)="choisirMois($event)"></app-selecteur>
+            </div>
+            <button type="button" class="me-bouton-secondaire annee" [class.actif]="filtres().periode === 'annee'" (click)="anneeScolaire()">
+              <ion-icon name="school-outline"></ion-icon> Année scolaire
+            </button>
+          </div>
+          @if (erreurDates()) { <span class="me-erreur-champ">{{ erreurDates() }}</span> }
+          <button type="button" class="me-lien aujourdhui" (click)="aujourdhuiPoint()">Aujourd'hui</button>
+        </section>
+        <section>
+          <h2>Élèves</h2>
+          <div class="ligne-filtres criteres">
+            <div class="me-champ">
+              <span class="libelle">Genre</span>
+              <app-selecteur idChamp="pt-sexe" icone="male-female-outline" [options]="optionsSexe" [valeur]="valeurSexe()" (valeurChange)="choisirSexe($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Redoublant</span>
+              <app-selecteur idChamp="pt-redoublant" icone="repeat-outline" [options]="optionsRedoublant" [valeur]="valeurRedoublant()" (valeurChange)="choisirRedoublant($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Cycle</span>
+              <app-selecteur idChamp="pt-cycle" icone="layers-outline" [options]="optionsCycle()" [valeur]="valeurCycle()" [desactive]="!!filtres().niveau_id || !!filtres().classe_id" (valeurChange)="choisirCycle($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Niveau</span>
+              <app-selecteur idChamp="pt-niveau" icone="school-outline" [options]="optionsNiveau()" [valeur]="filtres().niveau_id ?? 0" [desactive]="!!filtres().cycle || !!filtres().classe_id" (valeurChange)="choisirNiveau($event)"></app-selecteur>
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Classe</span>
+              <app-selecteur idChamp="pt-classe" icone="people-outline" [options]="optionsClasse()" [valeur]="filtres().classe_id ?? 0" [desactive]="!!filtres().cycle || !!filtres().niveau_id" (valeurChange)="choisirClasse($event)"></app-selecteur>
+            </div>
+          </div>
+          <p class="me-aide-champ">Cycle, niveau et classe : un seul à la fois (remettez « Tous » pour changer).</p>
+        </section>
+        @if (mode === 'dettes') {
+          <section>
+            <h2>Caissier</h2>
+            <div class="ligne-filtres caissier">
+              <app-selecteur idChamp="pt-caissier" icone="person-outline" [options]="optionsCaissier()" [valeur]="filtres().caissier_id ?? 0" (valeurChange)="choisirCaissier($event)"></app-selecteur>
+            </div>
+          </section>
+        }
+      </div>
+      <footer>
+        @if (nombreCriteres()) {
+          <button type="button" class="me-bouton-texte" (click)="effacerCriteres()">Effacer les critères</button>
+        }
+        <button type="button" class="me-bouton-principal" (click)="modaleFiltres.set(false)">
+          @if (chargement()) { <ion-spinner name="dots"></ion-spinner> } @else { Voir le point }
+        </button>
+      </footer>
+    </div>
+  </ng-template>
+</ion-modal>

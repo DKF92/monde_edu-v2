@@ -1,0 +1,301 @@
+// Pages Evaluations (notes, resultats) : onglets, choix, grilles defilantes.
+
+.onglets {
+  align-self: flex-start;
+}
+
+.choix {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+
+  @media (min-width: 760px) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  &.quatre {
+    @media (min-width: 900px) {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+      align-items: end;
+    }
+  }
+}
+
+.liste {
+  padding: 0;
+  min-width: 0;
+
+  &.attenue {
+    opacity: 0.55;
+  }
+}
+
+.titre-tableau {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 16px 20px 10px;
+
+  h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--me-texte);
+  }
+
+  p {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 4px 0 0;
+    font-size: 12.5px;
+    color: var(--me-texte-doux);
+  }
+
+  .boutons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+.defilant {
+  overflow-x: auto;
+  padding: 0 8px 12px;
+}
+
+.grille {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+
+  th {
+    position: sticky;
+    top: 0;
+    padding: 8px 8px;
+    background: var(--me-fond);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--me-texte-leger);
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: bottom;
+
+    small {
+      display: block;
+      font-weight: 600;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+  }
+
+  td {
+    padding: 8px;
+    border-top: 1px solid var(--me-bordure);
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  tbody tr:nth-child(even) td {
+    background: var(--me-ligne-alternee);
+  }
+
+  tbody tr.cliquable {
+    cursor: pointer;
+
+    &:hover td {
+      background: var(--me-survol);
+    }
+  }
+
+  .num {
+    width: 36px;
+    color: var(--me-texte-leger);
+  }
+
+  .eleve {
+    text-align: left;
+    min-width: 190px;
+    white-space: normal;
+
+    small {
+      display: block;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11px;
+      color: var(--me-texte-leger);
+    }
+  }
+
+  .eleve-fixe {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--me-surface);
+  }
+
+  .moy {
+    font-weight: 800;
+    color: var(--me-texte);
+
+    ion-icon {
+      vertical-align: -2px;
+      font-size: 13px;
+      color: var(--me-vert);
+    }
+  }
+
+  .faible {
+    color: var(--ion-color-danger);
+  }
+
+  .appr {
+    text-align: left;
+    color: var(--me-texte-doux);
+  }
+
+  .vide {
+    padding: 24px;
+    color: var(--me-texte-doux);
+  }
+
+  .actions-eval {
+    display: flex;
+    justify-content: center;
+    gap: 2px;
+    margin-top: 4px;
+
+    .me-action {
+      width: 28px;
+      height: 28px;
+      font-size: 15px;
+    }
+  }
+
+  select {
+    height: 32px;
+    padding: 0 6px;
+    border: 1px solid var(--me-bordure);
+    border-radius: 8px;
+    background: var(--me-surface);
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--me-texte);
+  }
+}
+
+// ============================ Fenetre de saisie ============================
+
+.entete-saisie {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: end;
+}
+
+.compteur-saisie {
+  margin: 12px 0 6px;
+  font-size: 12.5px;
+  color: var(--me-texte-doux);
+}
+
+.saisie-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 128px;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 8px;
+    border-radius: 10px;
+
+    &:nth-child(even) {
+      background: var(--me-ligne-alternee);
+    }
+  }
+
+  label {
+    min-width: 0;
+    font-size: 13.5px;
+    color: var(--me-texte);
+  }
+
+  .rang-saisie {
+    display: inline-block;
+    width: 26px;
+    color: var(--me-texte-leger);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .me-saisie {
+    height: 38px;
+    text-align: right;
+    font-weight: 700;
+  }
+}
+
+// ============================ Resultats ============================
+
+.chiffres {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+
+  @media (min-width: 900px) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .me-carte {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 14px 16px;
+  }
+
+  small {
+    font-size: 12px;
+    color: var(--me-texte-doux);
+  }
+
+  strong {
+    font-size: 20px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.matiere-provisoire {
+  font-style: italic;
+  color: var(--me-texte-doux);
+}
+
+.boutons-choix {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  button {
+    height: 44px;
+  }
+}
+
+// Conduite : saisie dans le tableau.
+.grille .saisie-cellule .me-saisie {
+  width: 96px;
+  height: 36px;
+  margin: 0 auto;
+  text-align: right;
+  font-weight: 700;
+}

@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import {
@@ -19,11 +19,12 @@ import {
   businessOutline,
   calendarOutline,
   bookOutline,
+  briefcaseOutline,
   logOutOutline,
   personCircleOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
-import { ChoisirAnneeModalComponent } from '../annee-scolaire/choisir-annee-modal.component';
+import { EspaceTravailService } from '../../core/services/espace-travail.service';
 
 @Component({
   selector: 'app-profil',
@@ -41,7 +42,6 @@ import { ChoisirAnneeModalComponent } from '../annee-scolaire/choisir-annee-moda
     IonIcon,
     IonChip,
     IonButton,
-    ChoisirAnneeModalComponent,
   ],
   templateUrl: './profil.page.html',
   styleUrl: './profil.page.scss',
@@ -54,24 +54,12 @@ export class ProfilPage {
   readonly etablissement = this.auth.etablissementActif;
   readonly anneeScolaire = this.auth.anneeScolaire;
   readonly periode = this.auth.periode;
-  readonly estProfilPedagogique = this.auth.estProfilPedagogique;
-  readonly plusieursEtablissements = () => this.auth.etablissements().length > 1;
-  readonly afficherModaleAnnee = signal(false);
+  readonly peutChoisirPeriode = this.auth.peutChoisirPeriode;
+  readonly poste = this.auth.poste;
+  readonly espaceTravail = inject(EspaceTravailService);
 
   constructor() {
-    addIcons({ businessOutline, calendarOutline, bookOutline, logOutOutline, personCircleOutline });
-  }
-
-  changerEtablissement(): void {
-    this.router.navigateByUrl('/select-etablissement');
-  }
-
-  changerAnneeScolaire(): void {
-    this.afficherModaleAnnee.set(true);
-  }
-
-  changerPeriode(): void {
-    this.router.navigateByUrl('/choisir-periode');
+    addIcons({ businessOutline, calendarOutline, bookOutline, briefcaseOutline, logOutOutline, personCircleOutline });
   }
 
   seDeconnecter(): void {

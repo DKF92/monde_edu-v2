@@ -1,0 +1,202 @@
+<ion-modal class="modale-utilisateur" [isOpen]="isOpen" [backdropDismiss]="!enregistrement()" (didDismiss)="fermer()">
+  <ng-template>
+    <form class="contenu-modale" [formGroup]="formulaire" (ngSubmit)="enregistrer()" novalidate>
+      <header class="entete">
+        <span class="me-pastille teinte-orange"><ion-icon name="person-outline"></ion-icon></span>
+        <div>
+          <h1>{{ estCreation ? 'Nouvel utilisateur' : 'Modifier le compte' }}</h1>
+          <p>
+            @if (estCreation) {
+              Un mot de passe provisoire sera généré. L'utilisateur devra le changer à sa première connexion.
+            } @else {
+              {{ utilisateur?.prenoms }} {{ utilisateur?.nom }} · {{ utilisateur?.matricule }}
+            }
+          </p>
+        </div>
+        <button type="button" class="fermer" (click)="fermer()" aria-label="Fermer">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </header>
+
+      <div class="corps">
+        <!-- ================= Identite ================= -->
+        <section>
+          <h2>Identité</h2>
+          <div class="grille">
+            <div class="champ">
+              <label for="u-nom">Nom <span class="requis">*</span></label>
+              <input id="u-nom" class="saisie" formControlName="nom" autocomplete="off" [class.invalide]="erreur('nom')" (input)="effacerErreur('nom')" />
+              @if (erreur('nom'); as e) { <p class="erreur-champ">{{ e }}</p> }
+            </div>
+            <div class="champ">
+              <label for="u-prenoms">Prénoms</label>
+              <input id="u-prenoms" class="saisie" formControlName="prenoms" autocomplete="off" [class.invalide]="erreur('prenoms')" (input)="effacerErreur('prenoms')" />
+              @if (erreur('prenoms'); as e) { <p class="erreur-champ">{{ e }}</p> }
+            </div>
+            <div class="champ">
+              <label for="u-email">Adresse e-mail <span class="requis">*</span></label>
+              <input id="u-email" class="saisie" type="email" formControlName="email" autocomplete="off" inputmode="email" placeholder="nom@exemple.com" [class.invalide]="erreur('email')" (input)="effacerErreur('email')" />
+              @if (erreur('email'); as e) {
+                <p class="erreur-champ">{{ e }}</p>
+              } @else {
+                <p class="aide-champ">Identifiant de connexion.</p>
+              }
+            </div>
+            <div class="champ">
+              <label for="u-tel">Téléphone</label>
+              <input id="u-tel" class="saisie" type="tel" formControlName="telephone" autocomplete="off" inputmode="tel" placeholder="07 00 00 00 00" [class.invalide]="erreur('telephone')" (input)="effacerErreur('telephone')" />
+              @if (erreur('telephone'); as e) { <p class="erreur-champ">{{ e }}</p> }
+            </div>
+            <div class="champ">
+              <span class="libelle">Sexe</span>
+              <div class="segments" role="radiogroup" aria-label="Sexe">
+                @for (s of [{ v: 'M', l: 'Masculin' }, { v: 'F', l: 'Féminin' }]; track s.v) {
+                  <button type="button" role="radio" [attr.aria-checked]="formulaire.controls.sexe.value === s.v" [class.actif]="formulaire.controls.sexe.value === s.v" (click)="choisirValeur('sexe', s.v)">{{ s.l }}</button>
+                }
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= Postes ================= -->
+        <section>
+          <h2>Postes <span class="requis">*</span></h2>
+          <p class="intro">
+            @if (postesVerrouilles) {
+              <ion-icon name="lock-closed-outline"></ion-icon>
+              Vous ne pouvez pas modifier vos propres postes : demandez à un autre administrateur.
+            } @else {
+              Un utilisateur peut occuper plusieurs postes ; il choisira celui avec lequel il travaille à la connexion.
+            }
+          </p>
+          <div class="postes" role="group" aria-label="Postes">
+            @for (poste of postesAffiches; track poste.id) {
+              <button
+                type="button"
+                class="poste"
+                [class.choisi]="postesChoisis().has(poste.id)"
+                [disabled]="posteDesactive(poste)"
+                [attr.aria-pressed]="postesChoisis().has(poste.id)"
+                [title]="infoPoste(poste)"
+                (click)="basculerPoste(poste)"
+              >
+                <ion-icon [name]="postesChoisis().has(poste.id) ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
+                <span class="poste-nom">{{ poste.nom }}</span>
+                @if (poste.est_sensible) {
+                  <ion-icon name="lock-closed" class="cadenas"></ion-icon>
+                }
+              </button>
+            }
+          </div>
+          @if (erreur('postes'); as e) {
+            <p class="erreur-champ">{{ e }}</p>
+          } @else if (aDesPostesProteges && !options?.peut_gerer_sensibles) {
+            <p class="aide-champ"><ion-icon name="lock-closed"></ion-icon> Postes protégés : seul le Super admin peut les attribuer.</p>
+          }
+        </section>
+
+        <!-- ================= Niveaux / matieres (selon les postes) ================= -->
+        @if (afficherNiveaux() || afficherMatieres()) {
+          <section>
+            <h2>Affectations</h2>
+            <div class="grille">
+              @if (afficherNiveaux()) {
+                <div class="champ large">
+                  <label for="u-niveaux">Niveaux suivis (éducateur)</label>
+                  <app-selecteur-multiple
+                    idChamp="u-niveaux"
+                    icone="layers-outline"
+                    placeholder="Choisir les niveaux…"
+                    nomPluriel="niveaux"
+                    [options]="optionsNiveaux"
+                    [valeurs]="niveauxChoisis()"
+                    [invalide]="!!erreur('niveaux')"
+                    (valeursChange)="niveauxChoisis.set($event); effacerErreur('niveaux')"
+                  ></app-selecteur-multiple>
+                  @if (erreur('niveaux'); as e) {
+                    <p class="erreur-champ">{{ e }}</p>
+                  } @else {
+                    <p class="aide-champ">Pour l'année scolaire en cours : l'éducateur inscrit et suit les élèves de ces niveaux.</p>
+                  }
+                </div>
+              }
+              @if (afficherMatieres()) {
+                <div class="champ large">
+                  <label for="u-matieres">Matières enseignées (professeur)</label>
+                  <app-selecteur-multiple
+                    idChamp="u-matieres"
+                    icone="book-outline"
+                    placeholder="Choisir les matières…"
+                    nomPluriel="matières"
+                    [options]="optionsMatieres"
+                    [valeurs]="matieresChoisies()"
+                    [invalide]="!!erreur('matieres')"
+                    (valeursChange)="matieresChoisies.set($event); effacerErreur('matieres')"
+                  ></app-selecteur-multiple>
+                  @if (erreur('matieres'); as e) {
+                    <p class="erreur-champ">{{ e }}</p>
+                  } @else if (!optionsMatieres.length) {
+                    <p class="aide-champ">Aucune matière n'est encore créée dans l'établissement.</p>
+                  } @else {
+                    <p class="aide-champ">Matières que ce professeur enseigne dans l'établissement.</p>
+                  }
+                </div>
+              }
+            </div>
+          </section>
+        }
+
+        <!-- ================= Informations professionnelles ================= -->
+        <section>
+          <h2>Informations professionnelles</h2>
+          <div class="grille">
+            <div class="champ large">
+              <span class="libelle">Statut</span>
+              <div class="segments" role="radiogroup" aria-label="Statut du contrat">
+                @for (c of contrats; track c.valeur) {
+                  <button type="button" role="radio" [attr.aria-checked]="formulaire.controls.statut_contrat.value === c.valeur" [class.actif]="formulaire.controls.statut_contrat.value === c.valeur" (click)="choisirValeur('statut_contrat', c.valeur)">{{ c.libelle }}</button>
+                }
+              </div>
+            </div>
+            <div class="champ">
+              <label for="u-diplome">Diplôme</label>
+              <input id="u-diplome" class="saisie" formControlName="diplome" autocomplete="off" (input)="effacerErreur('diplome')" />
+              @if (erreur('diplome'); as e) { <p class="erreur-champ">{{ e }}</p> }
+            </div>
+            <div class="champ">
+              <label for="u-embauche">Date d'embauche</label>
+              <input id="u-embauche" class="saisie" type="date" formControlName="date_embauche" (input)="effacerErreur('date_embauche')" />
+              @if (erreur('date_embauche'); as e) { <p class="erreur-champ">{{ e }}</p> }
+            </div>
+            <div class="champ">
+              <label for="u-nationalite">Nationalité</label>
+              <input id="u-nationalite" class="saisie" formControlName="nationalite" autocomplete="off" placeholder="Ivoirienne" (input)="effacerErreur('nationalite')" />
+            </div>
+            <div class="champ">
+              <label for="u-quartier">Quartier</label>
+              <input id="u-quartier" class="saisie" formControlName="quartier" autocomplete="off" (input)="effacerErreur('quartier')" />
+            </div>
+          </div>
+        </section>
+
+        @if (erreurGenerale(); as e) {
+          <div class="alerte-erreur" role="alert">
+            <ion-icon name="alert-circle-outline"></ion-icon>
+            <span>{{ e }}</span>
+          </div>
+        }
+      </div>
+
+      <footer class="actions">
+        <button type="button" class="bouton-texte" (click)="fermer()" [disabled]="enregistrement()">Annuler</button>
+        <button type="submit" class="bouton-confirmer" [disabled]="enregistrement()">
+          @if (enregistrement()) {
+            <ion-spinner name="dots"></ion-spinner>
+          } @else {
+            {{ estCreation ? 'Créer le compte' : 'Enregistrer' }}
+          }
+        </button>
+      </footer>
+    </form>
+  </ng-template>
+</ion-modal>

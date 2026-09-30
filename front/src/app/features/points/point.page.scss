@@ -1,0 +1,67 @@
+// Complete les styles du point de caisse (../paiements/point-caisse.page.scss).
+
+.aujourdhui {
+  margin-top: 8px;
+}
+
+.ligne-filtres.caissier {
+  grid-template-columns: minmax(0, 360px);
+}
+
+// Liste des eleves d'une case.
+.liste-eleves {
+  .defilant {
+    overflow-x: auto;
+  }
+
+  .tab {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+
+    th {
+      padding: 8px 10px;
+      background: var(--me-fond);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      text-align: left;
+      color: var(--me-texte-doux);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 8px 10px;
+      border-top: 1px solid var(--me-bordure);
+      white-space: nowrap;
+    }
+
+    .d {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .matricule {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-weight: 700;
+    }
+
+    .reste {
+      color: #b35c00;
+      font-weight: 700;
+    }
+
+    .vide {
+      text-align: center;
+      color: var(--me-texte-doux);
+    }
+
+    tbody tr {
+      cursor: pointer;
+
+      &:hover {
+        background: var(--me-survol);
+      }
+    }
+  }
+}
