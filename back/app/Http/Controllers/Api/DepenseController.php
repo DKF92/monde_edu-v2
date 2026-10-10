@@ -4,15 +4,18 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AnneeScolaire;
+use App\Models\Banque;
 use App\Models\Depense;
 use App\Models\Etablissement;
 use App\Models\Reglement;
+use App\Models\User;
 use App\Support\BilanCaisse;
 use App\Support\Document;
 use App\Support\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -35,7 +38,7 @@ class DepenseController extends Controller
 
         $parCategorie = (clone $requete)->reorder()->selectRaw('categorie, SUM(montant) AS total, COUNT(*) AS nombre')
             ->groupBy('categorie')->get()->keyBy('categorie');
-        $page = (clone $requete)->with('payeur:id,name,prenoms')
+        $page = (clone $requete)->with(['payeur:id,name,prenoms', 'banque', 'retraitPar:id,name,prenoms'])
             ->paginate(min(max($request->integer('par_page', 10), 1), 200));
 
         return response()->json([
@@ -54,9 +57,12 @@ class DepenseController extends Controller
                 ])->values(),
             ],
             'categories' => collect(Depense::CATEGORIES)->map(fn ($l, $c) => ['valeur' => $c, 'libelle' => $l])->values(),
+            'par_source' => (clone $requete)->reorder()->selectRaw('source, SUM(montant) AS total, COUNT(*) AS nombre')->groupBy('source')->get()
+                ->mapWithKeys(fn ($r) => [$r->source => ['montant' => (int) $r->total, 'nombre' => (int) $r->nombre]]),
+            'banques' => Banque::orderBy('nom')->get(['id', 'nom', 'sigle'])->map(fn (Banque $b) => ['id' => $b->id, 'libelle' => trim(($b->sigle ? $b->sigle.' · ' : '').$b->nom)])->values(),
             'payeurs' => $request->user()->can('depenses.voir')
-                ? Depense::where('annee_scolaire_id', $this->anneeId($tenant))->with('payeur:id,name,prenoms')->get()
-                    ->pluck('payeur')->filter()->unique('id')->map(fn ($u) => ['id' => $u->id, 'nom' => trim($u->name.' '.$u->prenoms)])->values()
+                ? User::whereIn('id', Depense::where('annee_scolaire_id', $this->anneeId($tenant))->whereNotNull('payeur_id')->distinct()->select('payeur_id'))
+                    ->orderBy('name')->get(['id', 'name', 'prenoms'])->map(fn ($u) => ['id' => $u->id, 'nom' => trim($u->name.' '.$u->prenoms)])->values()
                 : [],
         ]);
     }
@@ -65,7 +71,7 @@ class DepenseController extends Controller
     public function document(Request $request, TenantContext $tenant)
     {
         [$requete, $filtres] = $this->requete($request, $tenant);
-        $depenses = $requete->with('payeur:id,name,prenoms')->get()->map(fn (Depense $d) => $this->presenter($d));
+        $depenses = $requete->with(['payeur:id,name,prenoms', 'banque', 'retraitPar:id,name,prenoms'])->get()->map(fn (Depense $d) => $this->presenter($d));
         $annee = AnneeScolaire::find($this->anneeId($tenant));
 
         return Document::repondre('pdf.depenses', Document::entete(Etablissement::findOrFail($tenant->id())) + [
@@ -74,13 +80,31 @@ class DepenseController extends Controller
             'titre' => 'Dépenses '.$this->libellePeriode($filtres, $annee),
             'depenses' => $depenses,
             'total' => (int) $depenses->sum('montant'),
-            'parCategorie' => $depenses->groupBy('categorie')->map(fn ($g, $c) => ['libelle' => Depense::CATEGORIES[$c] ?? $c, 'montant' => (int) $g->sum('montant'), 'nombre' => $g->count()])->values(),
+            // Bilans sous la liste : par source (caisse, chaque banque), par categorie, par personne ayant saisi.
+            'bilans' => [
+                'Bilan par source' => $this->bilan($depenses, fn ($d) => $d['source'] === 'banque' ? 'Banque '.($d['banque'] ?? '') : 'Caisse'),
+                'Bilan par catégorie' => $this->bilan($depenses, fn ($d) => $d['categorie_libelle']),
+                'Bilan par personne ayant saisi' => $this->bilan($depenses, fn ($d) => $d['payeur'] ?? '—'),
+            ],
             'genere_le' => now(),
             'edite_par' => trim($request->user()->name.' '.$request->user()->prenoms),
         ], 'depenses', $request->query('format'), 'landscape');
     }
 
     // ------------------------------------------------------------ Saisie
+
+    /** Listes du formulaire : banques actives et personnel habilite aux retraits bancaires. */
+    public function options(Request $request)
+    {
+        abort_unless($request->user()->can('depenses.gerer') || $request->user()->can('depenses.modifier'), 403);
+
+        return response()->json([
+            'banques' => Banque::where('is_active', true)->orderBy('nom')->get()
+                ->map(fn (Banque $b) => ['id' => $b->id, 'libelle' => trim(($b->sigle ? $b->sigle.' · ' : '').$b->nom.($b->numero_compte ? ' · '.$b->numero_compte : ''))])->values(),
+            'retraits' => $this->habilites()->values(),
+            'categories' => collect(Depense::CATEGORIES)->map(fn ($l, $c) => ['valeur' => $c, 'libelle' => $l])->values(),
+        ]);
+    }
 
     public function store(Request $request, TenantContext $tenant)
     {
@@ -99,14 +123,14 @@ class DepenseController extends Controller
         });
         $this->enregistrerJustificatif($request, $depense);
 
-        return response()->json(['data' => $this->presenter($depense->fresh('payeur'))], 201);
+        return response()->json(['data' => $this->presenter($depense->fresh(['payeur', 'banque', 'retraitPar']))], 201);
     }
 
     public function show(Request $request, int $id)
     {
         $depense = $this->trouver($request, $id);
 
-        return response()->json(['data' => $this->presenter($depense->load('payeur')) + [
+        return response()->json(['data' => $this->presenter($depense->load(['payeur', 'banque', 'retraitPar'])) + [
             'historique' => DB::table('depenses_historique as h')->leftJoin('users as u', 'u.id', '=', 'h.user_id')
                 ->where('h.depense_id', $depense->id)->orderByDesc('h.id')
                 ->get(['h.action', 'h.motif', 'h.avant', 'h.apres', 'h.created_at', 'u.name', 'u.prenoms'])
@@ -137,7 +161,7 @@ class DepenseController extends Controller
         $this->enregistrerJustificatif($request, $depense);
         $this->historiser($depense, 'modification', $data['motif'], $avant, $this->instantane($depense->fresh()), $request->user()->id);
 
-        return response()->json(['data' => $this->presenter($depense->fresh('payeur'))]);
+        return response()->json(['data' => $this->presenter($depense->fresh(['payeur', 'banque', 'retraitPar']))]);
     }
 
     public function destroy(Request $request, int $id)
@@ -202,19 +226,22 @@ class DepenseController extends Controller
             ->when($periode['au'], fn ($x, $d) => $x->whereDate($colonne, '<=', $d));
         $encaissements = $dansPeriode(Reglement::where('annee_scolaire_id', $annee->id), 'date_paiement')
             ->selectRaw("DATE_FORMAT(date_paiement, '%Y-%m') AS mois, SUM(montant_total) AS total")->groupBy('mois')->pluck('total', 'mois');
-        $depenses = $dansPeriode(Depense::where('annee_scolaire_id', $annee->id), 'date_depense')
+        // Solde de caisse (V1) : seules les sorties de caisse ; les depenses banque sont a part.
+        $depenses = $dansPeriode(Depense::where('annee_scolaire_id', $annee->id)->where('source', 'caisse'), 'date_depense')
             ->selectRaw("DATE_FORMAT(date_depense, '%Y-%m') AS mois, categorie, SUM(montant) AS total")->groupBy('mois', 'categorie')->get();
+        $banque = $dansPeriode(Depense::where('annee_scolaire_id', $annee->id)->where('source', 'banque'), 'date_depense')
+            ->selectRaw("DATE_FORMAT(date_depense, '%Y-%m') AS mois, SUM(montant) AS total")->groupBy('mois')->pluck('total', 'mois');
 
         // Mois de la periode (annee scolaire : tous ses mois).
         $mois = collect(BilanCaisse::moisDeLAnnee($annee))
             ->filter(fn ($m) => (! $periode['du'] || $m['valeur'] >= substr($periode['du'], 0, 7)) && (! $periode['au'] || $m['valeur'] <= substr($periode['au'], 0, 7)));
-        $lignes = $mois->map(function ($m) use ($encaissements, $depenses) {
+        $lignes = $mois->map(function ($m) use ($encaissements, $depenses, $banque) {
             $duMois = $depenses->where('mois', $m['valeur']);
             $salaires = (int) $duMois->where('categorie', 'salaires')->sum('total');
             $total = (int) $duMois->sum('total');
             $entrees = (int) ($encaissements[$m['valeur']] ?? 0);
 
-            return ['mois' => $m['libelle'], 'encaissements' => $entrees, 'salaires' => $salaires, 'autres' => $total - $salaires, 'depenses' => $total, 'solde' => $entrees - $total];
+            return ['mois' => $m['libelle'], 'encaissements' => $entrees, 'salaires' => $salaires, 'autres' => $total - $salaires, 'depenses' => $total, 'solde' => $entrees - $total, 'banque' => (int) ($banque[$m['valeur']] ?? 0)];
         })->values();
 
         $totalEntrees = (int) $encaissements->sum();
@@ -228,6 +255,8 @@ class DepenseController extends Controller
             'encaissements' => $totalEntrees,
             'depenses' => $totalSorties,
             'solde' => $totalEntrees - $totalSorties,
+            // Depenses payees par la banque (hors solde de caisse).
+            'depenses_banque' => (int) $banque->sum(),
             'par_categorie' => collect(Depense::CATEGORIES)->map(fn ($libelle, $cle) => [
                 'categorie' => $cle, 'libelle' => $libelle, 'montant' => (int) $depenses->where('categorie', $cle)->sum('total'),
             ])->values(),
@@ -248,6 +277,8 @@ class DepenseController extends Controller
             'au' => ['nullable', 'date'],
             'categorie' => ['nullable', Rule::in(array_keys(Depense::CATEGORIES))],
             'mode' => ['nullable', Rule::in(array_keys(Depense::MODES))],
+            'source' => ['nullable', Rule::in(array_keys(Depense::SOURCES))],
+            'banque_id' => ['nullable', 'integer'],
             'payeur_id' => ['nullable', 'integer'],
             'recherche' => ['nullable', 'string', 'max:100'],
         ]);
@@ -269,6 +300,8 @@ class DepenseController extends Controller
             ->when($f['au'], fn (Builder $q, $d) => $q->whereDate('date_depense', '<=', $d))
             ->when($f['categorie'] ?? null, fn (Builder $q, $c) => $q->where('categorie', $c))
             ->when($f['mode'] ?? null, fn (Builder $q, $m) => $q->where('mode_paiement', $m))
+            ->when($f['source'] ?? null, fn (Builder $q, $s) => $q->where('source', $s))
+            ->when($f['banque_id'] ?? null, fn (Builder $q, $b) => $q->where('banque_id', $b))
             ->when($f['payeur_id'] ?? null, fn (Builder $q, $p) => $q->where('payeur_id', $p))
             ->when($texte !== '', fn (Builder $q) => $q->where(fn (Builder $w) => $w->where('libelle', 'like', "%{$texte}%")
                 ->orWhere('beneficiaire', 'like', "%{$texte}%")->orWhere('numero', 'like', "%{$texte}%")
@@ -278,9 +311,34 @@ class DepenseController extends Controller
         return [$requete, $f];
     }
 
+    /**
+     * Personnel habilite aux retraits bancaires : comptes dont un poste de
+     * l'etablissement a le droit « Retraits bancaires ».
+     *
+     * @return \Illuminate\Support\Collection<int, array{id: int, nom: string}>
+     */
+    private function habilites(): \Illuminate\Support\Collection
+    {
+        return DB::table('users as u')
+            ->join('model_has_roles as mr', fn ($j) => $j->on('mr.model_id', '=', 'u.id')->where('mr.model_type', (new \App\Models\User)->getMorphClass()))
+            ->join('roles as r', 'r.id', '=', 'mr.role_id')
+            ->join('role_has_permissions as rp', 'rp.role_id', '=', 'r.id')
+            ->join('permissions as p', 'p.id', '=', 'rp.permission_id')
+            ->where('r.etablissement_id', app(TenantContext::class)->id())->where('r.is_active', true)
+            ->where('p.name', 'depenses.retrait_banque')->whereNull('u.deleted_at')->where('u.statut', 'actif')
+            ->distinct()->orderBy('u.name')->orderBy('u.prenoms')->get(['u.id', 'u.name', 'u.prenoms'])
+            ->map(fn ($u) => ['id' => (int) $u->id, 'nom' => trim($u->prenoms.' '.$u->name)]);
+    }
+
     private function valider(Request $request, bool $modification = false): array
     {
+        $banque = $request->input('source') === 'banque';
+
         return $request->validate(array_merge($modification ? ['motif' => ['required', 'string', 'min:3', 'max:500']] : [], [
+            // Depense caisse (V1) ou banque : la banque et la personne qui a fait le retrait.
+            'source' => ['nullable', Rule::in(array_keys(Depense::SOURCES))],
+            'banque_id' => [Rule::requiredIf($banque), 'nullable', 'integer', Rule::exists('banques', 'id')->where('etablissement_id', app(TenantContext::class)->id())],
+            'retrait_par_id' => [Rule::requiredIf($banque), 'nullable', 'integer', Rule::in($this->habilites()->pluck('id')->all())],
             'date_depense' => ['required', 'date', 'before_or_equal:today'],
             'categorie' => ['required', Rule::in(array_keys(Depense::CATEGORIES))],
             'libelle' => ['required', 'string', 'max:300'],
@@ -297,12 +355,21 @@ class DepenseController extends Controller
             'montant.min' => 'Le montant doit être positif.',
             'justificatif.mimes' => 'Le justificatif doit être une image ou un PDF.',
             'justificatif.max' => 'Le justificatif ne doit pas dépasser 5 Mo.',
+            'banque_id.required' => 'Choisissez la banque.',
+            'banque_id.exists' => 'Cette banque n\'existe pas.',
+            'retrait_par_id.required' => 'Indiquez qui a fait le retrait.',
+            'retrait_par_id.in' => 'Cette personne n\'est pas habilitée aux retraits bancaires.',
         ]);
     }
 
     private function champs(array $data): array
     {
+        $banque = ($data['source'] ?? 'caisse') === 'banque';
+
         return [
+            'source' => $banque ? 'banque' : 'caisse',
+            'banque_id' => $banque ? (int) $data['banque_id'] : null,
+            'retrait_par_id' => $banque ? (int) $data['retrait_par_id'] : null,
             'date_depense' => $data['date_depense'],
             'categorie' => $data['categorie'],
             'libelle' => trim($data['libelle']),
@@ -349,6 +416,9 @@ class DepenseController extends Controller
             'categorie' => $d->categorie,
             'libelle' => $d->libelle,
             'montant' => (int) $d->montant,
+            'source' => $d->source,
+            'banque_id' => $d->banque_id,
+            'retrait_par_id' => $d->retrait_par_id,
             'mode_paiement' => $d->mode_paiement,
             'beneficiaire' => $d->beneficiaire,
             'piece_comptable' => $d->piece_comptable,
@@ -372,6 +442,13 @@ class DepenseController extends Controller
         ]);
     }
 
+    /** Lignes [libelle, nombre, montant] triees par montant decroissant. */
+    private function bilan(Collection $depenses, \Closure $cle): array
+    {
+        return $depenses->groupBy($cle)->map(fn ($g, $libelle) => ['libelle' => (string) $libelle, 'nombre' => $g->count(), 'montant' => (int) $g->sum('montant')])
+            ->sortByDesc('montant')->values()->all();
+    }
+
     private function presenter(Depense $d): array
     {
         return [
@@ -382,6 +459,11 @@ class DepenseController extends Controller
             'categorie_libelle' => Depense::CATEGORIES[$d->categorie] ?? $d->categorie,
             'libelle' => $d->libelle,
             'montant' => (int) $d->montant,
+            'source' => $d->source ?? 'caisse',
+            'banque_id' => $d->banque_id,
+            'banque' => $d->banque ? trim(($d->banque->sigle ? $d->banque->sigle.' · ' : '').$d->banque->nom) : null,
+            'retrait_par_id' => $d->retrait_par_id,
+            'retrait_par' => $d->retraitPar ? trim($d->retraitPar->prenoms.' '.$d->retraitPar->name) : null,
             'mode' => $d->mode_paiement,
             'beneficiaire' => $d->beneficiaire,
             'piece_comptable' => $d->piece_comptable,

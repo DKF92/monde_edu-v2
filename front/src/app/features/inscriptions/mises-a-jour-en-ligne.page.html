@@ -1,0 +1,135 @@
+<ion-content class="me-page-admin">
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/inscriptions')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Inscriptions
+        </button>
+        <h1>Mises à jour en ligne</h1>
+        <p>
+          Ce que « Mettre à jour » a repris du site de l'État{{ resultat()?.annee ? ' en ' + resultat()?.annee : '' }}.
+          Le niveau et le statut affecté ne changent pas directement après le choix de la classe ou un paiement : ils attendent ici.
+        </p>
+      </div>
+    </header>
+
+    <div class="barre-filtres">
+      <div class="onglets" role="tablist">
+        <button type="button" role="tab" [class.actif]="etat() === 'a_traiter'" [attr.aria-selected]="etat() === 'a_traiter'" (click)="choisirEtat('a_traiter')">
+          À traiter <span class="nombre">{{ resultat()?.compteurs?.a_traiter ?? '…' }}</span>
+        </button>
+        <button type="button" role="tab" [class.actif]="etat() === 'introuvables'" [attr.aria-selected]="etat() === 'introuvables'" (click)="choisirEtat('introuvables')" title="Déjà scannés sans inscription en ligne trouvée : rescannés à chaque mise à jour">
+          Introuvables en ligne <span class="nombre attention">{{ resultat()?.compteurs?.introuvables ?? '…' }}</span>
+        </button>
+        <button type="button" role="tab" [class.actif]="etat() === 'toutes'" [attr.aria-selected]="etat() === 'toutes'" (click)="choisirEtat('toutes')">
+          Toutes <span class="nombre">{{ resultat()?.compteurs?.toutes ?? '…' }}</span>
+        </button>
+      </div>
+      <label class="recherche">
+        <ion-icon name="search-outline"></ion-icon>
+        <input type="search" placeholder="Matricule, nom ou prénoms" [value]="recherche()" (input)="chercher($event)" aria-label="Rechercher un élève" />
+      </label>
+    </div>
+
+    @if (chargement() && !resultat()) {
+      <section class="me-carte bloc"><ion-skeleton-text [animated]="true" style="width: 100%; height: 160px"></ion-skeleton-text></section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les mises à jour</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (resultat()) {
+      @let r = resultat()!;
+      @if (!r.data.length) {
+        <section class="me-carte">
+          <div class="me-etat-vide">
+            <ion-icon name="globe-outline"></ion-icon>
+            <strong>{{ etat() === 'a_traiter' ? 'Aucune mise à jour en attente' : etat() === 'introuvables' ? 'Aucun élève introuvable en ligne' : 'Aucune mise à jour pour le moment' }}</strong>
+            <span>Les mises à jour se font depuis la liste des inscriptions, bouton « Mettre à jour ».</span>
+          </div>
+        </section>
+      }
+
+      <div class="liste" [class.attenue]="chargement()">
+        @for (m of r.data; track m.id) {
+          <article class="me-carte maj" [class.a-traiter]="m.a_traiter" [class.introuvable]="m.type === 'introuvable'">
+            <div class="maj-entete">
+              <button type="button" class="eleve" (click)="ouvrir(m)" [disabled]="!m.inscription_id">
+                <strong>{{ m.eleve ? m.eleve.nom + ' ' + m.eleve.prenoms : 'Élève supprimé' }}</strong>
+                <small>
+                  <span class="matricule">{{ m.eleve?.matricule }}</span>
+                  @if (m.niveau) { · {{ m.classe ?? m.niveau }} }
+                </small>
+              </button>
+              <div class="etats">
+                @if (m.statut !== null) {
+                  <span [class]="'me-badge ' + tons[m.statut]" title="Statut actuel de l'inscription">{{ libellesStatut[m.statut] }}</span>
+                } @else {
+                  <span class="me-badge">Inscription annulée</span>
+                }
+                @if (m.type === 'introuvable') {
+                  <span class="me-badge attention"><ion-icon name="globe-outline"></ion-icon> Introuvable en ligne</span>
+                } @else if (m.a_traiter) {
+                  <span class="me-badge attention"><ion-icon name="time-outline"></ion-icon> À traiter</span>
+                } @else if (m.en_attente) {
+                  <span class="me-badge succes"><ion-icon name="checkmark-circle-outline"></ion-icon> Traitée</span>
+                }
+              </div>
+            </div>
+
+            @if (m.type === 'introuvable') {
+              <p class="introuvable-texte">
+                Aucune inscription trouvée sur le site de l'État pour ce matricule
+                ({{ m.tentatives }} scan{{ m.tentatives > 1 ? 's' : '' }}). Vérifiez le matricule ou l'inscription en ligne de l'élève :
+                il sera scanné de nouveau à la prochaine mise à jour.
+              </p>
+            }
+            <ul class="changements">
+              @for (c of m.changements; track $index) {
+                <li [class.attente]="!c.applique && !c.traite">
+                  <span class="libelle">{{ c.libelle }}</span>
+                  <span class="valeurs">
+                    @if (c.avant !== null && c.avant !== '') { <span class="avant">{{ valeur(c.avant) }}</span> <ion-icon name="arrow-forward-outline"></ion-icon> }
+                    <strong>{{ valeur(c.apres) }}</strong>
+                  </span>
+                  <span class="etat-element">
+                    @if (c.applique) { Appliqué } @else if (c.traite) { Reporté } @else { En attente }
+                  </span>
+                </li>
+              }
+            </ul>
+            @for (rq of m.remarques; track $index) {
+              @if (rq.includes('autre établissement')) { <p class="remarque">{{ rq }}</p> }
+            }
+
+            <div class="maj-pied">
+              <small>
+                {{ m.type === 'introuvable' ? 'Dernier scan le ' : '' }}{{ dateHeure(m.date) }}{{ m.auteur ? ' · ' + m.auteur : '' }}
+                @if (m.type !== 'introuvable') { · statut lors de la mise à jour : {{ libellesStatut[m.statut_lors] }} }
+              </small>
+              <div class="actions">
+                @if (m.peut_modifier) {
+                  <button type="button" class="me-bouton-principal" (click)="modifier(m)">
+                    <ion-icon name="create-outline"></ion-icon> Modifier
+                  </button>
+                }
+                @if (m.peut_supprimer) {
+                  <button type="button" class="me-bouton-secondaire danger" (click)="supprimerPaiements(m)" [disabled]="action() === m.id">
+                    @if (action() === m.id) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="trash-outline"></ion-icon> Supprimer les paiements }
+                  </button>
+                }
+              </div>
+            </div>
+          </article>
+        }
+      </div>
+
+      @if (r.total) {
+        <app-pagination [total]="r.total" [page]="page()" [taille]="taille()" (pageChange)="allerPage($event)" (tailleChange)="changerTaille($event)"></app-pagination>
+      }
+    }
+  </div>
+</ion-content>

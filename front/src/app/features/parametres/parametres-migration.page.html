@@ -1,0 +1,235 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/parametres')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Paramètres
+        </button>
+        <h1>Migration V1</h1>
+        <p>Reprise des données de la V1 dans la base de migration, puis choix de la base utilisée par l'application.</p>
+      </div>
+    </header>
+
+    @if (basculee()) {
+      <section class="me-carte bloc bascule">
+        <ion-icon name="checkmark-circle-outline"></ion-icon>
+        <div>
+          <strong>L'application utilise maintenant la base « {{ suivi()?.cible }} ».</strong>
+          <p>Reconnectez-vous avec le même e-mail et le même mot de passe.</p>
+        </div>
+        <button type="button" class="me-bouton-principal" (click)="seReconnecter()"><ion-icon name="log-in-outline"></ion-icon> Se reconnecter</button>
+      </section>
+    }
+
+    @if (chargement() && !etat()) {
+      <section class="me-carte bloc"><ion-skeleton-text [animated]="true" style="width: 100%; height: 160px"></ion-skeleton-text></section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger l'état de la migration</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (etat()) {
+      @let e = etat()!;
+      @if (!e.serveur_local) {
+        <p class="me-note"><ion-icon name="information-circle-outline"></ion-icon><span>La migration se fait sur le serveur de l'école.</span></p>
+      }
+
+      <!-- Bases de donnees : liste horizontale, selection, bascule -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <div>
+            <h2>Base de données utilisée</h2>
+            <p>Sélectionnez une base puis basculez : vous serez déconnecté immédiatement et vous vous reconnecterez sur la base choisie.</p>
+          </div>
+        </div>
+
+        <div class="bases" role="radiogroup" aria-label="Bases de données">
+          @for (b of e.bases; track b.nom) {
+            <button type="button" class="base" role="radio" [attr.aria-checked]="selection() === b.nom" [class.choisie]="selection() === b.nom" [class.actuelle]="b.actuelle" (click)="choisir(b)">
+              <span class="base-tete">
+                <ion-icon name="server-outline"></ion-icon>
+                <strong>{{ b.nom }}</strong>
+              </span>
+              <span class="base-etat">
+                @if (b.actuelle) { <span class="me-badge succes">Utilisée</span> }
+                @if (b.nom === cible()) { <span class="me-badge info">Reçoit la V1</span> }
+                @if (b.vide) { <span class="me-badge">Vide</span> }
+              </span>
+              <small>
+                @if (b.v2 && !b.vide) {
+                  {{ b.etablissements.length }} établissement{{ b.etablissements.length > 1 ? 's' : '' }} · {{ nombre(b.eleves) }} élèves
+                } @else if (b.vide) {
+                  {{ b.v2 ? 'tables vides' : 'aucune table' }}
+                } @else {
+                  pas une base V2
+                }
+              </small>
+              @if (b.v2 && b.etablissements.length) { <small class="etabs">{{ b.etablissements.join(' · ') }}</small> }
+            </button>
+          }
+        </div>
+
+        <div class="action-bascule">
+          @if (blocageBascule(); as raison) {
+            <span class="me-aide-champ">{{ raison }}</span>
+          } @else {
+            <span class="me-aide-champ">L'application utilisera « {{ selection() }} » pour tout le monde.</span>
+          }
+          <button type="button" class="me-bouton-principal" (click)="basculerSelection()" [disabled]="!!blocageBascule() || basculee()">
+            <ion-icon name="swap-horizontal-outline"></ion-icon> Basculer sur cette base
+          </button>
+        </div>
+      </section>
+
+      <!-- Lancer la migration -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <div>
+            <h2>Lancer la migration</h2>
+            <p>Dumps V1 lus à la racine du dossier <code>back</code>. L'application reste sur « {{ e.base_actuelle }} » pendant la reprise.</p>
+          </div>
+        </div>
+
+        <ul class="dumps">
+          @for (d of e.dumps; track d.nom) {
+            <li><ion-icon name="document-text-outline"></ion-icon> <strong>{{ d.nom }}</strong> <small>{{ taille(d.taille) }} · {{ d.date }}</small></li>
+          } @empty {
+            <li class="manque"><ion-icon name="alert-circle-outline"></ion-icon> Aucun fichier .sql à la racine de <code>back</code> : déposez-y les dumps V1.</li>
+          }
+        </ul>
+
+        <div class="me-champ champ-cible">
+          <label for="cible">Base qui reçoit les données V1</label>
+          <input id="cible" class="me-saisie" [value]="cible()" (input)="cible.set(valeurTexte($event))" [disabled]="enCours()" />
+          <span class="me-aide-champ">Son nom doit contenir « migration » ; ce ne peut pas être la base utilisée.</span>
+        </div>
+
+        <p class="avertissement">
+          <ion-icon name="warning-outline"></ion-icon>
+          <span>
+            À chaque lancement, toutes les tables de « {{ cible() }} » sont <strong>vidées</strong> (la base et sa structure restent)
+            @if (ciblePresente(); as b) { @if (b.v2) { ({{ b.etablissements.length }} établissement{{ b.etablissements.length > 1 ? 's' : '' }}, {{ nombre(b.eleves) }} élèves aujourd'hui) } }
+            puis remplie avec la V1 seule. Votre compte y est recopié comme Super admin pour pouvoir vous y connecter.
+          </span>
+        </p>
+
+        <div class="options">
+          <label>
+            <button type="button" class="me-interrupteur" role="switch" [class.actif]="essai()" [attr.aria-checked]="essai()" [disabled]="enCours()" (click)="essai.set(!essai())"><span></span></button>
+            Essai : tout faire puis annuler (rapport seulement)
+          </label>
+        </div>
+
+        @if (erreurLancement(); as m) { <p class="me-erreur-champ">{{ m }}</p> }
+
+        <button type="button" class="me-bouton-principal" (click)="lancer()" [disabled]="lancement() || enCours() || basculee() || !e.dumps.length || !e.serveur_local || !cible().trim()">
+          @if (lancement() || enCours()) { <ion-spinner name="dots"></ion-spinner> Migration en cours… } @else { <ion-icon name="play-outline"></ion-icon> Lancer la migration }
+        </button>
+      </section>
+    }
+
+    <!-- Suivi en temps reel -->
+    @if (suivi(); as s) {
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <div>
+            <h2>
+              @if (!s.termine) { Migration en cours } @else if (s.succes) { Migration terminée } @else { Migration échouée }
+              @if (s.essai) { <span class="me-badge">essai</span> }
+            </h2>
+            <p>Base « {{ s.cible }} » · lancée le {{ dateHeure(s.debut) }}</p>
+          </div>
+          @if (!s.termine) { <ion-spinner name="crescent"></ion-spinner> }
+          @else if (s.succes) { <span class="me-badge succes"><ion-icon name="checkmark-circle-outline"></ion-icon> Réussie</span> }
+          @else { <span class="me-badge attention"><ion-icon name="alert-circle-outline"></ion-icon> Échec</span> }
+        </div>
+
+        <div class="journal" #journal>
+          @for (l of s.lignes; track $index) { <div>{{ l }}</div> } @empty { <div>Démarrage…</div> }
+        </div>
+
+        @if (s.resume; as r) {
+          @if (r.erreur) { <p class="me-erreur-champ">Échec, rien n'a été enregistré : {{ r.erreur }}</p> }
+
+          @if (s.succes && !s.essai && !basculee()) {
+            <div class="passer">
+              <div>
+                <strong>Passer sur la base migrée « {{ s.cible }} » ?</strong>
+                <small>Vous serez déconnecté immédiatement, puis vous vous reconnecterez sur cette base (même e-mail, même mot de passe).</small>
+              </div>
+              <button type="button" class="me-bouton-principal" (click)="passerSurMigree(s.cible)"><ion-icon name="swap-horizontal-outline"></ion-icon> Passer sur la base migrée</button>
+            </div>
+          }
+
+          <div class="resultats">
+            <div>
+              <h3>Volumes repris</h3>
+              <table class="tableau">
+                <tbody>
+                  @for (c of r.compteurs | keyvalue: sansTri; track c.key) {
+                    <tr><td>{{ c.key }}</td><td class="nombre">{{ nombre(c.value) }}</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <div>
+              <h3>Contrôles V1 / V2 <small>{{ ecarts() ? ecarts() + ' écart(s)' : 'tout est identique' }}</small></h3>
+              <table class="tableau">
+                <thead><tr><th>Contrôle</th><th class="nombre">V1</th><th class="nombre">V2</th></tr></thead>
+                <tbody>
+                  @for (c of r.controles; track $index) {
+                    <tr [class.ecart]="c.v1 !== c.v2"><td>{{ c.libelle }}</td><td class="nombre">{{ nombre(c.v1) }}</td><td class="nombre">{{ nombre(c.v2) }}</td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          @if (r.anomalies.length) {
+            <h3>Anomalies relevées</h3>
+            <ul class="anomalies">
+              @for (a of r.anomalies; track a.code + a.libelle) {
+                <li><span class="code">{{ a.code }}</span> {{ a.libelle }} <strong>{{ nombre(a.nombre) }}</strong></li>
+              }
+            </ul>
+          }
+
+          @if (!basculee()) {
+            <div class="fichiers">
+              <button type="button" class="me-bouton-secondaire" (click)="telecharger(r.rapport)"><ion-icon name="document-text-outline"></ion-icon> Rapport détaillé</button>
+              @if (r.mots_de_passe) {
+                <button type="button" class="me-bouton-secondaire" (click)="telecharger(r.mots_de_passe)"><ion-icon name="key-outline"></ion-icon> Mots de passe provisoires</button>
+              }
+            </div>
+          }
+        }
+      </section>
+    }
+
+    @if (etat(); as e) {
+      @if (e.derniers.length) {
+        <section class="me-carte bloc">
+          <h2 class="titre-simple">Dernières migrations</h2>
+          <ul class="derniers">
+            @for (d of e.derniers; track d.rapport) {
+              <li>
+                <div>
+                  <strong>{{ dateHeure(d.date) }} · {{ d.cible }}</strong>
+                  <small>
+                    {{ d.essai ? 'essai' : 'réelle' }} · {{ d.duree }} s ·
+                    @if (d.erreur) { échec : {{ d.erreur }} } @else { {{ d.ecarts ? d.ecarts + ' contrôle(s) sur ' + d.controles + ' avec écart' : 'contrôles identiques' }} }
+                  </small>
+                </div>
+                @if (d.rapport) { <button type="button" class="me-lien" (click)="telecharger(d.rapport)">Rapport</button> }
+                @if (d.mots_de_passe) { <button type="button" class="me-lien" (click)="telecharger(d.mots_de_passe)">Mots de passe</button> }
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    }
+  </div>
+</ion-content>

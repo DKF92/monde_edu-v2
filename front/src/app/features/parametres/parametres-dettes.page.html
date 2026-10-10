@@ -1,0 +1,68 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/parametres')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Paramètres
+        </button>
+        <h1>Dettes</h1>
+        <p>Restes des années précédentes pris en compte comme dette de l'élève.</p>
+      </div>
+    </header>
+
+    @if (chargement()) {
+      <section class="me-carte"><ion-skeleton-text [animated]="true" style="width: 100%; height: 120px"></ion-skeleton-text></section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les paramètres</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else {
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-orange"><ion-icon name="wallet-outline"></ion-icon></span>
+          <div>
+            <h2>Années de dettes prises en compte</h2>
+            <p>
+              Le reste à payer d'une année devient une dette à la réinscription de l'élève. Choisissez sur combien d'années en arrière
+              cette dette compte : caisse, reste à payer, liste et point des dettes, réductions sur dettes.
+            </p>
+          </div>
+        </div>
+
+        <div class="choix-nombre">
+          <button type="button" class="me-action" (click)="changer(-1)" [disabled]="nombre() <= 1" aria-label="Une année de moins"><ion-icon name="remove-outline"></ion-icon></button>
+          <input class="me-saisie" type="number" min="1" max="20" [value]="nombre()" (change)="saisir($event)" aria-label="Nombre d'années" />
+          <button type="button" class="me-action" (click)="changer(1)" [disabled]="nombre() >= 20" aria-label="Une année de plus"><ion-icon name="add-outline"></ion-icon></button>
+          <span>année{{ nombre() > 1 ? 's' : '' }} en arrière</span>
+        </div>
+
+        <p class="me-note">
+          <ion-icon name="information-circle-outline"></ion-icon>
+          <span>
+            @if (nombre() === 1) {
+              Seule la dernière dette compte : le reste de l'année {{ anneesConcernees()[0] }}.
+            } @else {
+              Les dettes de {{ anneesConcernees().join(', ') }} comptent.
+            }
+            Les dettes plus anciennes restent enregistrées mais ne sont plus demandées.
+            @if (donnees()?.annee) { (Année de travail : {{ donnees()?.annee }}.) }
+          </span>
+        </p>
+      </section>
+
+      <div class="me-barre-enregistrer">
+        <span class="etat" [class.modifie]="modifie()">{{ modifie() ? 'Modifications non enregistrées' : 'Tout est enregistré' }}</span>
+        @if (modifie()) {
+          <button type="button" class="me-bouton-texte" (click)="annuler()" [disabled]="enregistrement()">Annuler</button>
+        }
+        <button type="button" class="me-bouton-principal" (click)="enregistrer()" [disabled]="!modifie() || enregistrement()">
+          @if (enregistrement()) { <ion-spinner name="dots"></ion-spinner> } @else { Enregistrer }
+        </button>
+      </div>
+    }
+  </div>
+</ion-content>

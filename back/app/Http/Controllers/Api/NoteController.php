@@ -19,7 +19,9 @@ use Illuminate\Validation\ValidationException;
 /**
  * Saisie des notes (V1 Note/new_note, Moyenne/enr_moy) :
  * - une evaluation = numero dans la periode, notee sur 10, 20 ou 40 ;
- * - notes.saisir : ses classes et matieres (professeur) ; moyennes.gerer : toutes ;
+ * - notes.saisir : ses classes et matieres (professeur) ; notes.saisir_toutes :
+ *   toutes, a la place des professeurs (informaticien) ; l'educateur ne saisit
+ *   que la conduite (Absences, droit absences.gerer) ;
  * - les moyennes arretees par le directeur (Parametres > Arret des notes,
  *   droit notes.arreter) bloquent les notes (V1 arrete) ; une periode
  *   cloturee n'accepte plus de notes. Voir App\Support\ArretNotes.
@@ -39,7 +41,7 @@ class NoteController extends Controller
         $classes = Classe::where('classes.annee_scolaire_id', $anneeId)
             ->when($visibles !== null, fn ($q) => $q->whereIn('classes.id', $visibles))
             ->with('niveau:id,libelle,ordre,cycle')->get()
-            ->sortBy(fn (Classe $c) => [$c->niveau?->ordre, $c->libelle])->values();
+            ->sortBy(fn (Classe $c) => [$c->niveau?->ordre, \App\Support\NomClasse::cleTri($c->libelle)])->values();
 
         return response()->json([
             'periodes' => $this->periodes($anneeId),
@@ -236,6 +238,6 @@ class NoteController extends Controller
     private function autoriser(Request $request): void
     {
         $u = $request->user();
-        abort_unless($u->can('notes.saisir') || $u->can('notes.voir') || $u->can('notes.arreter'), 403);
+        abort_unless($u->canAny(['notes.saisir', 'notes.saisir_toutes', 'notes.voir', 'notes.arreter']), 403);
     }
 }

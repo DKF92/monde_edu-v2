@@ -9,6 +9,8 @@ use App\Support\BilanCaisse;
 use App\Support\Document;
 use App\Support\PorteePedagogique;
 use App\Support\Points;
+use App\Support\PointsFinances;
+use App\Support\Reductions;
 use App\Support\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,19 +30,19 @@ class PointController extends Controller
     {
         $d = $this->contexte($request, $tenant, 'inscriptions');
 
-        return response()->json(['data' => $d + Points::inscriptions($d['annee_id'], $d['periode'], $d['criteres'], $this->niveaux($request, $d['annee_id']), $request->boolean('general'))]);
+        return response()->json(['data' => $d + Points::inscriptions($d['annee_id'], $d['periode'], $d['criteres'], $this->niveaux($request, $d['annee_id']), $request->boolean('general'), $d['agent'] === 'tous')]);
     }
 
     public function inscriptionsDocument(Request $request, TenantContext $tenant)
     {
         $d = $this->contexte($request, $tenant, 'inscriptions');
         $general = $request->boolean('general');
-        $d += Points::inscriptions($d['annee_id'], $d['periode'], $d['criteres'], $this->niveaux($request, $d['annee_id']), $general);
+        $d += Points::inscriptions($d['annee_id'], $d['periode'], $d['criteres'], $this->niveaux($request, $d['annee_id']), $general, $d['agent'] === 'tous');
 
         return $this->document($request, $tenant, $d, $general ? 'Point général des inscrits' : 'Point des inscrits', 'point-inscrits');
     }
 
-    /** Eleves d'une case (oeil) : etat paye / cas / non_paye, colonne affecte. */
+    /** Eleves d'une case (oeil) : etat paye / cas / non_paye / sans_classe, colonne affecte. */
     public function inscriptionsEleves(Request $request, TenantContext $tenant)
     {
         $d = $this->contexte($request, $tenant, 'inscriptions');
@@ -57,7 +59,7 @@ class PointController extends Controller
 
         if ($request->filled('format')) {
             return Document::repondre('pdf.point-eleves', ['titre' => $titre, 'annee' => $d['annee'], 'eleves' => $eleves, 'genere_le' => now(), 'edite_par' => trim($request->user()->name.' '.$request->user()->prenoms)]
-                + Document::entete(Etablissement::findOrFail($tenant->id())), 'liste-inscrits', $request->query('format'), 'landscape');
+                + Document::entete(Etablissement::findOrFail($tenant->id())), 'liste-inscrits', $request->query('format'));
         }
 
         return response()->json(['titre' => $titre, 'data' => $eleves->values()]);
@@ -85,14 +87,90 @@ class PointController extends Controller
         return $this->document($request, $tenant, $d, $general ? 'Point général des dettes' : 'Point des dettes', 'point-dettes');
     }
 
+    // ------------------------------------------------------------ Reductions
+
+    /** Point des reductions (date d'octroi) : par type ; general = genre, niveau, classe, donneur d'ordre. */
+    public function reductions(Request $request, TenantContext $tenant)
+    {
+        $d = $this->contexte($request, $tenant, 'reductions');
+
+        return response()->json(['data' => $d + $this->pointReductions($d, $request->boolean('general'))]);
+    }
+
+    public function reductionsDocument(Request $request, TenantContext $tenant)
+    {
+        $d = $this->contexte($request, $tenant, 'reductions');
+        $general = $request->boolean('general');
+
+        return $this->document($request, $tenant, $d + $this->pointReductions($d, $general), $general ? 'Point général des réductions' : 'Point des réductions', 'point-reductions');
+    }
+
+    private function pointReductions(array $d, bool $general): array
+    {
+        $lignes = Reductions::requete($d['annee_id'], ['du' => $d['periode']['du'], 'au' => $d['periode']['au'], 'criteres' => $d['criteres']])->get()
+            ->map(fn ($l) => Reductions::presenter($l));
+
+        return [
+            'unite' => 'montant',
+            'colonnes' => ['affecte' => 'Élèves affectés', 'non_affecte' => 'Élèves non affectés', 'total' => 'Total'],
+            'sections' => array_map(fn ($s) => $s + ['partie' => $s['titre']], Reductions::sections($lignes, $general)),
+        ];
+    }
+
+    // ------------------------------------------------------------ Depenses et entrees
+
+    public function depenses(Request $request, TenantContext $tenant)
+    {
+        $d = $this->contexte($request, $tenant, 'depenses');
+
+        return response()->json(['data' => $d + PointsFinances::depenses($d['annee_id'], $d['periode'], $request->boolean('general'))]);
+    }
+
+    public function depensesDocument(Request $request, TenantContext $tenant)
+    {
+        $d = $this->contexte($request, $tenant, 'depenses');
+        $general = $request->boolean('general');
+
+        return $this->document($request, $tenant, $d + PointsFinances::depenses($d['annee_id'], $d['periode'], $general), $general ? 'Point général des dépenses' : 'Point des dépenses', 'point-depenses');
+    }
+
+    public function entrees(Request $request, TenantContext $tenant)
+    {
+        $d = $this->contexte($request, $tenant, 'entrees');
+
+        return response()->json(['data' => $d + PointsFinances::entrees($d['annee_id'], $d['periode'], $request->boolean('general'))]);
+    }
+
+    public function entreesDocument(Request $request, TenantContext $tenant)
+    {
+        $d = $this->contexte($request, $tenant, 'entrees');
+        $general = $request->boolean('general');
+
+        return $this->document($request, $tenant, $d + PointsFinances::entrees($d['annee_id'], $d['periode'], $general), $general ? 'Point général des entrées' : 'Point des entrées', 'point-entrees');
+    }
+
     // ------------------------------------------------------------ Outils
+
+    private const TITRES = [
+        'inscriptions' => 'Point des inscrits de ',
+        'dettes' => 'Point des dettes de ',
+        'reductions' => 'Point des réductions de ',
+        'depenses' => 'Point des dépenses de ',
+        'entrees' => 'Point des entrées de ',
+    ];
 
     private function contexte(Request $request, TenantContext $tenant, string $point): array
     {
         $u = $request->user();
-        abort_unless($point === 'inscriptions'
-            ? ($u->can('inscriptions.gerer') || $u->can('rapports.voir'))
-            : ($u->can('reglements.voir') || $u->can('dettes.gerer')), 403);
+        abort_unless(match ($point) {
+            'inscriptions' => $u->can('inscriptions.gerer') || $u->can('rapports.voir'),
+            'dettes' => $u->can('reglements.voir') || $u->can('dettes.gerer'),
+            'reductions' => $u->can('reductions.voir') || $u->can('reductions.gerer'),
+            'depenses' => $u->can('depenses.voir'),
+            'entrees' => $u->can('entrees.voir'),
+        }, 403);
+        // Depenses et entrees : pas de criteres eleve.
+        $criteresEleve = ! in_array($point, ['depenses', 'entrees'], true);
 
         $filtres = $request->validate([
             'periode' => ['nullable', Rule::in(['jour', 'dates', 'mois', 'annee'])],
@@ -105,19 +183,36 @@ class PointController extends Controller
             'niveau_id' => ['nullable', 'integer'],
             'classe_id' => ['nullable', 'integer'],
             'caissier_id' => ['nullable', 'integer'],
+            // Point des inscrits : educateur qui a enregistre ('tous' = un tableau par educateur).
+            'agent' => ['nullable', 'regex:/^(tous|\d+)$/'],
         ]);
         $annee = AnneeScolaire::find(PorteePedagogique::anneeId($tenant));
         abort_unless($annee, 422, 'Aucune année scolaire active.');
         // Par defaut : toute l'annee (un point d'inscriptions a la journee est souvent vide).
         $filtres['periode'] ??= 'annee';
         $periode = BilanCaisse::periode($filtres, $annee);
-        $criteres = BilanCaisse::criteres($filtres);
-        $libelle = BilanCaisse::libelleCriteres($criteres);
+        $criteres = $criteresEleve ? BilanCaisse::criteres($filtres) : [];
+        $libelle = $criteresEleve ? BilanCaisse::libelleCriteres($criteres) : '';
         $caissierId = $point === 'dettes' && ! empty($filtres['caissier_id']) ? (int) $filtres['caissier_id'] : null;
         $caissier = $caissierId ? DB::table('users')->where('id', $caissierId)->first(['name', 'prenoms']) : null;
 
+        // Filtre educateur : pas pour un educateur connecte (il voit ses niveaux).
+        $filtreAgents = $point === 'inscriptions' && ! PorteePedagogique::poste($request)?->lie_niveaux;
+        $agent = $filtreAgents ? ($filtres['agent'] ?? null) : null;
+        $agentNom = null;
+        if ($agent !== null && $agent !== 'tous') {
+            $agent = (int) $agent;
+            $criteres['enregistre_par_id'] = $agent;
+            $u = DB::table('users')->where('id', $agent)->first(['name', 'prenoms']);
+            $agentNom = $u ? trim($u->prenoms.' '.$u->name) : null;
+        }
+
         return [
-            'titre' => ($point === 'inscriptions' ? 'Point des inscrits de ' : 'Point des dettes de ').$periode['libelle'].($libelle ? ' · '.$libelle : ''),
+            'titre' => self::TITRES[$point].$periode['libelle'].($libelle ? ' · '.$libelle : '')
+                .($agentNom ? ' · inscrits par '.$agentNom : ''),
+            'agent' => $agent,
+            'agent_nom' => $agentNom,
+            'agents' => $filtreAgents ? $this->agents($annee->id) : [],
             'annee' => $annee->libelle,
             'annee_id' => $annee->id,
             'periode' => $periode,
@@ -126,7 +221,9 @@ class PointController extends Controller
             'caissier_id' => $caissierId,
             'caissier' => $caissier ? trim($caissier->name.' '.$caissier->prenoms) : null,
             'mois_disponibles' => BilanCaisse::moisDeLAnnee($annee),
-            'criteres_disponibles' => BilanCaisse::criteresDisponibles($annee->id, $point === 'inscriptions' ? $this->niveaux($request, $annee->id) : null),
+            'criteres_disponibles' => $criteresEleve
+                ? BilanCaisse::criteresDisponibles($annee->id, $point === 'inscriptions' ? $this->niveaux($request, $annee->id) : null)
+                : ['cycles' => [], 'niveaux' => [], 'classes' => []],
             'genere_le' => now()->toDateTimeString(),
         ];
     }
@@ -135,6 +232,24 @@ class PointController extends Controller
     {
         return Document::repondre('pdf.point', ['p' => $d, 'titreDocument' => $titre, 'edite_par' => trim($request->user()->name.' '.$request->user()->prenoms)]
             + Document::entete(Etablissement::findOrFail($tenant->id())), $fichier, $request->query('format'));
+    }
+
+    /**
+     * Liste « Educateur » du point des inscrits : les comptes a poste
+     * d'educateur (rattache a des niveaux) et tous ceux qui ont enregistre
+     * une inscription de l'annee.
+     */
+    private function agents(int $anneeId): array
+    {
+        $etablissementId = app(TenantContext::class)->id();
+        $educateurs = DB::table('model_has_roles as mr')->join('roles as r', 'r.id', '=', 'mr.role_id')
+            ->where('r.etablissement_id', $etablissementId)->where('r.lie_niveaux', true)->pluck('mr.model_id');
+        $inscripteurs = DB::table('inscriptions')->where('etablissement_id', $etablissementId)->where('annee_scolaire_id', $anneeId)
+            ->whereNotNull('enregistre_par_id')->distinct()->pluck('enregistre_par_id');
+
+        return DB::table('users')->whereIn('id', $educateurs->merge($inscripteurs)->unique())->whereNull('deleted_at')
+            ->orderBy('name')->orderBy('prenoms')->get(['id', 'name', 'prenoms'])
+            ->map(fn ($u) => ['id' => (int) $u->id, 'nom' => trim($u->prenoms.' '.$u->name)])->values()->all();
     }
 
     /** Educateur (poste rattache a des niveaux) : ses niveaux seulement, aucun s'il n'en a pas. */

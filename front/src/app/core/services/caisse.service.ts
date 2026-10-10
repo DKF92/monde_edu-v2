@@ -57,6 +57,15 @@ export class CaisseService {
   }
 
   journal(filtres: FiltresJournal): Observable<PageJournal> {
+    return this.http.get<PageJournal>(`${this.api}/reglements`, { params: this.parametresJournal(filtres) });
+  }
+
+  /** Liste des paiements imprimable (memes filtres que l'ecran). */
+  async imprimerJournal(filtres: FiltresJournal, titre: string): Promise<void> {
+    await this.documents.afficher({ titre, chemin: '/reglements/document', params: this.parametresJournal(filtres), nomFichier: 'paiements' });
+  }
+
+  private parametresJournal(filtres: FiltresJournal): HttpParams {
     let params = new HttpParams().set('page', filtres.page).set('par_page', filtres.par_page);
     if (filtres.periode) params = params.set('periode', filtres.periode);
     if (filtres.du) params = params.set('du', filtres.du);
@@ -69,8 +78,7 @@ export class CaisseService {
     if (filtres.type_frais_id) params = params.set('type_frais_id', filtres.type_frais_id);
     if (filtres.dette) params = params.set('dette', 1);
     if (filtres.affecte !== null && filtres.affecte !== undefined) params = params.set('affecte', filtres.affecte ? 1 : 0);
-    params = this.parametresCriteres(params, filtres);
-    return this.http.get<PageJournal>(`${this.api}/reglements`, { params });
+    return this.parametresCriteres(params, filtres);
   }
 
   /** Detail d'un paiement : paiement, inscription, historique des corrections. */
@@ -120,6 +128,7 @@ export class CaisseService {
     if (filtres.du) params = params.set('du', filtres.du);
     if (filtres.au) params = params.set('au', filtres.au);
     if (filtres.mois) params = params.set('mois', filtres.mois);
+    if (filtres.caissier) params = params.set('caissier', filtres.caissier);
     return this.parametresCriteres(params, filtres);
   }
 

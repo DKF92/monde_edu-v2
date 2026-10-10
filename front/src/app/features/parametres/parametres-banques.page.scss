@@ -1,0 +1,75 @@
+.liste-banques {
+  padding: 8px 0;
+}
+
+.titre-liste {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 20px 12px;
+  border-bottom: 1px solid var(--me-bordure);
+
+  h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+  }
+
+  span {
+    font-size: 13px;
+    color: var(--me-texte-doux);
+  }
+}
+
+.banque {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--me-bordure);
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &.inactive .infos {
+    opacity: 0.55;
+  }
+
+  .infos {
+    flex: 1;
+    min-width: 0;
+
+    strong {
+      display: block;
+      font-size: 14px;
+      color: var(--me-texte);
+    }
+
+    small {
+      font-size: 12.5px;
+      color: var(--me-texte-doux);
+    }
+  }
+
+  .actions {
+    display: flex;
+    gap: 2px;
+  }
+}
+
+.grille-champs {
+  display: grid;
+  gap: 12px;
+
+  @media (min-width: 560px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.corps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}

@@ -6,6 +6,7 @@ import { ToastController, IonContent, IonIcon, IonSkeletonText, IonSpinner } fro
 import { addIcons } from 'ionicons';
 import {
   chevronBackOutline,
+  serverOutline,
   businessOutline,
   callOutline,
   locationOutline,
@@ -71,6 +72,7 @@ export class ParametresEtablissementPage implements OnInit {
   constructor() {
     addIcons({
       chevronBackOutline,
+      serverOutline,
       businessOutline,
       callOutline,
       locationOutline,

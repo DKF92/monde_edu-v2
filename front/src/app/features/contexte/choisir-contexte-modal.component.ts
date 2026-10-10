@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
-import { IonModal, IonIcon } from '@ionic/angular';
+import { IonModal, IonIcon, NavController } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
   calendarOutline,
@@ -25,6 +25,7 @@ import {
 import { Subject, catchError, of, switchMap, tap } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { ContexteService } from '../../core/services/contexte.service';
+import { ReseauService } from '../../core/services/reseau.service';
 import {
   ContexteEtablissement,
   Etablissement,
@@ -59,6 +60,8 @@ export class ChoisirContexteModalComponent implements OnChanges {
   private readonly auth = inject(AuthService);
   private readonly contexteService = inject(ContexteService);
   private readonly router = inject(Router);
+  private readonly navigation = inject(NavController);
+  private readonly reseau = inject(ReseauService);
   private readonly destroyRef = inject(DestroyRef);
 
   @Input() isOpen = false;
@@ -231,8 +234,16 @@ export class ChoisirContexteModalComponent implements OnChanges {
       null;
 
     const { periodes: _, ...anneeScolaire } = annee;
+    // Espace de travail modifie (etablissement, annee, periode ou poste) :
+    // retour a l'accueil, les pages ouvertes affichaient l'ancien contexte.
+    const avant = [this.auth.etablissementActif()?.id, this.auth.anneeScolaire()?.id, this.auth.periode()?.id ?? null, this.auth.poste()?.id].join('|');
+    const apres = [contexte.etablissement.id, anneeScolaire.id, periode?.id ?? null, poste.id].join('|');
     this.auth.appliquerContexte({ etablissement: contexte.etablissement, anneeScolaire, periode, poste });
+    this.reseau.memoriserServeurLocal(contexte.serveur_local);
     this.ferme.emit();
+    if (avant !== apres) {
+      this.navigation.navigateRoot('/tabs/dashboard', { animated: false });
+    }
   }
 
   annuler(): void {

@@ -30,7 +30,8 @@ export interface NiveauInscription {
 export interface OptionsInscription {
   annee: string | null;
   niveaux: NiveauInscription[];
-  tous_niveaux: { id: number; code: string; libelle: string; ordre: number }[];
+  /** de_classe : niveau propose dans les listes (avec serie au 2nd cycle, pas le niveau general seul). */
+  tous_niveaux: { id: number; code: string; libelle: string; ordre: number; de_classe: boolean }[];
   niveaux_restreints: boolean;
   formats_matricule: string[];
   verification_en_ligne: boolean;
@@ -98,11 +99,11 @@ export interface LigneInscription {
   affecte: boolean;
   redoublant: boolean;
   inscrit_en_ligne: boolean;
+  /** Deja scannee sans recu trouve sur le site de l'Etat. */
+  en_ligne_introuvable: boolean;
   date_inscription: string | null;
-  total_du: number;
-  total_reduit: number;
-  total_paye: number;
-  reste: number;
+  enregistre_par: string | null;
+  boursier: boolean;
 }
 
 export interface PageInscriptions {
@@ -175,6 +176,10 @@ export interface FournitureInscription {
 }
 
 export interface DetailInscription extends Omit<LigneInscription, 'eleve'> {
+  total_du: number;
+  total_reduit: number;
+  total_paye: number;
+  reste: number;
   annee: string | null;
   eleve: FicheEleve & { id: number; photo_url: string | null };
   langue_vivante_2: string | null;
@@ -256,7 +261,23 @@ export interface LigneMiseAJourEnLigne {
   id: number;
   eleve: string;
   trouve: boolean;
+  /** Scannee sans recu trouve sur le site de l'Etat. */
+  introuvable?: boolean;
   remarques: string[];
+}
+
+/** Etat du scan « Mettre a jour » qui tourne sur le serveur. */
+export interface EtatScanEnLigne {
+  en_cours: boolean;
+  total: number;
+  traitees: number;
+  trouvees: number;
+  introuvables: number;
+  erreur: string | null;
+  debut: string | null;
+  fin: string | null;
+  par: string | null;
+  dernieres: LigneMiseAJourEnLigne[];
 }
 
 export interface LotMiseAJourEnLigne {
@@ -264,4 +285,48 @@ export interface LotMiseAJourEnLigne {
   dernier_id: number;
   restantes: number;
   site_indisponible: string | null;
+}
+
+/** Element d'une mise a jour en ligne (avant / apres), applique directement ou en attente. */
+export interface ChangementEnLigne {
+  champ: string;
+  libelle: string;
+  avant: string | number | null;
+  apres: string | number | null;
+  applique: boolean;
+  /** En attente mais deja reporte sur l'inscription. */
+  traite: boolean;
+}
+
+/** Inscriptions > Mises a jour en ligne : une mise a jour d'inscription. */
+export interface MiseAJourEnLigne {
+  id: number;
+  /** mise_a_jour : recu repris ; introuvable : scan sans recu. */
+  type: 'mise_a_jour' | 'introuvable';
+  tentatives: number;
+  date: string | null;
+  auteur: string | null;
+  eleve: { matricule: string; nom: string; prenoms: string } | null;
+  inscription_id: number | null;
+  statut_lors: StatutInscription;
+  statut: StatutInscription | null;
+  niveau: string | null;
+  classe: string | null;
+  changements: ChangementEnLigne[];
+  remarques: string[];
+  niveau_demande_id: number | null;
+  affecte_demande: boolean | null;
+  en_attente: boolean;
+  a_traiter: boolean;
+  peut_modifier: boolean;
+  peut_supprimer: boolean;
+}
+
+export interface PageMisesAJourEnLigne {
+  data: MiseAJourEnLigne[];
+  total: number;
+  page: number;
+  par_page: number;
+  compteurs: { toutes: number; a_traiter: number; introuvables: number };
+  annee: string | null;
 }

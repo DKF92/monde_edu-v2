@@ -133,6 +133,8 @@ export class InscriptionFormulairePage implements OnInit, OnDestroy {
   readonly modifiableTarif = signal(true);
   /** Modification ouverte depuis "Mise à jour inscription en ligne" (fiche). */
   readonly depuisEnLigne = signal(false);
+  /** Arrivee depuis Inscriptions > Mises a jour en ligne : elements en ligne a reporter. */
+  readonly miseAJourEnLigne = signal<string[] | null>(null);
 
   readonly erreurs = signal<Record<string, string>>({});
   readonly apercu = signal<ApercuFrais | null>(null);
@@ -175,7 +177,9 @@ export class InscriptionFormulairePage implements OnInit, OnDestroy {
   });
 
   readonly optionsTousNiveaux = computed<OptionSelecteur[]>(() =>
-    (this.options()?.tous_niveaux ?? []).map((n) => ({ valeur: n.id, libelle: n.libelle })),
+    (this.options()?.tous_niveaux ?? [])
+      .filter((n) => n.de_classe || n.id === this.inscription().niveau_id)
+      .map((n) => ({ valeur: n.id, libelle: n.libelle })),
   );
 
   readonly classesDuNiveau = computed<ClasseInscription[]>(
@@ -278,6 +282,7 @@ export class InscriptionFormulairePage implements OnInit, OnDestroy {
           this.remplirDepuisDetail(detail);
           this.etape.set(2);
           this.reprendreEnLigne();
+          this.reprendreMiseAJour();
         }
         this.chargement.set(false);
       },
@@ -358,6 +363,36 @@ export class InscriptionFormulairePage implements OnInit, OnDestroy {
     this.enLigne.set(etat.enLigne);
     this.appliquerEnLigne(new Set(etat.champs ?? []));
     this.depuisEnLigne.set(true);
+  }
+
+  /**
+   * Arrivee depuis Inscriptions > Mises a jour en ligne (« Modifier ») : le
+   * niveau et / ou le statut affecte en ligne sont reportes dans la saisie
+   * (la classe est a choisir dans le nouveau niveau), a verifier puis
+   * enregistrer : les frais sont recalcules a l'enregistrement.
+   */
+  private reprendreMiseAJour(): void {
+    const etat = history.state as { miseAJour?: { niveau_id: number | null; affecte: boolean | null; changements: string[] } } | null;
+    const m = etat?.miseAJour;
+    if (!m) {
+      return;
+    }
+    if (m.affecte !== null && m.affecte !== undefined) {
+      this.majInscription('affecte', m.affecte);
+    }
+    if (m.niveau_id) {
+      // Le site de l'Etat donne le niveau general (TLE) : serie de l'eleve si elle existe, sinon choix manuel.
+      const tous = this.options()?.tous_niveaux ?? [];
+      const demande = tous.find((n) => n.id === m.niveau_id);
+      if (demande?.de_classe) {
+        this.choisirNiveau(m.niveau_id);
+      } else if (demande) {
+        const serie = this.serieDe(tous.find((n) => n.id === this.inscription().niveau_id)?.code);
+        const choisi = tous.find((n) => n.de_classe && !!serie && n.code === demande.code + serie);
+        if (choisi) this.choisirNiveau(choisi.id);
+      }
+    }
+    this.miseAJourEnLigne.set(m.changements ?? []);
   }
 
   basculerEcart(cle: string): void {
@@ -832,10 +867,20 @@ export class InscriptionFormulairePage implements OnInit, OnDestroy {
     return this.niveauxAccessibles().find((n) => n.id === niveauId)?.classes ?? [];
   }
 
+  /** Niveau de l'annee suivante : ordre suivant, meme serie si elle existe (2NDE C -> 1ERE C, 1ERE A -> TLE A1). */
   private niveauSuivant(niveauId: number): number | null {
-    const tous = [...(this.options()?.tous_niveaux ?? [])].sort((a, b) => a.ordre - b.ordre);
-    const i = tous.findIndex((n) => n.id === niveauId);
-    return i >= 0 && i < tous.length - 1 ? tous[i + 1].id : null;
+    const tous = (this.options()?.tous_niveaux ?? []).filter((n) => n.de_classe);
+    const actuel = this.options()?.tous_niveaux.find((n) => n.id === niveauId);
+    if (!actuel) return null;
+    const ordre = Math.min(...tous.filter((n) => n.ordre > actuel.ordre).map((n) => n.ordre));
+    const candidats = tous.filter((n) => n.ordre === ordre);
+    const serie = this.serieDe(actuel.code)?.[0];
+    return (serie ? candidats.find((n) => this.serieDe(n.code)?.[0] === serie) : undefined)?.id ?? candidats[0]?.id ?? null;
+  }
+
+  /** Serie d'un niveau du 2nd cycle d'apres son code (« TLEA2 » -> « A2 »), null sinon. */
+  private serieDe(code: string | undefined): string | null {
+    return /^(?:2NDE|1ERE|TLE)(.+)$/.exec(code ?? '')?.[1] ?? null;
   }
 
   private formatValide(matricule: string): boolean {

@@ -11,6 +11,7 @@ import {
   receiptOutline,
   peopleOutline,
   pricetagOutline,
+  businessOutline,
   personOutline,
   cloudOfflineOutline,
   eyeOutline,
@@ -24,7 +25,7 @@ import {
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { ActionsCaisseService } from '../../core/services/actions-caisse.service';
-import { DetailDepense, Depense, DepenseService, FiltresDepenses, PageDepenses } from '../../core/services/depense.service';
+import { DetailDepense, Depense, DepenseService, FiltresDepenses, PageDepenses, SourceDepense } from '../../core/services/depense.service';
 import { LIBELLES_MODE } from '../../core/models/caisse.model';
 import { OptionSelecteur, SelecteurComponent } from '../../shared/selecteur.component';
 import { PaginationComponent, TAILLES_PAGE } from '../../shared/pagination.component';
@@ -65,6 +66,14 @@ export class DepensesPage implements OnDestroy {
   readonly au = signal(this.jour(0));
   readonly recherche = signal('');
   readonly categorie = signal('');
+  /** Caisse (1) ou banque (2), 0 = toutes. */
+  readonly source = signal<SourceDepense | null>(null);
+  readonly optionsSource: OptionSelecteur[] = [
+    { valeur: 0, libelle: 'Caisse et banque' },
+    { valeur: 1, libelle: 'Dépenses caisse' },
+    { valeur: 2, libelle: 'Dépenses banque' },
+  ];
+  readonly rangSource = computed(() => (this.source() === 'caisse' ? 1 : this.source() === 'banque' ? 2 : 0));
   readonly payeur = signal(0);
   readonly page = signal(1);
   readonly taille = signal(TAILLES_PAGE[0]);
@@ -131,6 +140,7 @@ export class DepensesPage implements OnDestroy {
       receiptOutline,
       peopleOutline,
       pricetagOutline,
+      businessOutline,
       personOutline,
       cloudOfflineOutline,
       eyeOutline,
@@ -189,6 +199,11 @@ export class DepensesPage implements OnDestroy {
     this.liste.arreter();
     clearTimeout(this.minuterie);
     this.minuterie = setTimeout(() => this.charger(), 250);
+  }
+
+  choisirSource(rang: number): void {
+    this.source.set(rang === 1 ? 'caisse' : rang === 2 ? 'banque' : null);
+    this.relancer();
   }
 
   choisirCategorie(rang: number): void {
@@ -274,6 +289,7 @@ export class DepensesPage implements OnDestroy {
       du: this.du(),
       au: this.au(),
       categorie: this.categorie() || null,
+      source: this.source(),
       payeur_id: this.payeur() || null,
       recherche: this.recherche(),
     };

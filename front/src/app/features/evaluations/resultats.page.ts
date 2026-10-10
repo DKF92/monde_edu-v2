@@ -43,7 +43,7 @@ export class ResultatsPage {
   readonly router = inject(Router);
 
   readonly libellesDecision = LIBELLES_DECISION;
-  readonly peutSaisir = computed(() => this.auth.aPermission('notes.saisir') || this.auth.aPermission('moyennes.gerer'));
+  readonly peutSaisir = computed(() => ['notes.saisir', 'notes.saisir_toutes'].some((p) => this.auth.aPermission(p)));
 
   readonly options = signal<OptionsEvaluations | null>(null);
   readonly erreurOptions = signal(false);

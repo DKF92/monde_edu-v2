@@ -27,6 +27,7 @@ import {
 } from 'ionicons/icons';
 import { CibleReduction, FiltresReductions, PageReductions, ReductionAccordee, ReductionsService } from '../../core/services/reductions.service';
 import { OptionSelecteur, SelecteurComponent } from '../../shared/selecteur.component';
+import { AuthService } from '../../core/services/auth.service';
 import { PaginationComponent, TAILLES_PAGE, paginer } from '../../shared/pagination.component';
 
 /**
@@ -48,6 +49,8 @@ export class ReductionsPage {
   private readonly toasts = inject(ToastController);
   private readonly alertes = inject(AlertController);
   readonly router = inject(Router);
+  /** Sans « Réductions » (reductions.voir seul) : consultation et impressions. */
+  readonly peutGerer = inject(AuthService).aPermission('reductions.gerer');
 
   readonly donnees = signal<PageReductions | null>(null);
   readonly chargement = signal(false);

@@ -3,7 +3,7 @@
     <header class="me-entete-page">
       <div>
         <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/paiements')">
-          <ion-icon name="chevron-back-outline"></ion-icon> Caisse
+          <ion-icon name="chevron-back-outline"></ion-icon> Point paiements
         </button>
         <h1>Encaisser</h1>
         <p>Versement d'un élève inscrit : reçu imprimable et SMS au parent.</p>
@@ -100,7 +100,7 @@
                   <span class="me-badge">{{ s.affecte ? 'Affecté(e)' : 'Non affecté(e)' }}</span>
                 </span>
               </div>
-              <button type="button" class="me-action" title="Voir l'inscription" aria-label="Voir l'inscription" (click)="router.navigate(['/tabs/inscriptions', s.id])">
+              <button type="button" class="me-action" title="Voir l'inscription" aria-label="Voir l'inscription" (click)="voirInscription(s.id, s.eleve.id)">
                 <ion-icon name="eye-outline"></ion-icon>
               </button>
             </div>

@@ -9,8 +9,10 @@ use App\Models\Etablissement;
 use App\Models\Periode;
 use App\Support\BilanCaisse;
 use App\Support\Document;
+use App\Support\PorteeFinances;
 use App\Support\PorteePedagogique;
 use App\Support\Reductions;
+use App\Support\ResteAPayer;
 use App\Support\Resultats;
 use App\Support\TenantContext;
 use Illuminate\Http\Request;
@@ -42,6 +44,7 @@ class RapportController extends Controller
         'decisions' => ['Admissions et redoublements', 'Décisions de fin d\'année (admis, redoublants, exclus) par niveau, avec l\'approche genre.', false, 'Pédagogie'],
         'absences' => ['Absences', 'Heures d\'absence par classe : justifiées, non justifiées, élèves concernés.', false, 'Vie scolaire'],
         'absents' => ['Élèves les plus absents', 'Élèves qui ont des heures d\'absence non justifiées, du plus absent au moins absent.', false, 'Vie scolaire'],
+        'bilan_financier' => ['Bilan financier global', 'Toutes les opérations financières de l\'année en un document : frais, encaissements, dettes, réductions, dépenses, entrées banque, soldes de caisse et de banque.', false, 'Finances'],
         'finances_classes' => ['Situation financière par classe', 'Dû, réduit, payé, reste à payer et taux de recouvrement de chaque classe.', false, 'Finances'],
         'recettes_frais' => ['Recettes par type de frais', 'Pour chaque frais : montant dû, réductions, encaissé, reste et taux de recouvrement.', false, 'Finances'],
         'recettes_mois' => ['Recettes et dépenses par mois', 'Encaissements (frais et dettes), dépenses et solde de chaque mois de l\'année.', false, 'Finances'],
@@ -60,8 +63,8 @@ class RapportController extends Controller
 
         return response()->json([
             'annee' => AnneeScolaire::find($anneeId)?->libelle,
-            'rubriques' => self::RUBRIQUES,
-            'rapports' => collect(self::RAPPORTS)->map(fn ($r, $code) => ['code' => $code, 'titre' => $r[0], 'description' => $r[1], 'periode' => $r[2],
+            'rubriques' => $this->rubriques($request),
+            'rapports' => collect(self::RAPPORTS)->filter(fn ($r) => in_array($r[3], $this->rubriques($request), true))->map(fn ($r, $code) => ['code' => $code, 'titre' => $r[0], 'description' => $r[1], 'periode' => $r[2],
                 'rubrique' => $r[3], 'masque' => in_array($code, $masques, true)])->values(),
             'peut_masquer' => $request->user()->can('etablissement.gerer'),
             'periodes' => Periode::where('annee_scolaire_id', $anneeId)->orderBy('numero')->get()
@@ -91,6 +94,15 @@ class RapportController extends Controller
     {
         $this->autoriser($request);
         $rapport = $this->rapport($request, $tenant, $code);
+        if ($code === 'bilan_financier') {
+            return Document::repondre('pdf.bilan-financier', Document::entete(Etablissement::findOrFail($tenant->id())) + [
+                'rapport' => $rapport,
+                'sections' => $this->bilanFinancier(PorteePedagogique::anneeId($tenant)),
+                'annee' => $rapport['annee'],
+                'genere_le' => now(),
+                'edite_par' => trim($request->user()->name.' '.$request->user()->prenoms),
+            ], 'bilan-financier-'.$rapport['annee'], $request->query('format'));
+        }
 
         return Document::repondre('pdf.rapport', Document::entete(Etablissement::findOrFail($tenant->id())) + [
             'rapport' => $rapport,
@@ -100,11 +112,25 @@ class RapportController extends Controller
         ], 'rapport-'.$code, $request->query('format'), count($rapport['colonnes']) > 8 ? 'landscape' : 'portrait');
     }
 
+    /** Bilan financier general (menu Bilans) : toutes ses sections, comme le document. */
+    public function bilanFinancierComplet(Request $request, TenantContext $tenant)
+    {
+        $this->autoriser($request);
+        abort_unless(in_array('Finances', $this->rubriques($request), true), 403, 'Votre poste ne permet pas de consulter les rapports financiers.');
+        $anneeId = PorteePedagogique::anneeId($tenant);
+
+        return response()->json([
+            'annee' => AnneeScolaire::find($anneeId)?->libelle,
+            'sections' => $this->bilanFinancier($anneeId),
+        ]);
+    }
+
     // ------------------------------------------------------------ Rapports
 
     private function rapport(Request $request, TenantContext $tenant, string $code): array
     {
         abort_unless(isset(self::RAPPORTS[$code]), 404);
+        abort_unless(in_array(self::RAPPORTS[$code][3], $this->rubriques($request), true), 403, 'Votre poste ne permet pas de consulter les rapports financiers.');
         $anneeId = PorteePedagogique::anneeId($tenant);
         $periode = null;
         if (self::RAPPORTS[$code][2]) {
@@ -146,6 +172,8 @@ class RapportController extends Controller
             'recettes_frais' => $this->recettesFrais($anneeId),
             'recettes_mois' => $this->recettesMois($anneeId),
             'reductions' => $this->reductions($anneeId),
+            // Ecran : la synthese ; le document reprend toutes les sections.
+            'bilan_financier' => $this->bilanFinancier($anneeId)[0]['rapport'],
         };
     }
 
@@ -285,7 +313,7 @@ class RapportController extends Controller
         $lignes = DB::table('inscriptions as i')->join('eleves as e', 'e.id', '=', 'i.eleve_id')->join('niveaux as n', 'n.id', '=', 'i.niveau_id')
             ->where('i.annee_scolaire_id', $anneeId)->where('i.etablissement_id', app(TenantContext::class)->id())
             ->whereNotNull('i.classe_id')->whereNull('e.deleted_at')
-            ->groupBy('n.id', 'n.libelle', 'n.ordre')->orderBy('n.ordre')
+            ->groupBy('n.id', 'n.libelle', 'n.ordre')->orderBy('n.ordre')->orderBy('n.libelle')
             ->selectRaw("n.libelle AS niveau,
                 SUM(i.decision_finale = 'ADMIS' AND e.sexe = 'F') AS admis_f, SUM(i.decision_finale = 'ADMIS' AND e.sexe = 'M') AS admis_g, SUM(i.decision_finale = 'ADMIS') AS admis_t,
                 SUM(i.decision_finale = 'REDOUBLE' AND e.sexe = 'F') AS redouble_f, SUM(i.decision_finale = 'REDOUBLE' AND e.sexe = 'M') AS redouble_g, SUM(i.decision_finale = 'REDOUBLE') AS redouble_t,
@@ -389,7 +417,7 @@ class RapportController extends Controller
         $lignes = DB::table('inscriptions as i')->join('eleves as e', 'e.id', '=', 'i.eleve_id')->join('niveaux as n', 'n.id', '=', 'i.niveau_id')
             ->join('annees_scolaires as a', 'a.id', '=', 'i.annee_scolaire_id')
             ->where('i.annee_scolaire_id', $anneeId)->where('i.etablissement_id', app(TenantContext::class)->id())->whereNull('e.deleted_at')
-            ->groupBy('n.id', 'n.libelle', 'n.ordre')->orderBy('n.ordre')
+            ->groupBy('n.id', 'n.libelle', 'n.ordre')->orderBy('n.ordre')->orderBy('n.libelle')
             ->selectRaw("n.libelle AS niveau,
                 SUM(NOT {$ancien} AND e.sexe = 'F') AS nouveaux_f, SUM(NOT {$ancien} AND e.sexe = 'M') AS nouveaux_g,
                 SUM({$ancien} AND e.sexe = 'F') AS anciens_f, SUM({$ancien} AND e.sexe = 'M') AS anciens_g,
@@ -614,6 +642,124 @@ class RapportController extends Controller
             'total' => $lignes->isNotEmpty() ? $this->sommes($lignes, $colonnes, 'niveau') : null];
     }
 
+    /**
+     * Bilan financier global de l'annee : synthese, puis le detail (frais,
+     * niveaux, modes de paiement, caissiers, mois, depenses, reductions).
+     *
+     * @return list<array{titre: string, rapport: array}>
+     */
+    private function bilanFinancier(int $anneeId): array
+    {
+        $etab = app(TenantContext::class)->id();
+        $reste = ResteAPayer::totaux(ResteAPayer::requete($anneeId, ['statut' => null, 'criteres' => [], 'recherche' => ''])->get()
+            ->map(fn ($l) => ResteAPayer::presenter($l)));
+        $reglements = DB::table('reglements')->where('reglements.etablissement_id', $etab)->where('reglements.annee_scolaire_id', $anneeId);
+        $lignesReglees = DB::table('reglement_lignes as rl')->join('reglements as g', 'g.id', '=', 'rl.reglement_id')
+            ->where('g.etablissement_id', $etab)->where('g.annee_scolaire_id', $anneeId)
+            ->selectRaw('SUM(CASE WHEN rl.dette_id IS NULL THEN rl.montant ELSE 0 END) AS frais, SUM(CASE WHEN rl.dette_id IS NULL THEN 0 ELSE rl.montant END) AS dettes')->first();
+        $depenses = DB::table('depenses')->where('depenses.etablissement_id', $etab)->where('depenses.annee_scolaire_id', $anneeId);
+        $parSource = (clone $depenses)->selectRaw("COALESCE(source, 'caisse') AS source, SUM(montant) AS montant")->groupBy('source')->pluck('montant', 'source');
+        $encaisse = (int) $lignesReglees->frais + (int) $lignesReglees->dettes;
+        $depCaisse = (int) ($parSource['caisse'] ?? 0);
+        $depBanque = (int) ($parSource['banque'] ?? 0);
+        // Entrees banque ; les versements de la caisse sont un transfert (deja encaisses).
+        $entrees = DB::table('entrees')->where('entrees.etablissement_id', $etab)->where('entrees.annee_scolaire_id', $anneeId);
+        $versements = (int) (clone $entrees)->where('categorie', 'versement_caisse')->sum('montant');
+        $entBanque = (int) (clone $entrees)->sum('montant');
+        $net = $reste['montant_du'] - $reste['reduction'];
+
+        // 1. Synthese (rubrique, montant).
+        $colonnes = [['cle' => 'rubrique', 'libelle' => 'Rubrique'], ['cle' => 'montant', 'libelle' => 'Montant', 'type' => 'montant', 'fort' => true]];
+        $ligne = fn (string $rubrique, int $montant) => ['rubrique' => $rubrique, 'montant' => $montant];
+        $synthese = ['colonnes' => $colonnes, 'total' => null, 'groupes' => [
+            ['titre' => 'Frais de l\'année', 'total' => null, 'lignes' => [
+                $ligne('Montant dû (inscriptions)', $reste['montant_du']),
+                $ligne('Réductions et cas sociaux', $reste['reduction']),
+                $ligne('Net à payer', $net),
+                $ligne('Encaissé', $reste['paye']),
+                $ligne('Reste à payer', $reste['reste_inscription']),
+            ]],
+            ['titre' => 'Dettes des années précédentes (prises en compte)', 'total' => null, 'lignes' => [
+                $ligne('Dettes', $reste['dette']),
+                $ligne('Réductions de dette', $reste['dette_reduite']),
+                $ligne('Encaissé sur les dettes', $reste['dette_payee']),
+                $ligne('Reste des dettes', $reste['reste_dette']),
+            ]],
+            ['titre' => 'Caisse', 'total' => null, 'lignes' => [
+                $ligne('Encaissements de l\'année (frais et dettes)', $encaisse),
+                $ligne('Dépenses payées par la caisse', $depCaisse),
+                $ligne('Solde de caisse', $encaisse - $depCaisse),
+                $ligne('Versements de la caisse à la banque', $versements),
+                $ligne('Solde de caisse après versements', $encaisse - $depCaisse - $versements),
+            ]],
+            ['titre' => 'Banque', 'total' => null, 'lignes' => [
+                $ligne('Entrées banque (versements de la caisse compris)', $entBanque),
+                $ligne('Dépenses payées par la banque', $depBanque),
+                $ligne('Solde banque de l\'année', $entBanque - $depBanque),
+            ]],
+            ['titre' => 'Ensemble', 'total' => null, 'lignes' => [
+                $ligne('Total des entrées (caisse + banque, hors versements)', $encaisse + $entBanque - $versements),
+                $ligne('Total des dépenses', $depCaisse + $depBanque),
+                $ligne('Résultat de l\'année', $encaisse + $entBanque - $versements - $depCaisse - $depBanque),
+            ]],
+        ]];
+        $synthese['sous_titre'] = 'Recouvrement des frais : '.($net > 0 ? number_format($reste['paye'] * 100 / $net, 2, ',', ' ') : '0').' % · '
+            .(clone $reglements)->count().' paiements';
+
+        // 3. Situation par niveau (totaux des classes de chaque niveau).
+        $classes = $this->financesClasses($anneeId);
+        $colNiveau = $classes['colonnes'];
+        $colNiveau[0] = ['cle' => 'classe', 'libelle' => 'Niveau'];
+        $niveaux = ['colonnes' => $colNiveau, 'groupes' => [['titre' => null, 'total' => null,
+            'lignes' => collect($classes['groupes'])->map(fn ($g) => $this->taux(array_merge($this->sommes(collect($g['lignes']), $colNiveau, 'classe'), ['classe' => $g['titre']])))->all()]],
+            'total' => $classes['total']];
+
+        // 4 et 5. Encaissements par mode de paiement et par caissier.
+        $modes = ['especes' => 'Espèces', 'mobile_money' => 'Mobile money', 'cheque' => 'Chèque', 'virement' => 'Virement'];
+        $colEnc = fn (string $titre) => [['cle' => 'libelle', 'libelle' => $titre], ['cle' => 'nombre', 'libelle' => 'Paiements', 'type' => 'nombre'], ['cle' => 'montant', 'libelle' => 'Montant', 'type' => 'montant', 'fort' => true]];
+        $tableau = fn (array $colonnes, Collection $lignes) => ['colonnes' => $colonnes, 'groupes' => [['titre' => null, 'total' => null, 'lignes' => $lignes->all()]],
+            'total' => $lignes->isNotEmpty() ? $this->sommes($lignes, $colonnes, $colonnes[0]['cle']) : null];
+        $parMode = (clone $reglements)->selectRaw('mode_paiement, COUNT(*) AS nombre, SUM(montant_total) AS montant')->groupBy('mode_paiement')->orderByDesc('montant')->get()
+            ->map(fn ($r) => ['libelle' => $modes[$r->mode_paiement] ?? $r->mode_paiement, 'nombre' => (int) $r->nombre, 'montant' => (int) $r->montant]);
+        $parCaissier = (clone $reglements)->leftJoin('users as u', 'u.id', '=', 'reglements.caissier_id')
+            ->selectRaw("COALESCE(TRIM(CONCAT(u.name, ' ', COALESCE(u.prenoms, ''))), '—') AS libelle, COUNT(*) AS nombre, SUM(reglements.montant_total) AS montant")
+            ->groupBy('reglements.caissier_id', 'u.name', 'u.prenoms')->orderByDesc('montant')->get()
+            ->map(fn ($r) => ['libelle' => $r->libelle, 'nombre' => (int) $r->nombre, 'montant' => (int) $r->montant]);
+
+        // 7. Depenses par categorie et par source.
+        $categories = \App\Models\Depense::CATEGORIES;
+        $colDep = fn (string $titre) => [['cle' => 'libelle', 'libelle' => $titre], ['cle' => 'nombre', 'libelle' => 'Dépenses', 'type' => 'nombre'], ['cle' => 'montant', 'libelle' => 'Montant', 'type' => 'montant', 'fort' => true]];
+        $depCategories = (clone $depenses)->selectRaw('categorie, COUNT(*) AS nombre, SUM(montant) AS montant')->groupBy('categorie')->orderByDesc('montant')->get()
+            ->map(fn ($r) => ['libelle' => $categories[$r->categorie] ?? $r->categorie, 'nombre' => (int) $r->nombre, 'montant' => (int) $r->montant]);
+        $depSources = (clone $depenses)->leftJoin('banques as b', 'b.id', '=', 'depenses.banque_id')
+            ->selectRaw("CASE WHEN depenses.source = 'banque' THEN CONCAT('Banque ', COALESCE(b.sigle, b.nom, '')) ELSE 'Caisse' END AS libelle, COUNT(*) AS nombre, SUM(depenses.montant) AS montant")
+            ->groupByRaw("CASE WHEN depenses.source = 'banque' THEN CONCAT('Banque ', COALESCE(b.sigle, b.nom, '')) ELSE 'Caisse' END")->orderByDesc('montant')->get()
+            ->map(fn ($r) => ['libelle' => $r->libelle, 'nombre' => (int) $r->nombre, 'montant' => (int) $r->montant]);
+
+        // 9. Entrees banque par categorie et par banque.
+        $colEnt = fn (string $titre) => [['cle' => 'libelle', 'libelle' => $titre], ['cle' => 'nombre', 'libelle' => 'Entrées', 'type' => 'nombre'], ['cle' => 'montant', 'libelle' => 'Montant', 'type' => 'montant', 'fort' => true]];
+        $entCategories = (clone $entrees)->selectRaw('categorie, COUNT(*) AS nombre, SUM(montant) AS montant')->groupBy('categorie')->orderByDesc('montant')->get()
+            ->map(fn ($r) => ['libelle' => \App\Models\Entree::CATEGORIES[$r->categorie] ?? $r->categorie, 'nombre' => (int) $r->nombre, 'montant' => (int) $r->montant]);
+        $entBanques = (clone $entrees)->leftJoin('banques as b', 'b.id', '=', 'entrees.banque_id')
+            ->selectRaw("TRIM(CONCAT(COALESCE(CONCAT(b.sigle, ' · '), ''), COALESCE(b.nom, '—'))) AS libelle, COUNT(*) AS nombre, SUM(entrees.montant) AS montant")
+            ->groupBy('entrees.banque_id', 'b.sigle', 'b.nom')->orderByDesc('montant')->get()
+            ->map(fn ($r) => ['libelle' => $r->libelle, 'nombre' => (int) $r->nombre, 'montant' => (int) $r->montant]);
+
+        return [
+            ['titre' => 'Synthèse', 'rapport' => $synthese],
+            ['titre' => 'Recettes par type de frais', 'rapport' => $this->recettesFrais($anneeId)],
+            ['titre' => 'Situation financière par niveau', 'rapport' => $niveaux],
+            ['titre' => 'Encaissements par mode de paiement', 'rapport' => $tableau($colEnc('Mode de paiement'), $parMode)],
+            ['titre' => 'Encaissements par caissier', 'rapport' => $tableau($colEnc('Caissier'), $parCaissier)],
+            ['titre' => 'Recettes et dépenses par mois', 'rapport' => $this->recettesMois($anneeId)],
+            ['titre' => 'Dépenses par catégorie', 'rapport' => $tableau($colDep('Catégorie'), $depCategories)],
+            ['titre' => 'Dépenses par source', 'rapport' => $tableau($colDep('Source'), $depSources)],
+            ['titre' => 'Entrées banque par catégorie', 'rapport' => $tableau($colEnt('Catégorie'), $entCategories)],
+            ['titre' => 'Entrées banque par banque', 'rapport' => $tableau($colEnt('Banque'), $entBanques)],
+            ['titre' => 'Réductions et cas sociaux', 'rapport' => $this->reductions($anneeId)],
+        ];
+    }
+
     /** Taux de recouvrement : paye / (du - reduit). */
     private function taux(array $l): array
     {
@@ -652,11 +798,17 @@ class RapportController extends Controller
         ];
     }
 
+    /** Rubriques visibles : Finances seulement pour les postes qui voient les montants. */
+    private function rubriques(Request $request): array
+    {
+        return PorteeFinances::voitMontants($request) ? self::RUBRIQUES : array_values(array_diff(self::RUBRIQUES, ['Finances']));
+    }
+
     /** Classes de l'annee, par niveau puis libelle. */
     private function classes(int $anneeId): Collection
     {
         return Classe::where('annee_scolaire_id', $anneeId)->with('niveau')->get()
-            ->sortBy(fn (Classe $c) => [$c->niveau?->ordre, $c->libelle])->values();
+            ->sortBy(fn (Classe $c) => [$c->niveau?->ordre, \App\Support\NomClasse::cleTri($c->libelle)])->values();
     }
 
     /** Resultats d'une classe, calcules une fois par requete (un rapport compile en reutilise plusieurs). */

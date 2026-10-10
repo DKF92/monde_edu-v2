@@ -4,6 +4,7 @@ import { IonIcon, IonSpinner, ModalController, ToastController } from '@ionic/an
 import { addIcons } from 'ionicons';
 import { closeOutline, documentTextOutline, gridOutline, documentOutline, printOutline, checkmarkOutline, cloudOfflineOutline, downloadOutline } from 'ionicons/icons';
 import { DemandeDocument, DocumentService, FormatDocument } from '../core/services/document.service';
+import { ApercuPdfMobileComponent } from './apercu-pdf-mobile.component';
 
 /**
  * Visionneuse d'un document de l'API : apercu PDF, telechargement Word /
@@ -12,7 +13,7 @@ import { DemandeDocument, DocumentService, FormatDocument } from '../core/servic
 @Component({
   selector: 'app-visionneuse-document',
   standalone: true,
-  imports: [IonIcon, IonSpinner],
+  imports: [IonIcon, IonSpinner, ApercuPdfMobileComponent],
   template: `
     <div class="me-modale visionneuse">
       <header>
@@ -33,7 +34,12 @@ import { DemandeDocument, DocumentService, FormatDocument } from '../core/servic
         } @else if (!url()) {
           <div class="attente"><ion-spinner name="crescent"></ion-spinner> Préparation du document…</div>
         } @else {
-          <iframe #cadre [src]="url()" title="Aperçu du document"></iframe>
+          @if (sansLecteurPdf && pdf) {
+            <!-- Telephone : pas de lecteur PDF dans un cadre, pages dessinees par l'application. -->
+            <app-apercu-pdf-mobile [pdf]="pdf"></app-apercu-pdf-mobile>
+          } @else {
+            <iframe #cadre [src]="url()" title="Aperçu du document"></iframe>
+          }
         }
       </div>
 
@@ -51,8 +57,8 @@ import { DemandeDocument, DocumentService, FormatDocument } from '../core/servic
           </button>
         </div>
         <div class="fin">
-          <button type="button" class="me-bouton-secondaire" (click)="imprimer()" [disabled]="!url()">
-            <ion-icon name="print-outline"></ion-icon> Imprimer
+          <button type="button" class="me-bouton-secondaire" (click)="imprimer()" [disabled]="!url() || impression()">
+            @if (impression()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer }
           </button>
           <button type="button" class="me-bouton-principal" (click)="terminer()">
             <ion-icon name="checkmark-outline"></ion-icon> Terminer
@@ -63,17 +69,22 @@ import { DemandeDocument, DocumentService, FormatDocument } from '../core/servic
   `,
   styles: [
     `
+      /* Toute la hauteur de la modale : le pied reste sous l'apercu, jamais par-dessus. */
       .visionneuse {
         height: 100%;
+        max-height: none;
       }
       .apercu {
-        flex: 1;
+        position: relative;
+        flex: 1 1 0;
         min-height: 0;
         display: flex;
         background: var(--me-fond);
       }
+      /* Le PDF s'arrete juste au-dessus du pied : derniere page visible en entier. */
       iframe {
-        flex: 1;
+        position: absolute;
+        inset: 0;
         width: 100%;
         height: 100%;
         border: none;
@@ -91,6 +102,7 @@ import { DemandeDocument, DocumentService, FormatDocument } from '../core/servic
         margin: auto;
       }
       footer {
+        flex-shrink: 0;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -130,8 +142,13 @@ export class VisionneuseDocumentComponent implements OnInit, OnDestroy {
   readonly cadre = viewChild<ElementRef<HTMLIFrameElement>>('cadre');
 
   readonly url = signal<SafeResourceUrl | null>(null);
+  /** Navigateur sans lecteur PDF integrable (telephones) : apercu dessine par l'application. */
+  readonly sansLecteurPdf = (navigator as Navigator & { pdfViewerEnabled?: boolean }).pdfViewerEnabled === false || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   readonly erreur = signal<string | null>(null);
   readonly enCours = signal<FormatDocument | null>(null);
+  /** Telephone : pages en preparation pour l'impression. */
+  readonly impression = signal(false);
+  private paysage = false;
 
   /** PDF deja recu (apercu) : reutilise pour le telechargement PDF. */
   pdf: Blob | null = null;
@@ -146,6 +163,8 @@ export class VisionneuseDocumentComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    document.getElementById('me-impression-pdf')?.remove();
+    this.retirerZoneImpression();
     if (this.urlBrute) {
       URL.revokeObjectURL(this.urlBrute);
     }
@@ -157,9 +176,11 @@ export class VisionneuseDocumentComponent implements OnInit, OnDestroy {
       next: (r) => {
         this.pdf = r.body;
         // Document en paysage : modale elargie (voir .visionneuse-document.paysage).
-        this.hote.nativeElement.closest('ion-modal')?.classList.toggle('paysage', r.headers.get('X-Orientation') === 'landscape');
+        this.paysage = r.headers.get('X-Orientation') === 'landscape';
+        this.hote.nativeElement.closest('ion-modal')?.classList.toggle('paysage', this.paysage);
         this.urlBrute = URL.createObjectURL(new Blob([r.body!], { type: 'application/pdf' }));
-        this.url.set(this.assainisseur.bypassSecurityTrustResourceUrl(this.urlBrute));
+        // #zoom=100 : le lecteur PDF du navigateur ouvre le document a 100 %.
+        this.url.set(this.assainisseur.bypassSecurityTrustResourceUrl(this.urlBrute + '#zoom=100'));
       },
       error: () => this.erreur.set('Impossible de préparer le document.'),
     });
@@ -186,16 +207,96 @@ export class VisionneuseDocumentComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Imprime le PDF affiche (impression du navigateur). */
+  /**
+   * Lance l'impression du PDF : charge dans un cadre invisible (le PDF seul,
+   * pas la page), la fenetre d'impression s'ouvre des qu'il est pret. Telephone
+   * (pas d'impression depuis un cadre) : pages dessinees puis imprimees depuis
+   * la page elle-meme, sans ouvrir d'onglet.
+   */
   imprimer(): void {
-    const fenetre = this.cadre()?.nativeElement.contentWindow;
-    try {
-      fenetre?.focus();
-      fenetre?.print();
-    } catch {
-      // Apercu non imprimable (certains mobiles) : le PDF est telecharge pour etre imprime.
-      this.telecharger('pdf');
+    if (!this.urlBrute) return;
+    if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      void this.imprimerSurTelephone();
+      return;
     }
+    document.getElementById('me-impression-pdf')?.remove();
+    const cadre = document.createElement('iframe');
+    cadre.id = 'me-impression-pdf';
+    cadre.setAttribute('aria-hidden', 'true');
+    cadre.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
+    cadre.onload = () =>
+      // Petit delai : le lecteur PDF du navigateur doit avoir fini d'afficher le document.
+      setTimeout(() => {
+        try {
+          cadre.contentWindow?.focus();
+          cadre.contentWindow?.print();
+        } catch {
+          this.telecharger('pdf');
+        }
+      }, 400);
+    cadre.src = this.urlBrute;
+    document.body.appendChild(cadre);
+  }
+
+  /**
+   * Telephone : chaque page du PDF devient une image dans une zone seule
+   * visible a l'impression (@media print), puis window.print().
+   */
+  private async imprimerSurTelephone(): Promise<void> {
+    if (!this.pdf || this.impression()) return;
+    this.impression.set(true);
+    this.retirerZoneImpression();
+    try {
+      const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+      pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs/pdf.worker.min.mjs';
+      const doc = await pdfjs.getDocument({ data: new Uint8Array(await this.pdf.arrayBuffer()) }).promise;
+      const zone = document.createElement('div');
+      zone.id = 'me-zone-impression';
+      const style = document.createElement('style');
+      style.id = 'me-style-impression';
+      style.textContent = `
+        #me-zone-impression { display: none; }
+        @media print {
+          @page { margin: 0; size: A4 ${this.paysage ? 'landscape' : 'portrait'}; }
+          html, body { height: auto !important; overflow: visible !important; position: static !important; background: #fff !important; }
+          body > :not(#me-zone-impression) { display: none !important; }
+          #me-zone-impression { display: block; }
+          #me-zone-impression img { display: block; width: 100%; height: 100vh; object-fit: contain; break-after: page; }
+          #me-zone-impression img:last-child { break-after: auto; }
+        }`;
+      for (let n = 1; n <= doc.numPages; n++) {
+        const page = await doc.getPage(n);
+        // ~150 dpi : net a l'impression, memoire raisonnable sur telephone.
+        const vue = page.getViewport({ scale: 150 / 72 });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.floor(vue.width);
+        canvas.height = Math.floor(vue.height);
+        await page.render({ canvasContext: canvas.getContext('2d')!, viewport: vue }).promise;
+        const image = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, 'image/jpeg', 0.9));
+        canvas.width = canvas.height = 0;
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(image!);
+        zone.appendChild(img);
+        page.cleanup();
+      }
+      await doc.destroy();
+      document.head.appendChild(style);
+      document.body.appendChild(zone);
+      await Promise.all(Array.from(zone.querySelectorAll('img')).map((i) => i.decode().catch(() => undefined)));
+      window.addEventListener('afterprint', () => setTimeout(() => this.retirerZoneImpression(), 500), { once: true });
+      window.print();
+    } catch {
+      this.retirerZoneImpression();
+      this.telecharger('pdf');
+    } finally {
+      this.impression.set(false);
+    }
+  }
+
+  private retirerZoneImpression(): void {
+    document.querySelectorAll<HTMLImageElement>('#me-zone-impression img').forEach((i) => URL.revokeObjectURL(i.src));
+    document.getElementById('me-zone-impression')?.remove();
+    document.getElementById('me-style-impression')?.remove();
   }
 
   terminer(): void {

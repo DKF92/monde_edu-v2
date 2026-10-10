@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EcrituresServeurEnLigne;
 use App\Http\Middleware\ExigerMotDePasseDefinitif;
 use App\Http\Middleware\ResolveContexteScolaire;
 use App\Http\Middleware\ResolveEtablissement;
@@ -27,6 +28,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // API pure: jamais de redirection vers une route web "login" inexistante,
         // toujours une reponse JSON 401 sur les requetes non authentifiees.
         $middleware->redirectGuestsTo(fn () => null);
+
+        // Serveur en ligne : seules les ecritures pedagogiques (config/serveur.php).
+        // Global : le refus passe avant l'authentification et la resolution des routes.
+        $middleware->append(EcrituresServeurEnLigne::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

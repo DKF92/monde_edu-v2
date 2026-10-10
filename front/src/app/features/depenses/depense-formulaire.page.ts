@@ -3,10 +3,11 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ToastController, IonContent, IonIcon, IonSkeletonText, IonSpinner } from '@ionic/angular';
 import { addIcons } from 'ionicons';
-import { chevronBackOutline, saveOutline, documentAttachOutline, closeCircleOutline, cloudUploadOutline, informationCircleOutline } from 'ionicons/icons';
+import { chevronBackOutline, saveOutline, documentAttachOutline, closeCircleOutline, cloudUploadOutline, informationCircleOutline, businessOutline, personOutline, cashOutline } from 'ionicons/icons';
 import { firstValueFrom } from 'rxjs';
-import { DepenseService, DetailDepense } from '../../core/services/depense.service';
+import { DepenseService, DetailDepense, OptionsDepense, SaisieDepense, SourceDepense } from '../../core/services/depense.service';
 import { LIBELLES_MODE, ModePaiement } from '../../core/models/caisse.model';
+import { OptionSelecteur, SelecteurComponent } from '../../shared/selecteur.component';
 
 /**
  * Saisie d'une depense (V1 new_dps : date, objet, montant, receveur, piece
@@ -16,7 +17,7 @@ import { LIBELLES_MODE, ModePaiement } from '../../core/models/caisse.model';
 @Component({
   selector: 'app-depense-formulaire',
   standalone: true,
-  imports: [IonContent, IonIcon, IonSkeletonText, IonSpinner],
+  imports: [IonContent, IonIcon, IonSkeletonText, IonSpinner, SelecteurComponent],
   templateUrl: './depense-formulaire.page.html',
   styleUrl: './depense-formulaire.page.scss',
 })
@@ -47,6 +48,19 @@ export class DepenseFormulairePage {
   readonly erreurs = signal<Record<string, string>>({});
 
   readonly motif = signal('');
+  /** Depense caisse (V1, inchangee) ou banque (banque + personne qui a fait le retrait). */
+  readonly source = signal<SourceDepense>('caisse');
+  readonly banqueId = signal(0);
+  readonly retraitParId = signal(0);
+  readonly options = signal<OptionsDepense | null>(null);
+  readonly optionsBanque = computed<OptionSelecteur[]>(() => [
+    { valeur: 0, libelle: 'Choisir la banque…' },
+    ...(this.options()?.banques ?? []).map((b) => ({ valeur: b.id, libelle: b.libelle })),
+  ]);
+  readonly optionsRetrait = computed<OptionSelecteur[]>(() => [
+    { valeur: 0, libelle: 'Choisir la personne…' },
+    ...(this.options()?.retraits ?? []).map((p) => ({ valeur: p.id, libelle: p.nom })),
+  ]);
   readonly date = signal(this.maxDate);
   readonly categorie = signal('');
   readonly libelle = signal('');
@@ -58,7 +72,7 @@ export class DepenseFormulairePage {
   readonly retirerJustificatif = signal(false);
 
   constructor() {
-    addIcons({ chevronBackOutline, saveOutline, documentAttachOutline, closeCircleOutline, cloudUploadOutline, informationCircleOutline });
+    addIcons({ chevronBackOutline, saveOutline, documentAttachOutline, closeCircleOutline, cloudUploadOutline, informationCircleOutline, businessOutline, personOutline, cashOutline });
   }
 
   async ionViewWillEnter(): Promise<void> {
@@ -67,6 +81,7 @@ export class DepenseFormulairePage {
     this.erreurs.set({});
     this.justificatif.set(null);
     this.retirerJustificatif.set(false);
+    this.service.options().subscribe({ next: (o) => this.options.set(o), error: () => this.options.set({ banques: [], retraits: [] }) });
     if (!id) {
       this.reinitialiser();
       return;
@@ -76,6 +91,9 @@ export class DepenseFormulairePage {
     try {
       const d = await firstValueFrom(this.service.detail(id));
       this.existante.set(d);
+      this.source.set(d.source ?? 'caisse');
+      this.banqueId.set(d.banque_id ?? 0);
+      this.retraitParId.set(d.retrait_par_id ?? 0);
       this.date.set(d.date);
       this.categorie.set(d.categorie);
       this.libelle.set(d.libelle);
@@ -107,6 +125,8 @@ export class DepenseFormulairePage {
   enregistrer(): void {
     const erreurs: Record<string, string> = {};
     if (this.modification() && this.motif().trim().length < 3) erreurs['motif'] = 'Le motif est obligatoire (3 caractères au moins).';
+    if (this.source() === 'banque' && !this.banqueId()) erreurs['banque_id'] = 'Choisissez la banque.';
+    if (this.source() === 'banque' && !this.retraitParId()) erreurs['retrait_par_id'] = 'Indiquez qui a fait le retrait.';
     if (!this.date()) erreurs['date_depense'] = 'Précisez la date.';
     if (!this.categorie()) erreurs['categorie'] = 'Choisissez la catégorie.';
     if (!this.libelle().trim()) erreurs['libelle'] = "Précisez l'objet de la dépense.";
@@ -114,7 +134,10 @@ export class DepenseFormulairePage {
     this.erreurs.set(erreurs);
     if (Object.keys(erreurs).length || this.enregistrement()) return;
 
-    const saisie = {
+    const saisie: SaisieDepense = {
+      source: this.source(),
+      banque_id: this.source() === 'banque' ? this.banqueId() : null,
+      retrait_par_id: this.source() === 'banque' ? this.retraitParId() : null,
       date_depense: this.date(),
       categorie: this.categorie(),
       libelle: this.libelle().trim(),
@@ -167,6 +190,9 @@ export class DepenseFormulairePage {
   private reinitialiser(): void {
     this.existante.set(null);
     this.motif.set('');
+    this.source.set('caisse');
+    this.banqueId.set(0);
+    this.retraitParId.set(0);
     this.date.set(this.maxDate);
     this.categorie.set('');
     this.libelle.set('');

@@ -5,6 +5,36 @@ import { environment } from '../../../environments/environment';
 import { ModePaiement } from '../models/caisse.model';
 import { DocumentService } from './document.service';
 
+export type SourceDepense = 'caisse' | 'banque';
+
+/** Banque de l'etablissement (Parametres > Banques). */
+export interface Banque {
+  id: number;
+  nom: string;
+  sigle: string | null;
+  numero_compte: string | null;
+  agence: string | null;
+  is_active: boolean;
+  libelle: string;
+  /** Nombre de depenses qui l'utilisent (suppression impossible si > 0). */
+  depenses?: number;
+}
+
+export interface SaisieBanque {
+  nom: string;
+  sigle: string | null;
+  numero_compte: string | null;
+  agence: string | null;
+  is_active?: boolean;
+}
+
+/** Listes du formulaire de depense. */
+export interface OptionsDepense {
+  banques: { id: number; libelle: string }[];
+  /** Personnel habilite aux retraits bancaires. */
+  retraits: { id: number; nom: string }[];
+}
+
 export interface Depense {
   id: number;
   numero: string;
@@ -13,6 +43,12 @@ export interface Depense {
   categorie_libelle: string;
   libelle: string;
   montant: number;
+  /** Sortie de caisse (V1) ou depense payee par la banque. */
+  source: SourceDepense;
+  banque_id: number | null;
+  banque: string | null;
+  retrait_par_id: number | null;
+  retrait_par: string | null;
   mode: ModePaiement;
   beneficiaire: string | null;
   piece_comptable: string | null;
@@ -46,6 +82,8 @@ export interface PageDepenses {
   totaux: { nombre: number; montant: number; par_categorie: { categorie: string; libelle: string; montant: number }[] };
   categories: { valeur: string; libelle: string }[];
   payeurs: { id: number; nom: string }[];
+  par_source: Partial<Record<SourceDepense, { montant: number; nombre: number }>>;
+  banques: { id: number; libelle: string }[];
 }
 
 export interface FiltresDepenses {
@@ -56,11 +94,16 @@ export interface FiltresDepenses {
   au?: string | null;
   categorie?: string | null;
   mode?: string | null;
+  source?: SourceDepense | null;
+  banque_id?: number | null;
   payeur_id?: number | null;
   recherche?: string;
 }
 
 export interface SaisieDepense {
+  source: SourceDepense;
+  banque_id: number | null;
+  retrait_par_id: number | null;
   date_depense: string;
   categorie: string;
   libelle: string;
@@ -81,6 +124,8 @@ export interface PointCaisse {
   encaissements: number;
   depenses: number;
   solde: number;
+  /** Depenses payees par la banque (hors solde de caisse). */
+  depenses_banque: number;
   par_categorie: { categorie: string; libelle: string; montant: number }[];
   par_mois: { mois: string; encaissements: number; salaires: number; autres: number; depenses: number; solde: number }[];
 }
@@ -101,6 +146,28 @@ export class DepenseService {
 
   lister(filtres: FiltresDepenses): Observable<PageDepenses> {
     return this.http.get<PageDepenses>(this.url, { params: this.parametres(filtres) });
+  }
+
+  options(): Observable<OptionsDepense> {
+    return this.http.get<OptionsDepense>(`${this.url}/options`);
+  }
+
+  // ------------------------------------------------ Banques (Parametres)
+
+  banques(): Observable<{ data: Banque[]; peut_gerer: boolean }> {
+    return this.http.get<{ data: Banque[]; peut_gerer: boolean }>(`${environment.apiUrl}/banques`);
+  }
+
+  creerBanque(s: SaisieBanque): Observable<{ data: Banque; message: string }> {
+    return this.http.post<{ data: Banque; message: string }>(`${environment.apiUrl}/banques`, s);
+  }
+
+  modifierBanque(id: number, s: Partial<SaisieBanque>): Observable<{ data: Banque; message: string }> {
+    return this.http.put<{ data: Banque; message: string }>(`${environment.apiUrl}/banques/${id}`, s);
+  }
+
+  supprimerBanque(id: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${environment.apiUrl}/banques/${id}`);
   }
 
   detail(id: number): Observable<DetailDepense> {
@@ -134,6 +201,11 @@ export class DepenseService {
 
   private formulaire(s: SaisieDepense): FormData {
     const fd = new FormData();
+    fd.append('source', s.source);
+    if (s.source === 'banque') {
+      if (s.banque_id) fd.append('banque_id', String(s.banque_id));
+      if (s.retrait_par_id) fd.append('retrait_par_id', String(s.retrait_par_id));
+    }
     fd.append('date_depense', s.date_depense);
     fd.append('categorie', s.categorie);
     fd.append('libelle', s.libelle);
@@ -156,6 +228,8 @@ export class DepenseService {
     if (f.periode === 'dates' && f.au) p = p.set('au', f.au);
     if (f.categorie) p = p.set('categorie', f.categorie);
     if (f.mode) p = p.set('mode', f.mode);
+    if (f.source) p = p.set('source', f.source);
+    if (f.banque_id) p = p.set('banque_id', f.banque_id);
     if (f.payeur_id) p = p.set('payeur_id', f.payeur_id);
     if (f.recherche?.trim()) p = p.set('recherche', f.recherche.trim());
     return p;

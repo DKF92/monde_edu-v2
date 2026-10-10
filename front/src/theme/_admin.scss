@@ -116,14 +116,61 @@ $me-bureau: 992px;
   }
 }
 
+// Boutons secondaires : teinte claire selon leur fonction (icone), bleu par
+// defaut. Ancien rendu (blanc, bordure grise) : supprimer ce bloc de teintes.
 .me-bouton-secondaire {
-  border: 1.5px solid var(--me-bordure);
-  background: var(--me-surface);
-  color: var(--me-texte);
+  --teinte-fond: var(--me-bleu-fond);
+  --teinte: var(--me-bleu);
+  border: 1.5px solid color-mix(in srgb, var(--teinte) 22%, transparent);
+  background: var(--teinte-fond);
+  color: color-mix(in srgb, var(--teinte) 80%, #1a2438);
+
+  ion-icon {
+    color: var(--teinte);
+  }
 
   &:hover:not(:disabled) {
-    border-color: var(--ion-color-primary);
-    color: var(--ion-color-primary);
+    border-color: var(--teinte);
+    background: color-mix(in srgb, var(--teinte-fond) 70%, var(--teinte) 12%);
+  }
+
+  // Imprimer, documents, telecharger : cyan.
+  &:has(ion-icon[name^='print']),
+  &:has(ion-icon[name^='documents']),
+  &:has(ion-icon[name^='document-text']),
+  &:has(ion-icon[name^='download']) {
+    --teinte-fond: var(--me-cyan-fond);
+    --teinte: var(--me-cyan);
+  }
+
+  // Filtres, reglages : violet.
+  &:has(ion-icon[name^='options']),
+  &:has(ion-icon[name^='settings']),
+  &:has(ion-icon[name^='funnel']) {
+    --teinte-fond: var(--me-violet-fond);
+    --teinte: var(--me-violet);
+  }
+
+  // Listes, eleves, joindre un fichier : vert.
+  &:has(ion-icon[name^='list']),
+  &:has(ion-icon[name^='people']),
+  &:has(ion-icon[name^='cloud-upload']),
+  &:has(ion-icon[name^='checkmark']) {
+    --teinte-fond: var(--me-vert-fond);
+    --teinte: var(--me-vert);
+  }
+
+  // Modifier, dupliquer, creer plusieurs : orange.
+  &:has(ion-icon[name^='create']),
+  &:has(ion-icon[name^='duplicate']),
+  &:has(ion-icon[name^='pencil']) {
+    --teinte-fond: var(--me-orange-fond);
+    --teinte: var(--me-orange);
+  }
+
+  // Filtre ou periode choisi : bordure appuyee.
+  &.actif {
+    border-color: var(--teinte);
   }
 }
 
@@ -165,6 +212,42 @@ $me-bureau: 992px;
   &.danger:hover:not(:disabled) {
     background: #fff0f0;
     color: var(--ion-color-danger);
+  }
+
+  // Actions d'une ligne : teinte claire selon l'action (voir, modifier,
+  // supprimer, imprimer, liste). Les autres (fermer, fleches) restent neutres.
+  &:has(ion-icon[name^='eye']) {
+    background: var(--me-bleu-fond);
+    color: var(--me-bleu);
+  }
+
+  &:has(ion-icon[name^='create']) {
+    background: var(--me-orange-fond);
+    color: var(--me-orange);
+  }
+
+  &:has(ion-icon[name^='trash']),
+  &.danger {
+    background: var(--me-rose-fond);
+    color: var(--me-rose);
+  }
+
+  &:has(ion-icon[name^='print']) {
+    background: var(--me-cyan-fond);
+    color: var(--me-cyan);
+  }
+
+  &:has(ion-icon[name^='list']) {
+    background: var(--me-vert-fond);
+    color: var(--me-vert);
+  }
+
+  &:is(:has(ion-icon[name^='eye']), :has(ion-icon[name^='create']), :has(ion-icon[name^='trash']), .danger, :has(ion-icon[name^='print']), :has(ion-icon[name^='list'])):hover:not(:disabled) {
+    filter: brightness(0.95) saturate(1.2);
+  }
+
+  &:disabled {
+    opacity: 0.45;
   }
 
   &:disabled {

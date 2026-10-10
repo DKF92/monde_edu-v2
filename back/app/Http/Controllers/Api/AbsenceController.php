@@ -69,7 +69,7 @@ class AbsenceController extends Controller
             'par_eleve' => $absences->groupBy('eleve.id')->map(fn ($g) => [
                 'eleve' => $g->first()['eleve'], 'classe' => $g->first()['classe'],
                 'heures' => $g->sum('nombre_heures'), 'justifiees' => $g->where('is_justifiee', true)->sum('nombre_heures'),
-            ])->sortBy(fn ($r) => [$r['classe'], $r['eleve']['nom'], $r['eleve']['prenoms']])->values(),
+            ])->sortBy(fn ($r) => [\App\Support\NomClasse::cleTri((string) $r['classe']), $r['eleve']['nom'], $r['eleve']['prenoms']])->values(),
             'sous_titre' => collect([$periode?->libelle, $classe?->libelle,
                 $request->filled('justifiee') ? ($request->boolean('justifiee') ? 'justifiées' : 'non justifiées') : null])->filter()->implode(' · '),
             'genere_le' => now(),

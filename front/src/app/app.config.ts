@@ -7,13 +7,14 @@ import { provideIonicAngular } from '@ionic/angular';
 import { provideServiceWorker } from '@angular/service-worker';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { chargementInterceptor } from './core/interceptors/chargement.interceptor';
+import { reseauInterceptor } from './core/interceptors/reseau.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideIonicAngular({}),
-    provideHttpClient(withInterceptors([chargementInterceptor, authInterceptor])),
+    provideHttpClient(withInterceptors([chargementInterceptor, authInterceptor, reseauInterceptor])),
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',

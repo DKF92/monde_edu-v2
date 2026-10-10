@@ -118,7 +118,7 @@ class ResteAPayerController extends Controller
             'classes' => ResteAPayer::parClasse($lignes),
             'totaux' => ResteAPayer::totaux($lignes),
             'nombre' => $lignes->count(),
-            'statistiques' => $stats ? ResteAPayer::statistiques($lignes, ResteAPayer::ETATS_DETTE, 'etat_dette') : [],
+            'statistiques' => $stats ? ResteAPayer::statistiques($lignes, ResteAPayer::ETATS_DETTE, 'etat_dette', ['dette_apres' => 'Dette', 'dette_payee' => 'Payé', 'reste_dette' => 'Reste']) : [],
             'genere_le' => now(),
             'edite_par' => trim($request->user()->name.' '.$request->user()->prenoms),
         ], $stats ? 'dettes-statistiques' : 'dettes', $request->query('format'), 'landscape');

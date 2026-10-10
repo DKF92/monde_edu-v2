@@ -356,6 +356,49 @@ $tableau: 860px;
     grid-template-columns: minmax(0, 150px) minmax(0, 1fr);
     align-items: center;
     gap: 10px;
+
+    &.avec-choix {
+      grid-template-columns: 18px minmax(0, 132px) minmax(0, 1fr);
+    }
+
+    &.principal {
+      display: block;
+
+      @media (min-width: 900px) {
+        grid-column: 1 / -1;
+      }
+    }
+
+    input[type='radio'] {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      accent-color: var(--me-bleu);
+      cursor: pointer;
+
+      &:disabled {
+        cursor: not-allowed;
+        opacity: 0.35;
+      }
+    }
+  }
+
+  .aide-principal {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--me-texte-doux);
+
+    ion-icon {
+      font-size: 17px;
+      color: var(--me-bleu);
+    }
+
+    strong {
+      color: var(--me-texte);
+    }
   }
 
   .matiere {

@@ -186,6 +186,15 @@
       <!-- ============================================================ 2. Fiche eleve -->
       @if (etape() === 2) {
         @let e = eleve();
+        @if (miseAJourEnLigne(); as maj) {
+          <p class="me-note">
+            <ion-icon name="globe-outline"></ion-icon>
+            <span>
+              Mise à jour en ligne à reporter{{ maj.length ? ' : ' + maj.join(' · ') : '' }}.
+              Choisissez la classe dans le nouveau niveau (sans classe, l'inscription repasse « en attente de choix de classe »), puis enregistrez : les frais sont recalculés.
+            </span>
+          </p>
+        }
         @if (depuisEnLigne()) {
           <p class="me-note">
             <ion-icon name="globe-outline"></ion-icon>

@@ -1,7 +1,8 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, NavigationStart, Router, RouterLink, RouterLinkActive } from '@angular/router';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { ScanEnLigneComponent } from '../../shared/scan-en-ligne.component';
 import { filter, map } from 'rxjs';
 import {
   IonSplitPane,
@@ -36,6 +37,7 @@ import { ENTREE_PROFIL, ICONES_NAVIGATION } from '../../core/navigation';
 import { LogoComponent } from '../../shared/logo.component';
 import { EspaceTravailService } from '../../core/services/espace-travail.service';
 import { ChoisirContexteModalComponent } from '../contexte/choisir-contexte-modal.component';
+import { ContexteService } from '../../core/services/contexte.service';
 import { AssistantComponent } from '../assistant/assistant.component';
 
 const STORAGE_MENU_REDUIT = 'monde_edu_menu_reduit';
@@ -51,6 +53,7 @@ const STORAGE_MENU_REDUIT = 'monde_edu_menu_reduit';
   selector: 'app-tabs',
   standalone: true,
   imports: [
+    ScanEnLigneComponent,
     FormsModule,
     RouterLink,
     RouterLinkActive,
@@ -72,6 +75,7 @@ export class TabsPage {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly navigation = inject(NavigationService);
+  private readonly contextes = inject(ContexteService);
   readonly espaceTravail = inject(EspaceTravailService);
 
   readonly sections = this.navigation.sections;
@@ -130,6 +134,13 @@ export class TabsPage {
 
 
   constructor() {
+    // Changement de page depuis une fenetre (ex. clic sur un eleve d'une
+    // liste) : la fenetre de la page quittee est fermee proprement, sinon elle
+    // resterait affichee par-dessus la nouvelle page. La fenetre d'espace de
+    // travail garde sa propre logique.
+    this.router.events.pipe(filter((e) => e instanceof NavigationStart), takeUntilDestroyed()).subscribe(() => {
+      document.querySelectorAll<HTMLIonModalElement>('ion-modal.show-modal:not(.modale-contexte)').forEach((m) => m.dismiss().catch(() => undefined));
+    });
     addIcons({
       ...ICONES_NAVIGATION,
       searchOutline,
@@ -149,6 +160,25 @@ export class TabsPage {
       gridOutline,
     });
 
+    // Droits du poste rafraichis a l'ouverture et au retour sur l'application.
+    this.rafraichirDroits();
+    const auRetour = () => document.visibilityState === 'visible' && this.rafraichirDroits();
+    document.addEventListener('visibilitychange', auRetour);
+    inject(DestroyRef).onDestroy(() => document.removeEventListener('visibilitychange', auRetour));
+  }
+
+  private rafraichirDroits(): void {
+    const etablissement = this.auth.etablissementActif();
+    const poste = this.auth.poste();
+    if (!etablissement || !poste) return;
+    // Hors ligne ou erreur : on garde les droits connus.
+    this.contextes.charger(etablissement.id).subscribe({
+      next: (c) => {
+        const aJour = c.postes.find((p) => p.id === poste.id);
+        if (aJour) this.auth.rafraichirPoste(aJour);
+      },
+      error: () => undefined,
+    });
   }
 
   basculerMenu(): void {

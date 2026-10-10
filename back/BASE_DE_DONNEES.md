@@ -125,7 +125,11 @@ erDiagram
 | `reglement_lignes` | Répartition d'un règlement : combien va à tel frais ou à telle dette. | `reglement_id` → `reglements`, `frais_eleve_id` → `frais_eleves` **ou** `dette_id` → `dettes` | `frais` |
 | `reglements_historique` | Corrections d'un paiement (droit « Modifier / supprimer un paiement ») : action (modification ou suppression), **motif obligatoire**, état avant et après (JSON), auteur. Une suppression retire le paiement et ses lignes (montants payés recalculés) ; la trace reste ici. | `etablissement_id`, `reglement_id` (sans clé étrangère), `eleve_id`, `user_id` → `users` | — (V1 : modification sans trace) |
 | `depenses` | Sortie de caisse (V1 `depense`) : numéro (`D2627-00001`), date, catégorie (salaires, fournitures, entretien, factures, transport, activités, autres), objet, montant, mode, bénéficiaire (V1 receveur), pièce comptable (référence), justificatif scanné, saisie par (V1 payeur = compte connecté). Droits : enregistrer (voit ses dépenses), voir (toutes + point de caisse = encaissements − dépenses), modifier / supprimer (motif obligatoire). | `etablissement_id`, `annee_scolaire_id`, `payeur_id` → `users` | `depense` |
+| `depenses` (suite, 01/10/2026) | **Caisse ou banque** : `source` = `caisse` (sortie de caisse, V1, inchangée) ou `banque` ; pour une dépense banque, `banque_id` (banque choisie) et `retrait_par_id` (personne qui a fait le retrait, parmi les comptes dont un poste a le droit `depenses.retrait_banque` « Retraits bancaires »). Le solde du point de caisse ne compte que les dépenses caisse. | `banque_id` → `banques`, `retrait_par_id` → `users` | — (nouveau en V2) |
+| `banques` | **Banques de l'établissement** (Paramètres › Banques) : nom, sigle, n° de compte, agence, active. Une banque utilisée par une dépense ne se supprime pas (on la désactive). Gestion : droit Paramètres de l'établissement ou Modifier les dépenses. | `etablissement_id` | — (nouveau en V2) |
 | `depenses_historique` | Corrections d'une dépense : action, motif obligatoire, état avant / après, auteur. | `etablissement_id`, `depense_id` (sans clé étrangère), `user_id` → `users` | — |
+| `entrees` (07/10/2026) | **Entrées banque** (Finances › Entrées) : numéro (`E2627-00001`), date, banque qui reçoit (tient lieu de bénéficiaire, mêmes banques que les dépenses), catégorie (versement de la caisse, subventions, dons, recettes d'activités, virements des parents, autres), objet, montant, mode, provenance, versement effectué par (droit `depenses.retrait_banque` « Opérations bancaires »), pièce comptable, justificatif, saisie par. Les **entrées caisse** sont les paiements (`reglements`) : non saisies ici. Un versement de la caisse est un transfert, hors du total des entrées. Droits : `entrees.gerer` (voit les siennes), `entrees.voir`, `entrees.modifier` (motif obligatoire). | `etablissement_id`, `annee_scolaire_id`, `banque_id` → `banques`, `verse_par_id` et `saisi_par_id` → `users` | — (nouveau en V2) |
+| `entrees_historique` | Corrections d'une entrée : action, motif obligatoire, état avant / après, auteur. | `etablissement_id`, `entree_id` (sans clé étrangère), `user_id` → `users` | — |
 
 ---
 
@@ -139,6 +143,20 @@ erDiagram
 | `absences` | Absence d'un élève **ou** d'un membre du personnel : dates, heures, justifiée, motif, qui l'a saisie, rattachée à l'année, la période et la classe. | `etablissement_id`, `annee_scolaire_id`, `periode_id`, `eleve_id` **ou** `personnel_id`, `classe_id`, `saisi_par_id` → `users` | `absence` |
 
 Décision de fin d'année : `inscriptions.decision_finale` (ADMIS, REDOUBLE, EXCLU) et `inscriptions.moyenne_annuelle` (V1 `decision`). Moyenne annuelle = (période 1 + 2 × période 2 + 2 × période 3) / 5.
+
+---
+
+## 5 bis. Rapports et synchronisation (serveur de l'école / serveur en ligne)
+
+Le serveur de l'école fait foi ; le serveur en ligne en est une copie, sur laquelle on n'écrit que la pédagogie (voir `config/serveur.php`). Les tables écrites des deux côtés portent un `uuid`, rempli par un déclencheur « avant insertion » (`{table}_uuid`), y compris pour les écritures directes en base : `notes`, `absences`, `moyennes`, `moyennes_generales`, `rapports_textes`, `rapports_personnalises`.
+
+| Table | Rôle |
+|---|---|
+| `rapports_textes` | Textes libres des rapports officiels (introduction, observations… signataire), par établissement et `cle` (« {année}-{type} » ou « {année}-periode-{id} »). Anciennement dans `etablissements.parametres`. |
+| `rapports_personnalises` | Modèles de rapports personnalisés (titre, configuration JSON) ; `uuid` = identifiant utilisé par l'application. Anciennement dans `etablissements.parametres`. |
+| `sync_journal` | Chaque changement d'une ligne (table, `ligne_id` ou `ligne_cle`, écriture ou suppression, origine école ou en ligne, date, date d'envoi). |
+| `sync_etat` | Avancement de la synchronisation (serveur de l'école) : dernier envoi, dernière récupération, dernière erreur. |
+| `sync_rejets` | Saisies faites en ligne refusées à l'école (ex. notes d'une classe arrêtée entre-temps), avec le motif et l'auteur à prévenir. |
 
 ---
 

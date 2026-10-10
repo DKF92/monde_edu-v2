@@ -9,23 +9,22 @@
 
         <form [formGroup]="formulaire" (ngSubmit)="seConnecter()" class="formulaire" novalidate>
           <div class="champ">
-            <label for="email">Adresse e-mail</label>
-            <div class="champ-saisie" [class.invalide]="champInvalide('email')">
-              <ion-icon name="mail-outline"></ion-icon>
+            <label for="identifiant">E-mail ou numéro de téléphone</label>
+            <div class="champ-saisie" [class.invalide]="champInvalide('identifiant')">
+              <ion-icon name="person-outline"></ion-icon>
               <input
-                id="email"
-                type="email"
-                formControlName="email"
+                id="identifiant"
+                type="text"
+                formControlName="identifiant"
                 autocomplete="username"
-                inputmode="email"
-                placeholder="nom@exemple.com"
-                [attr.aria-invalid]="champInvalide('email')"
+                autocapitalize="off"
+                spellcheck="false"
+                placeholder="nom@exemple.com ou 07 00 00 00 00"
+                [attr.aria-invalid]="champInvalide('identifiant')"
               />
             </div>
-            @if (champInvalide('email')) {
-              <p class="erreur-champ">
-                {{ formulaire.controls.email.hasError('required') ? 'Saisissez votre adresse e-mail.' : 'Cette adresse e-mail n\'est pas valide.' }}
-              </p>
+            @if (champInvalide('identifiant')) {
+              <p class="erreur-champ">Saisissez votre adresse e-mail ou votre numéro de téléphone.</p>
             }
           </div>
 

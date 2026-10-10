@@ -58,6 +58,7 @@
           }
         </label>
         <app-selecteur idChamp="filtre-categorie" icone="pricetag-outline" [options]="optionsCategorie()" [valeur]="rangCategorie()" (valeurChange)="choisirCategorie($event)"></app-selecteur>
+        <app-selecteur idChamp="filtre-source" icone="business-outline" [options]="optionsSource" [valeur]="rangSource()" (valeurChange)="choisirSource($event)"></app-selecteur>
         @if (peutVoirTout()) {
           <app-selecteur idChamp="filtre-payeur" icone="person-outline" [options]="optionsPayeur()" [valeur]="payeur()" (valeurChange)="choisirPayeur($event)"></app-selecteur>
         }
@@ -101,7 +102,10 @@
                 </small>
               </span>
               <span class="cellule" role="cell" data-libelle="Bénéficiaire">{{ d.beneficiaire || '—' }}</span>
-              <span class="cellule" role="cell" data-libelle="Mode">{{ libellesMode[d.mode] }}</span>
+              <span class="cellule" role="cell" data-libelle="Mode">
+                {{ libellesMode[d.mode] }}
+                @if (d.source === 'banque') { <span class="me-badge info" [title]="d.retrait_par ? 'Retrait : ' + d.retrait_par : ''">Banque{{ d.banque ? ' · ' + d.banque : '' }}</span> }
+              </span>
               <span class="cellule montant" role="cell" data-libelle="Montant">{{ f(d.montant) }}</span>
               <span class="cellule actions" role="cell">
                 <button type="button" class="me-action" title="Voir" aria-label="Voir la dépense" (click)="$event.stopPropagation(); ouvrir(d)"><ion-icon name="eye-outline"></ion-icon></button>
@@ -151,6 +155,10 @@
             <div><dt>Date</dt><dd>{{ dateFr(d.date) }}</dd></div>
             <div><dt>Catégorie</dt><dd>{{ d.categorie_libelle }}</dd></div>
             <div><dt>Mode</dt><dd>{{ libellesMode[d.mode] }}</dd></div>
+            <div><dt>Payée par</dt><dd>{{ d.source === 'banque' ? 'La banque' + (d.banque ? ' · ' + d.banque : '') : 'La caisse' }}</dd></div>
+            @if (d.source === 'banque') {
+              <div><dt>Retrait effectué par</dt><dd>{{ d.retrait_par || '—' }}</dd></div>
+            }
             <div><dt>Bénéficiaire</dt><dd>{{ d.beneficiaire || '—' }}</dd></div>
             <div><dt>Pièce comptable</dt><dd>{{ d.piece_comptable || '—' }}</dd></div>
             <div><dt>Saisie par</dt><dd>{{ d.payeur || '—' }}</dd></div>

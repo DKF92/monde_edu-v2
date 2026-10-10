@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Dette;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +46,8 @@ class ResteAPayer
         $dettes = DB::table('dettes as dt')
             ->leftJoin('annees_scolaires as ad', 'ad.id', '=', 'dt.annee_scolaire_id')
             ->where('dt.etablissement_id', $etablissement)->where('dt.is_annulee', false)
+            // Seulement les dettes prises en compte (parametre dettes_annees).
+            ->whereIn('dt.annee_scolaire_id', Dette::anneesPrisesEnCompte($anneeId) ?? [])
             ->groupBy('dt.eleve_id')
             ->selectRaw("dt.eleve_id, SUM(dt.montant) AS dette, SUM(dt.montant_reduit) AS dette_reduite, SUM(dt.montant_paye) AS dette_payee,
                 GROUP_CONCAT(DISTINCT ad.libelle ORDER BY ad.libelle SEPARATOR ', ') AS dette_annees");
@@ -155,7 +158,7 @@ class ResteAPayer
     public static function parClasse(Collection $lignes): array
     {
         return $lignes
-            ->sortBy(fn ($l) => [$l['classe'] === null ? 1 : 0, $l['niveau_ordre'] ?? 99, $l['classe'] ?? '', $l['nom'], $l['prenoms']])
+            ->sortBy(fn ($l) => [$l['classe'] === null ? 1 : 0, $l['niveau_ordre'] ?? 99, \App\Support\NomClasse::cleTri($l['classe'] ?? ''), $l['nom'], $l['prenoms']])
             ->groupBy(fn ($l) => $l['classe'] ?? 'Sans classe'.($l['niveau'] ? ' ('.$l['niveau'].')' : ''))
             ->map(fn (Collection $g, $classe) => ['classe' => $classe, 'lignes' => $g->values()->all(), 'totaux' => self::totaux($g)])
             ->values()->all();
@@ -163,39 +166,48 @@ class ResteAPayer
 
     /**
      * Statistiques : nombre d'eleves par etape (1er versement attendu, solde
-     * attendu, soldes) selon le sexe, le statut, le redoublement, le niveau et le cycle.
+     * attendu, soldes) et montants (a payer, paye, reste) selon le sexe, le
+     * statut, le redoublement, le cycle, le niveau et la classe.
      *
-     * Liste des dettes : colonnes ETATS_DETTE sur la cle "etat_dette".
+     * Liste des dettes : colonnes ETATS_DETTE sur la cle "etat_dette", montants de dette.
      *
-     * @return list<array{titre: string, colonnes: array, lignes: list<array{libelle: string, valeurs: array, total: int}>}>
+     * @param  array<string, string>  $montants  cle de ligne => libelle de colonne
+     * @return list<array{titre: string, colonnes: array, montants: array, lignes: list<array{libelle: string, valeurs: array, total: int, montants: array}>}>
      */
-    public static function statistiques(Collection $lignes, array $colonnes = self::ETAPES, string $cle = 'statut'): array
+    public static function statistiques(Collection $lignes, array $colonnes = self::ETAPES, string $cle = 'statut',
+        array $montants = ['a_payer' => 'À payer', 'paye' => 'Payé', 'reste' => 'Reste']): array
     {
         $etapes = collect($colonnes);
-        $tableau = function (string $titre, Collection $groupes) use ($etapes, $cle) {
+        $sommes = fn (Collection $g) => collect($montants)->map(fn ($_, $m) => (int) $g->sum($m))->all();
+        $tableau = function (string $titre, Collection $groupes) use ($etapes, $cle, $montants, $sommes, $lignes) {
             $rangees = $groupes->map(fn (Collection $g, $libelle) => [
                 'libelle' => (string) $libelle,
                 'valeurs' => $etapes->map(fn ($_, $e) => $g->where($cle, $e)->count())->all(),
                 'total' => $g->count(),
+                'montants' => $sommes($g),
             ])->values();
             $rangees->push([
                 'libelle' => 'Total',
                 'valeurs' => $etapes->map(fn ($_, $e) => (int) $rangees->sum(fn ($r) => $r['valeurs'][$e]))->all(),
                 'total' => (int) $rangees->sum('total'),
+                'montants' => $sommes($lignes),
             ]);
 
-            return ['titre' => $titre, 'colonnes' => $etapes->all(), 'lignes' => $rangees->all()];
+            return ['titre' => $titre, 'colonnes' => $etapes->all(), 'montants' => $montants, 'lignes' => $rangees->all()];
         };
         $ordonne = fn (Collection $g, array $ordre) => collect($ordre)->mapWithKeys(fn ($libelle, $cle) => [$libelle => $g->get($cle, collect())]);
-        $parNiveau = $lignes->sortBy('niveau_ordre')->groupBy(fn ($l) => $l['niveau'] ?? '—');
+        $parNiveau = $lignes->sortBy(fn ($l) => [$l['niveau_ordre'] ?? 99, $l['niveau'] ?? ''])->groupBy(fn ($l) => $l['niveau'] ?? '—');
         $parCycle = $lignes->sortBy('niveau_ordre')->groupBy(fn ($l) => BilanCaisse::CYCLES[$l['cycle']] ?? '—');
+        $parClasse = $lignes->sortBy(fn ($l) => [$l['classe'] === null ? 1 : 0, $l['niveau_ordre'] ?? 99, NomClasse::cleTri($l['classe'] ?? '')])
+            ->groupBy(fn ($l) => $l['classe'] ?? 'Sans classe');
 
         return [
-            $tableau('Par sexe', $ordonne($lignes->groupBy('sexe'), ['F' => 'Filles', 'M' => 'Garçons'])),
+            $tableau('Par genre', $ordonne($lignes->groupBy('sexe'), ['F' => 'Filles', 'M' => 'Garçons'])),
             $tableau('Par statut', $ordonne($lignes->groupBy(fn ($l) => $l['affecte'] ? 'a' : 'n'), ['a' => 'Affectés', 'n' => 'Non affectés'])),
             $tableau('Par redoublement', $ordonne($lignes->groupBy(fn ($l) => $l['redoublant'] ? 'r' : 'n'), ['n' => 'Non redoublants', 'r' => 'Redoublants'])),
-            $tableau('Par niveau', $parNiveau),
             $tableau('Par cycle', $parCycle),
+            $tableau('Par niveau', $parNiveau),
+            $tableau('Par classe', $parClasse),
         ];
     }
 }

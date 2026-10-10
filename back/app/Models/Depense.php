@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * numero : "D2627-00001" (annee + ordre dans l'etablissement).
  */
 #[Fillable([
-    'etablissement_id', 'annee_scolaire_id', 'numero', 'libelle', 'montant', 'mode_paiement', 'categorie',
+    'etablissement_id', 'annee_scolaire_id', 'numero', 'libelle', 'montant', 'source', 'banque_id', 'retrait_par_id', 'mode_paiement', 'categorie',
     'beneficiaire', 'piece_comptable', 'payeur_id', 'piece_justificative_path', 'date_depense',
 ])]
 class Depense extends Model
@@ -33,6 +33,20 @@ class Depense extends Model
     ];
 
     public const MODES = ['especes' => 'Espèces', 'mobile_money' => 'Mobile money', 'cheque' => 'Chèque', 'virement' => 'Virement'];
+
+    /** Caisse (V1, sortie de caisse) ou banque (banque + personne qui a fait le retrait). */
+    public const SOURCES = ['caisse' => 'Caisse', 'banque' => 'Banque'];
+
+    public function banque(): BelongsTo
+    {
+        return $this->belongsTo(Banque::class);
+    }
+
+    /** Personne qui a fait le retrait bancaire (depense banque). */
+    public function retraitPar(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'retrait_par_id');
+    }
 
     protected function casts(): array
     {

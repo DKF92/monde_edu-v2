@@ -34,6 +34,7 @@ export class NavigationService {
   );
 
   private estAutorisee(entree: EntreeNavigation): boolean {
-    return entree.permissions.length === 0 || entree.permissions.some((p) => this.auth.aPermission(p));
+    const une = (liste: string[]) => liste.some((p) => this.auth.aPermission(p));
+    return (entree.permissions.length === 0 || une(entree.permissions)) && (!entree.aussi || une(entree.aussi));
   }
 }

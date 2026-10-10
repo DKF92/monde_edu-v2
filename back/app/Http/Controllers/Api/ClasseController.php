@@ -10,6 +10,7 @@ use App\Models\Inscription;
 use App\Models\Niveau;
 use App\Models\Personnel;
 use App\Support\Document;
+use App\Support\NomClasse;
 use App\Support\PorteePedagogique;
 use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
@@ -26,7 +27,7 @@ use Illuminate\Validation\ValidationException;
  * - classes.gerer : creer, modifier, supprimer une classe (sans eleve).
  * Un poste rattache a des niveaux (educateur) ne voit que ses niveaux.
  *
- * Libelle = niveau + nom court (V1 lib_niveau + lib_classe) : "6EME 1", "2NDE A".
+ * Libelle = niveau + numero en exposant (« 6eme¹ », « TleA2³ ») ou lettre (« 6eme A ») : NomClasse.
  */
 class ClasseController extends Controller
 {
@@ -39,8 +40,8 @@ class ClasseController extends Controller
         $autorises = $this->niveauxAutorises($request, $annee->id);
 
         $classes = $this->classes($annee->id, $autorises);
-        $niveaux = Niveau::when($autorises !== null, fn (Builder $q) => $q->whereIn('id', $autorises))
-            ->orderBy('ordre')->get(['id', 'code', 'libelle', 'cycle', 'ordre']);
+        $niveaux = Niveau::deClasse()->when($autorises !== null, fn (Builder $q) => $q->whereIn('id', $autorises))
+            ->ordonnes()->get(['id', 'code', 'libelle', 'cycle', 'ordre']);
         $numerotation = $this->numerotation($tenant);
 
         return response()->json([
@@ -194,7 +195,7 @@ class ClasseController extends Controller
             'etablissement_id' => $tenant->id(),
             'annee_scolaire_id' => $annee->id,
             'niveau_id' => $niveau->id,
-            'libelle' => mb_strtoupper($niveau->libelle.' '.$nom),
+            'libelle' => NomClasse::composer($niveau->libelle, $nom),
         ])->id)->all());
 
         return response()->json(collect($this->classes($annee->id, null))->whereIn('id', $ids)->values(), 201);
@@ -239,21 +240,24 @@ class ClasseController extends Controller
      */
     private function classes(int $anneeId, ?array $niveaux, ?int $classeId = null): array
     {
+        // Effectifs : eleves visibles en classe (Parametres : statut minimum), comme la liste.
+        $visible = 'inscriptions.statut >= '.Inscription::statutVisibleEnClasse();
         $effectifs = Inscription::where('annee_scolaire_id', $anneeId)
             ->whereNotNull('classe_id')
             ->when($classeId, fn (Builder $q) => $q->where('classe_id', $classeId))
             ->join('eleves', 'eleves.id', '=', 'inscriptions.eleve_id')
             ->groupBy('inscriptions.classe_id')
             ->selectRaw("inscriptions.classe_id,
-                COUNT(*) AS total,
-                SUM(eleves.sexe = 'M') AS garcons,
-                SUM(eleves.sexe = 'F') AS filles,
-                SUM(inscriptions.affecte = 1) AS affectes,
-                SUM(inscriptions.redoublant = 1) AS redoublants,
+                SUM($visible) AS total,
+                SUM($visible AND eleves.sexe = 'M') AS garcons,
+                SUM($visible AND eleves.sexe = 'F') AS filles,
+                SUM($visible AND inscriptions.affecte = 1) AS affectes,
+                SUM($visible AND inscriptions.redoublant = 1) AS redoublants,
                 SUM(inscriptions.statut = ".Inscription::CLASSE_CHOISIE.') AS attente_versement,
                 SUM(inscriptions.statut = '.Inscription::PAIEMENT.') AS attente_solde,
                 SUM(inscriptions.statut = '.Inscription::SOLDE.') AS soldes')
             ->get()->keyBy('classe_id');
+        $educateurs = $this->educateursParNiveau($anneeId);
 
         return Classe::where('classes.annee_scolaire_id', $anneeId)
             ->when($classeId, fn (Builder $q) => $q->whereKey($classeId))
@@ -261,7 +265,7 @@ class ClasseController extends Controller
             ->with(['niveau:id,code,libelle,cycle,ordre', 'professeurPrincipal.user:id,name,prenoms', 'educateur.user:id,name,prenoms'])
             ->get()
             ->sortBy(fn (Classe $c) => [$c->niveau?->ordre ?? 99, $this->rang($c->libelle)])
-            ->map(function (Classe $c) use ($effectifs) {
+            ->map(function (Classe $c) use ($effectifs, $educateurs) {
                 $e = $effectifs->get($c->id);
                 $total = (int) ($e->total ?? 0);
                 $limite = $c->effectifLimite();
@@ -277,7 +281,7 @@ class ClasseController extends Controller
                     'source_limite' => $limite['source'],
                     'langue_vivante_2' => $c->langue_vivante_2,
                     'professeur_principal' => $this->personne($c->professeurPrincipal),
-                    'educateur' => $this->personne($c->educateur),
+                    'educateur' => $this->personne($this->educateurDe($c, $educateurs)),
                     'effectif' => $total,
                     'garcons' => (int) ($e->garcons ?? 0),
                     'filles' => (int) ($e->filles ?? 0),
@@ -312,7 +316,7 @@ class ClasseController extends Controller
     /** Eleves de la classe, par ordre alphabetique. */
     private function eleves(Classe $classe): array
     {
-        return $classe->inscriptions()
+        return $classe->inscriptions()->visiblesEnClasse()
             ->join('eleves', 'eleves.id', '=', 'inscriptions.eleve_id')
             ->orderBy('eleves.nom')->orderBy('eleves.prenoms')->orderBy('eleves.matricule')
             ->get([
@@ -337,6 +341,34 @@ class ClasseController extends Controller
                 'statut' => (int) $i->statut,
             ])
             ->values()->all();
+    }
+
+    /**
+     * Educateurs de l'annee par niveau general (V1 choix), le plus specialise
+     * d'abord (celui qui suit le moins de niveaux).
+     *
+     * @return Collection<int, Collection<int, Personnel>>
+     */
+    private function educateursParNiveau(int $anneeId): Collection
+    {
+        $lignes = DB::table('educateur_niveaux')->where('annee_scolaire_id', $anneeId)->get(['personnel_id', 'niveau_id']);
+        $nombre = $lignes->countBy('personnel_id');
+        $personnels = Personnel::with('user:id,name,prenoms')->whereIn('id', $lignes->pluck('personnel_id')->unique())->get()->keyBy('id');
+
+        return $lignes->groupBy('niveau_id')->map(fn ($l) => $l->pluck('personnel_id')->unique()
+            ->sortBy(fn ($id) => $nombre[$id])->map(fn ($id) => $personnels[$id] ?? null)->filter()->values());
+    }
+
+    /**
+     * Educateur d'une classe : celui de la classe s'il suit son niveau, sinon
+     * l'educateur qui suit ce niveau cette annee (la V1 mettait parfois le
+     * directeur dans la classe), sinon celui de la classe.
+     */
+    private function educateurDe(Classe $c, Collection $educateurs): ?Personnel
+    {
+        $candidats = $educateurs->get(Niveau::generalId($c->niveau_id)) ?? collect();
+
+        return $candidats->firstWhere('id', $c->educateur_id) ?? $candidats->first() ?? $c->educateur;
     }
 
     private function personnels(): array
@@ -385,7 +417,7 @@ class ClasseController extends Controller
         }
 
         $niveau = Niveau::findOrFail($data['niveau_id']);
-        $libelle = mb_strtoupper($niveau->libelle.' '.$nom);
+        $libelle = NomClasse::composer($niveau->libelle, $nom);
         $existe = Classe::where('annee_scolaire_id', $anneeId)->where('niveau_id', $niveau->id)->where('libelle', $libelle)
             ->when($classe, fn (Builder $q) => $q->whereKeyNot($classe->id))
             ->exists();
@@ -466,17 +498,15 @@ class ClasseController extends Controller
         return collect(range(1, $nombre))->map(fn ($i) => $depart + $i)->filter(fn ($o) => $o <= ord('Z'))->map(fn ($o) => chr($o))->values()->all();
     }
 
-    /** Nom court de la classe : le libelle sans le niveau ("6EME A" -> "A"). */
+    /** Nom court de la classe : le numero ou la lettre (« 6eme¹² » -> « 12 », « 6eme A » -> « A »). */
     private function nomCourt(Classe $c): string
     {
-        $prefixe = mb_strtoupper(($c->niveau?->libelle ?? '').' ');
-
-        return str_starts_with(mb_strtoupper($c->libelle), $prefixe) ? mb_substr($c->libelle, mb_strlen($prefixe)) : $c->libelle;
+        return NomClasse::nom($c->libelle, $c->niveau?->libelle);
     }
 
     /** Tri naturel des classes d'un niveau : 6EME 2 avant 6EME 10. */
     private function rang(string $libelle): string
     {
-        return preg_replace_callback('/\d+/', fn ($m) => str_pad($m[0], 4, '0', STR_PAD_LEFT), $libelle);
+        return NomClasse::cleTri($libelle);
     }
 }

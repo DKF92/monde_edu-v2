@@ -9,6 +9,7 @@ use App\Models\Etablissement;
 use App\Models\Niveau;
 use App\Models\Periode;
 use App\Support\Document;
+use App\Support\PorteeFinances;
 use App\Support\PorteePedagogique;
 use App\Support\Resultats;
 use App\Support\TenantContext;
@@ -24,7 +25,7 @@ use Illuminate\Validation\Rule;
  * a remplir a la main : "Signature", "Observation"...), le regroupement
  * (etablissement, cycle, niveau ou classe), les filtres et le tri.
  *
- * Les modeles enregistres (parametre rapports_personnalises) apparaissent dans
+ * Les modeles enregistres (table rapports_personnalises) apparaissent dans
  * les rapports, rubrique "Mes rapports" ; seul etablissement.gerer les
  * enregistre ou les supprime, tout detenteur de rapports.voir les imprime.
  */
@@ -77,12 +78,12 @@ class RapportPersonnaliseController extends Controller
         $anneeId = PorteePedagogique::anneeId($tenant);
 
         return response()->json([
-            'champs' => collect(self::CHAMPS)->map(fn ($c, $cle) => ['cle' => $cle, 'libelle' => $c[0], 'rubrique' => $c[1]])->values(),
+            'champs' => collect($this->champs($request))->map(fn ($c, $cle) => ['cle' => $cle, 'libelle' => $c[0], 'rubrique' => $c[1]])->values(),
             'regroupements' => collect(self::REGROUPEMENTS)->map(fn ($l, $v) => ['valeur' => $v, 'libelle' => $l])->values(),
             'tris' => collect(self::TRIS)->map(fn ($l, $v) => ['valeur' => $v, 'libelle' => $l])->values(),
             'cycles' => Niveau::whereIn('id', Classe::where('annee_scolaire_id', $anneeId)->select('niveau_id'))->distinct()->pluck('cycle')
                 ->map(fn ($c) => ['valeur' => $c, 'libelle' => self::CYCLES[$c] ?? $c])->values(),
-            'niveaux' => Niveau::whereIn('id', Classe::where('annee_scolaire_id', $anneeId)->select('niveau_id'))->orderBy('ordre')->get(['id', 'libelle', 'cycle']),
+            'niveaux' => Niveau::whereIn('id', Classe::where('annee_scolaire_id', $anneeId)->select('niveau_id'))->ordonnes()->get(['id', 'libelle', 'cycle']),
             'classes' => Classe::where('annee_scolaire_id', $anneeId)->join('niveaux', 'niveaux.id', '=', 'classes.niveau_id')
                 ->orderBy('niveaux.ordre')->orderBy('classes.libelle')->get(['classes.id', 'classes.libelle', 'classes.niveau_id']),
             'periodes' => Periode::where('annee_scolaire_id', $anneeId)->orderBy('numero')->get(['id', 'libelle']),
@@ -96,6 +97,7 @@ class RapportPersonnaliseController extends Controller
     {
         $this->autoriser($request);
         $config = $this->valider($request->all());
+        $this->verifierMontants($request, $config);
 
         return response()->json($this->construire($config, PorteePedagogique::anneeId($tenant)));
     }
@@ -109,6 +111,7 @@ class RapportPersonnaliseController extends Controller
         } else {
             $config = $this->valider((array) json_decode((string) $request->query('config'), true));
         }
+        $this->verifierMontants($request, $config);
         $anneeId = PorteePedagogique::anneeId($tenant);
         $rapport = $this->construire($config, $anneeId);
         $largeur = collect($rapport['colonnes'])->count();
@@ -125,6 +128,7 @@ class RapportPersonnaliseController extends Controller
     {
         $this->autoriserGestion($request);
         $config = $this->valider($request->all());
+        $this->verifierMontants($request, $config);
         $config['id'] = (string) Str::uuid();
 
         return response()->json(['message' => 'Rapport « '.$config['titre'].' » enregistré.', 'modele' => $this->sauver($tenant, $config)], 201);
@@ -135,6 +139,7 @@ class RapportPersonnaliseController extends Controller
         $this->autoriserGestion($request);
         abort_unless(isset($this->modeles($tenant)[$id]), 404, 'Rapport introuvable.');
         $config = $this->valider($request->all());
+        $this->verifierMontants($request, $config);
         $config['id'] = $id;
 
         return response()->json(['message' => 'Rapport « '.$config['titre'].' » modifié.', 'modele' => $this->sauver($tenant, $config)]);
@@ -146,8 +151,7 @@ class RapportPersonnaliseController extends Controller
         $modeles = $this->modeles($tenant);
         abort_unless(isset($modeles[$id]), 404, 'Rapport introuvable.');
         $titre = $modeles[$id]['titre'];
-        unset($modeles[$id]);
-        Etablissement::findOrFail($tenant->id())->definirParametres(['rapports_personnalises' => $modeles]);
+        DB::table('rapports_personnalises')->where('etablissement_id', $tenant->id())->where('uuid', $id)->delete();
 
         return response()->json(['message' => 'Rapport « '.$titre.' » supprimé.']);
     }
@@ -283,6 +287,18 @@ class RapportPersonnaliseController extends Controller
         return implode(' · ', $morceaux);
     }
 
+    /** Champs proposes : sans la rubrique Finances pour un poste qui ne voit pas les montants. */
+    private function champs(Request $request): array
+    {
+        return PorteeFinances::voitMontants($request) ? self::CHAMPS : array_filter(self::CHAMPS, fn ($c) => $c[1] !== 'Finances');
+    }
+
+    private function verifierMontants(Request $request, array $config): void
+    {
+        $montants = collect($config['colonnes'])->where('type', 'champ')->contains(fn ($c) => (self::CHAMPS[$c['cle']][1] ?? null) === 'Finances');
+        abort_if($montants && ! PorteeFinances::voitMontants($request), 403, 'Ce rapport contient des colonnes financières : votre poste ne permet pas de les consulter.');
+    }
+
     // ------------------------------------------------------------ Modeles
 
     private function valider(array $donnees): array
@@ -344,17 +360,23 @@ class RapportPersonnaliseController extends Controller
         ];
     }
 
-    /** @return array<string, array> modeles indexes par id */
+    /** @return array<string, array> modeles (table rapports_personnalises) indexes par uuid */
     private function modeles(TenantContext $tenant): array
     {
-        return (array) (Etablissement::findOrFail($tenant->id())->parametre('rapports_personnalises') ?? []);
+        return DB::table('rapports_personnalises')->where('etablissement_id', $tenant->id())->orderBy('id')->get()
+            ->mapWithKeys(fn ($r) => [$r->uuid => ['id' => $r->uuid] + (json_decode($r->configuration, true) ?: [])])->all();
     }
 
     private function sauver(TenantContext $tenant, array $config): array
     {
-        $modeles = $this->modeles($tenant);
-        $modeles[$config['id']] = $config;
-        Etablissement::findOrFail($tenant->id())->definirParametres(['rapports_personnalises' => $modeles]);
+        $valeurs = ['titre' => mb_substr($config['titre'], 0, 150), 'configuration' => json_encode($config, JSON_UNESCAPED_UNICODE),
+            'modifie_par_id' => auth()->id(), 'updated_at' => now()];
+        $existe = DB::table('rapports_personnalises')->where('etablissement_id', $tenant->id())->where('uuid', $config['id']);
+        if ($existe->exists()) {
+            $existe->update($valeurs);
+        } else {
+            DB::table('rapports_personnalises')->insert($valeurs + ['uuid' => $config['id'], 'etablissement_id' => $tenant->id(), 'created_at' => now()]);
+        }
 
         return $config;
     }

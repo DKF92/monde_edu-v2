@@ -501,7 +501,8 @@ export class ClassesPage {
   }
 
   private normaliser(texte: string): string {
-    return texte.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    // NFKD : « 6eme¹ » devient « 6eme1 » ; sans espaces : « 6eme 1 » le trouve aussi.
+    return texte.normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '').toLowerCase();
   }
 
   private async notifier(message: string, erreur = false): Promise<void> {

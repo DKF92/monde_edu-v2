@@ -41,9 +41,9 @@ class CaisseService
     }
 
     /** Dettes des annees precedentes encore ouvertes (plus ancienne d'abord). */
-    public function dettesOuvertes(Eleve $eleve): Collection
+    public function dettesOuvertes(Eleve $eleve, ?int $anneeId = null): Collection
     {
-        return Dette::with('anneeScolaire')->where('eleve_id', $eleve->id)->where('is_annulee', false)->get()
+        return Dette::with('anneeScolaire')->where('eleve_id', $eleve->id)->where('is_annulee', false)->prisesEnCompte($anneeId)->get()
             ->filter(fn (Dette $d) => $d->resteAPayer() > 0)
             ->sortBy(fn (Dette $d) => $d->anneeScolaire?->libelle)
             ->values();
@@ -68,7 +68,7 @@ class CaisseService
         $max = (int) $etablissement->parametre('versements_max');
         $minimum = $numero === 1
             ? (int) (GrilleTarifaire::where('annee_scolaire_id', $inscription->annee_scolaire_id)
-                ->where('niveau_id', $inscription->niveau_id)->where('affecte', $inscription->affecte)
+                ->where('niveau_id', \App\Models\Niveau::generalId($inscription->niveau_id))->where('affecte', $inscription->affecte)
                 ->value('montant_minimum_inscription') ?? $etablissement->parametre('versement_minimum'))
             : (int) $etablissement->parametre('versement_minimum');
         $doitSolder = $max > 0 && $numero >= $max;
@@ -160,7 +160,7 @@ class CaisseService
             }
         }
 
-        $dettes = $this->dettesOuvertes($inscription->eleve);
+        $dettes = $this->dettesOuvertes($inscription->eleve, $inscription->annee_scolaire_id);
         $resteDettes = (int) $dettes->sum(fn (Dette $d) => $d->resteAPayer());
         if ($montantDette > $resteDettes) {
             throw ValidationException::withMessages(['montant_dette' => [$resteDettes > 0

@@ -10,13 +10,16 @@ use App\Models\FraisEleve;
 use App\Models\Inscription;
 use App\Models\Reglement;
 use App\Models\ReglementLigne;
+use App\Models\User;
 use App\Services\CaisseService;
 use App\Support\BilanCaisse;
 use App\Support\Document;
 use App\Support\FicheEleve;
 use App\Support\PorteeFinances;
+use App\Support\PorteePedagogique;
 use App\Support\RecuPaiement;
 use App\Support\TenantContext;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -56,7 +59,7 @@ class CaisseController extends Controller
             ->limit(20)
             ->get();
 
-        $dettes = Dette::whereIn('eleve_id', $inscriptions->pluck('eleve_id'))->where('is_annulee', false)
+        $dettes = Dette::whereIn('eleve_id', $inscriptions->pluck('eleve_id'))->where('is_annulee', false)->prisesEnCompte($this->anneeId($tenant))
             ->get()->groupBy('eleve_id')
             ->map(fn ($d) => (int) $d->sum(fn (Dette $x) => max(0, $x->resteAPayer())));
 
@@ -132,8 +135,109 @@ class CaisseController extends Controller
      */
     public function journal(Request $request, TenantContext $tenant)
     {
+        [$base, $filtreLignes, $ligneRetenue, $data, $encaisse, $estCaissier, $matricule, $enfants] = $this->requeteJournal($request, $tenant);
+
+        $parMode = (clone $base)->selectRaw('mode_paiement, COUNT(*) AS nombre, SUM(montant_total) AS total')
+            ->groupBy('mode_paiement')->get()->keyBy('mode_paiement');
+
+        $page = (clone $base)->with(['eleve', 'inscription.classe:id,libelle', 'caissier:id,name,prenoms'])
+            ->orderByDesc('reglements.date_paiement')->orderByDesc('reglements.id')
+            ->paginate(min(max($request->integer('par_page', 50), 1), 200));
+
+        // Cellule du bilan : part de chaque paiement qui a regle ces frais.
+        $parts = $filtreLignes
+            ? ReglementLigne::whereIn('reglement_id', collect($page->items())->pluck('id'))->where($ligneRetenue)
+                ->groupBy('reglement_id')->selectRaw('reglement_id, SUM(montant) AS part')->pluck('part', 'reglement_id')
+            : collect();
+        $totalParts = $filtreLignes
+            ? (int) ReglementLigne::whereIn('reglement_id', (clone $base)->select('reglements.id'))->where($ligneRetenue)->sum('montant')
+            : null;
+
+        return response()->json([
+            'data' => collect($page->items())->map(fn (Reglement $r) => $this->presenterReglement($r, false)
+                + ['part' => $filtreLignes ? (int) ($parts[$r->id] ?? 0) : null])->values(),
+            'total_parts' => $totalParts,
+            'total' => $page->total(),
+            'page' => $page->currentPage(),
+            'par_page' => $page->perPage(),
+            'du' => $data['du'],
+            'au' => $data['au'],
+            'totaux' => [
+                'nombre' => (int) $parMode->sum('nombre'),
+                'montant' => (int) $parMode->sum('total'),
+                'par_mode' => collect(self::MODES)->mapWithKeys(fn ($m) => [$m => (int) ($parMode[$m]->total ?? 0)]),
+            ],
+            // Portee appliquee : ses encaissements (droit Encaisser) ou tout.
+            'mes_encaissements' => $encaisse && $matricule === '' && ($estCaissier || $request->boolean('moi')),
+            'matricule' => $matricule !== '' ? $matricule : null,
+            // Encaisseurs de l'annee (sans charger tous les paiements).
+            'caissiers' => ($estCaissier || $enfants !== null) ? [] : User::whereIn('id', Reglement::where('annee_scolaire_id', $this->anneeId($tenant))
+                ->whereNotNull('caissier_id')->distinct()->select('caissier_id'))->orderBy('name')->get(['id', 'name', 'prenoms'])
+                ->map(fn ($u) => ['id' => $u->id, 'nom' => trim($u->name.' '.$u->prenoms)])->values(),
+        ]);
+    }
+
+    /**
+     * Liste des paiements imprimable (memes filtres que la liste), avec les
+     * totaux par mode de paiement.
+     */
+    public function journalDocument(Request $request, TenantContext $tenant)
+    {
+        [$base, $filtreLignes, $ligneRetenue, $data] = $this->requeteJournal($request, $tenant);
+        $reglements = (clone $base)->with(['eleve:id,matricule,nom,prenoms', 'inscription.classe:id,libelle', 'caissier:id,name,prenoms'])
+            ->orderBy('reglements.date_paiement')->orderBy('reglements.id')->get();
+        $parts = $filtreLignes
+            ? ReglementLigne::whereIn('reglement_id', (clone $base)->select('reglements.id'))->where($ligneRetenue)
+                ->groupBy('reglement_id')->selectRaw('reglement_id, SUM(montant) AS part')->pluck('part', 'reglement_id')
+            : null;
+        $date = fn (?string $d) => $d ? Carbon::parse($d)->format('d/m/Y') : '…';
+        $periode = match (true) {
+            $data['du'] && $data['du'] === $data['au'] => 'le '.$date($data['du']),
+            $data['du'] || $data['au'] => 'du '.$date($data['du']).' au '.$date($data['au']),
+            default => "toute l'année",
+        };
+        $annee = AnneeScolaire::find($this->anneeId($tenant))?->libelle;
+        $caissier = ($data['caissier_id'] ?? null) ? User::find($data['caissier_id']) : null;
+        $montant = fn (Reglement $r) => (int) ($parts !== null ? ($parts[$r->id] ?? 0) : $r->montant_total);
+
+        return Document::repondre('pdf.paiements', Document::entete(Etablissement::findOrFail($tenant->id())) + [
+            'annee' => $annee,
+            'periode' => $periode,
+            'filtres' => collect([
+                ($data['mode'] ?? null) ? 'mode '.$data['mode'] : null,
+                $caissier ? 'encaissés par '.trim($caissier->name.' '.$caissier->prenoms) : null,
+                trim($data['recherche'] ?? '') !== '' ? 'recherche « '.trim($data['recherche']).' »' : null,
+            ])->filter()->implode(' · '),
+            'lignes' => $reglements->map(fn (Reglement $r) => [
+                'date' => $r->date_paiement,
+                'numero' => $r->numero_recu,
+                'matricule' => $r->eleve?->matricule,
+                'nom' => $r->eleve?->nom,
+                'prenoms' => $r->eleve?->prenoms,
+                'classe' => $r->inscription?->classe?->libelle,
+                'mode' => $r->mode_paiement,
+                'caissier' => $r->caissier ? trim($r->caissier->name.' '.$r->caissier->prenoms) : null,
+                'montant' => $montant($r),
+            ]),
+            'part' => $parts !== null,
+            'par_mode' => $reglements->groupBy('mode_paiement')->map(fn ($g, $mode) => [
+                'mode' => $mode, 'nombre' => $g->count(), 'montant' => (int) $g->sum($montant),
+            ])->sortBy('mode')->values(),
+            'genere_le' => now(),
+            'edite_par' => trim($request->user()->name.' '.$request->user()->prenoms),
+        ], 'paiements-'.$annee, $request->query('format'));
+    }
+
+    /**
+     * Requete de la liste des paiements et ses filtres (liste et document).
+     *
+     * @return array{0: Builder, 1: bool, 2: \Closure, 3: array, 4: bool, 5: bool, 6: string, 7: ?array}
+     */
+    private function requeteJournal(Request $request, TenantContext $tenant): array
+    {
         $encaisse = $request->user()->can('reglements.encaisser');
         abort_unless($encaisse || $request->user()->can('reglements.voir'), 403);
+        $estCaissier = PorteePedagogique::poste($request)?->code === 'caissier';
 
         $data = $request->validate([
             'periode' => ['nullable', Rule::in(['jour', 'semaine', 'mois', 'annee', 'dates'])],
@@ -167,7 +271,9 @@ class CaisseController extends Controller
             $criteres = BilanCaisse::criteres([]);
         } else {
             $criteres = BilanCaisse::criteres($request->only(['sexe', 'redoublant', 'cycle', 'niveau_id', 'classe_id']));
-            if ($encaisse) {
+            // Un caissier ne voit que ses encaissements (V1) ; les autres postes
+            // qui encaissent choisissent le caissier (filtre du point de caisse).
+            if ($encaisse && ($estCaissier || $request->boolean('moi'))) {
                 $data['caissier_id'] = $request->user()->id;
             }
         }
@@ -220,43 +326,7 @@ class CaisseController extends Controller
                     ->when(! $criteres['classe_id'] && ! $criteres['niveau_id'] && $criteres['cycle'], fn ($x) => $x->whereHas('niveau', fn ($n) => $n->where('cycle', $criteres['cycle'])));
             }));
 
-        $parMode = (clone $base)->selectRaw('mode_paiement, COUNT(*) AS nombre, SUM(montant_total) AS total')
-            ->groupBy('mode_paiement')->get()->keyBy('mode_paiement');
-
-        $page = (clone $base)->with(['eleve', 'inscription.classe:id,libelle', 'caissier:id,name,prenoms'])
-            ->orderByDesc('reglements.date_paiement')->orderByDesc('reglements.id')
-            ->paginate(min(max($request->integer('par_page', 50), 1), 200));
-
-        // Cellule du bilan : part de chaque paiement qui a regle ces frais.
-        $parts = $filtreLignes
-            ? ReglementLigne::whereIn('reglement_id', collect($page->items())->pluck('id'))->where($ligneRetenue)
-                ->groupBy('reglement_id')->selectRaw('reglement_id, SUM(montant) AS part')->pluck('part', 'reglement_id')
-            : collect();
-        $totalParts = $filtreLignes
-            ? (int) ReglementLigne::whereIn('reglement_id', (clone $base)->select('reglements.id'))->where($ligneRetenue)->sum('montant')
-            : null;
-
-        return response()->json([
-            'data' => collect($page->items())->map(fn (Reglement $r) => $this->presenterReglement($r, false)
-                + ['part' => $filtreLignes ? (int) ($parts[$r->id] ?? 0) : null])->values(),
-            'total_parts' => $totalParts,
-            'total' => $page->total(),
-            'page' => $page->currentPage(),
-            'par_page' => $page->perPage(),
-            'du' => $data['du'],
-            'au' => $data['au'],
-            'totaux' => [
-                'nombre' => (int) $parMode->sum('nombre'),
-                'montant' => (int) $parMode->sum('total'),
-                'par_mode' => collect(self::MODES)->mapWithKeys(fn ($m) => [$m => (int) ($parMode[$m]->total ?? 0)]),
-            ],
-            // Portee appliquee : ses encaissements (droit Encaisser) ou tout.
-            'mes_encaissements' => $encaisse && $matricule === '',
-            'matricule' => $matricule !== '' ? $matricule : null,
-            'caissiers' => ($encaisse || $enfants !== null) ? [] : Reglement::where('annee_scolaire_id', $this->anneeId($tenant))
-                ->with('caissier:id,name,prenoms')->get()->pluck('caissier')->filter()->unique('id')
-                ->map(fn ($u) => ['id' => $u->id, 'nom' => trim($u->name.' '.$u->prenoms)])->values(),
-        ]);
+        return [$base, $filtreLignes, $ligneRetenue, $data, $encaisse, $estCaissier, $matricule, $enfants];
     }
 
     // ------------------------------------------------------------ Bilan
@@ -283,12 +353,19 @@ class CaisseController extends Controller
     public function bilanGeneralPdf(Request $request, TenantContext $tenant)
     {
         $bilan = $this->donneesBilan($request, $tenant, false);
-        $bilan['sections'] = BilanCaisse::general($bilan['annee_id'], $bilan['caissier']['id'], $bilan['periode'], $bilan['criteres']);
+        // Total general ou « Tous » : un bilan par caissier juste apres le bilan general (point 2).
+        $bilan['sections'] = BilanCaisse::general($bilan['annee_id'], $bilan['caissier']['id'], $bilan['periode'], $bilan['criteres'],
+            $bilan['caissier']['id'] ? [] : $bilan['caissiers']);
 
         return Document::repondre('pdf.bilan-caisse-general', ['b' => $bilan] + Document::entete(Etablissement::findOrFail($tenant->id())),
             'bilan-general', $request->query('format'));
     }
 
+    /**
+     * Filtre caissier (pas pour un caissier connecte : il voit ses propres
+     * encaissements, V1) : vide = total general de tous les caissiers,
+     * 'tous' = le total general puis un bilan par caissier, id = un caissier.
+     */
     private function donneesBilan(Request $request, TenantContext $tenant, bool $calculer = true): array
     {
         abort_unless($request->user()->can('reglements.encaisser'), 403);
@@ -303,6 +380,7 @@ class CaisseController extends Controller
             'cycle' => ['nullable', Rule::in(array_keys(BilanCaisse::CYCLES))],
             'niveau_id' => ['nullable', 'integer'],
             'classe_id' => ['nullable', 'integer'],
+            'caissier' => ['nullable', 'regex:/^(tous|\d+)$/'],
         ]);
         $annee = AnneeScolaire::find($this->anneeId($tenant));
         abort_unless($annee, 422, 'Aucune année scolaire active.');
@@ -311,20 +389,45 @@ class CaisseController extends Controller
         $libelleCriteres = BilanCaisse::libelleCriteres($criteres);
         $user = $request->user();
 
+        // Caissiers de l'annee (ceux qui ont encaisse), pour le filtre et « Tous ».
+        $estCaissier = PorteePedagogique::poste($request)?->code === 'caissier';
+        $caissiers = $estCaissier ? [] : DB::table('reglements as g')->join('users as u', 'u.id', '=', 'g.caissier_id')
+            ->where('g.etablissement_id', $tenant->id())->where('g.annee_scolaire_id', $annee->id)
+            ->distinct()->orderBy('u.name')->orderBy('u.prenoms')->get(['u.id', 'u.name', 'u.prenoms'])
+            ->map(fn ($u) => ['id' => (int) $u->id, 'nom' => trim($u->prenoms.' '.$u->name)])->values()->all();
+        $choix = $estCaissier ? (string) $user->id : ($filtres['caissier'] ?? null);
+        $caissier = match (true) {
+            $choix === null => ['id' => null, 'nom' => 'Tous les caissiers'],
+            $choix === 'tous' => ['id' => null, 'nom' => 'Tous les caissiers'],
+            default => ['id' => (int) $choix, 'nom' => ($u = DB::table('users')->where('id', (int) $choix)->first(['name', 'prenoms'])) ? trim($u->prenoms.' '.$u->name) : '—'],
+        };
+
         $donnees = [
             'periode' => $periode,
             'titre' => 'Bilan de '.$periode['libelle'].($libelleCriteres ? ' · '.$libelleCriteres : ''),
+            'filtre_caissier' => ! $estCaissier,
+            'caissier_choisi' => $estCaissier ? null : ($choix === 'tous' ? 'tous' : ($choix !== null ? (int) $choix : null)),
+            'caissiers' => $caissiers,
             'annee' => $annee->libelle,
             'annee_id' => $annee->id,
             'criteres' => $criteres,
             'criteres_libelle' => $libelleCriteres,
             'mois_disponibles' => BilanCaisse::moisDeLAnnee($annee),
             'criteres_disponibles' => BilanCaisse::criteresDisponibles($annee->id),
-            'caissier' => ['id' => $user->id, 'nom' => trim($user->name.' '.$user->prenoms)],
+            'caissier' => $caissier,
+            'edite_par' => trim($user->prenoms.' '.$user->name),
             'genere_le' => now()->toDateTimeString(),
         ];
+        if (! $calculer) {
+            return $donnees;
+        }
+        $donnees += BilanCaisse::calculer($annee->id, $caissier['id'], $periode, $criteres);
+        // « Tous » : un bilan par caissier sous le total general.
+        $donnees['par_caissier'] = $choix === 'tous' && ! $estCaissier
+            ? collect($caissiers)->map(fn ($c) => ['caissier' => $c] + BilanCaisse::calculer($annee->id, $c['id'], $periode, $criteres))->values()->all()
+            : [];
 
-        return $calculer ? $donnees + BilanCaisse::calculer($annee->id, $user->id, $periode, $criteres) : $donnees;
+        return $donnees;
     }
 
     /**
@@ -354,7 +457,7 @@ class CaisseController extends Controller
                 'maximum' => $maximum,
                 'minimum' => $bornes['doit_solder'] ? $maximum : min($bornes['minimum_regle'], $maximum),
                 'doit_solder' => $bornes['doit_solder'],
-                'dettes_maximum' => (int) $this->caisse->dettesOuvertes($inscription->eleve)->sum(fn (Dette $d) => $d->resteAPayer()) + $partDette,
+                'dettes_maximum' => (int) $this->caisse->dettesOuvertes($inscription->eleve, $inscription->annee_scolaire_id)->sum(fn (Dette $d) => $d->resteAPayer()) + $partDette,
             ];
         }
 

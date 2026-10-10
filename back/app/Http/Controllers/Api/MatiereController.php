@@ -111,7 +111,7 @@ class MatiereController extends Controller
         return response()->json($this->presenterEnseignants($classe, $anneeId));
     }
 
-    /** {enseignants: [{matiere_id, personnel_id|null}]} */
+    /** {enseignants: [{matiere_id, personnel_id|null}], professeur_principal_id?: int|null} */
     public function enregistrerEnseignants(Request $request, TenantContext $tenant, int $id)
     {
         abort_unless($request->user()->can('classes.gerer') || $request->user()->can('matieres.gerer'), 403);
@@ -121,9 +121,13 @@ class MatiereController extends Controller
             'enseignants' => ['present', 'array'],
             'enseignants.*.matiere_id' => ['required', 'integer', Rule::exists('matieres', 'id')->where('etablissement_id', $tenant->id())],
             'enseignants.*.personnel_id' => ['nullable', 'integer', Rule::exists('personnels', 'id')->where('etablissement_id', $tenant->id())],
+            'professeur_principal_id' => ['sometimes', 'nullable', 'integer', Rule::exists('personnels', 'id')->where('etablissement_id', $tenant->id())],
         ]);
 
         DB::transaction(function () use ($data, $classe, $anneeId) {
+            if (array_key_exists('professeur_principal_id', $data)) {
+                $classe->update(['professeur_principal_id' => $data['professeur_principal_id']]);
+            }
             foreach ($data['enseignants'] as $e) {
                 AffectationEnseignant::where('annee_scolaire_id', $anneeId)->where('classe_id', $classe->id)->where('matiere_id', $e['matiere_id'])->delete();
                 if ($e['personnel_id'] ?? null) {
@@ -147,7 +151,7 @@ class MatiereController extends Controller
 
         return [
             'groupes' => collect(self::GROUPES)->map(fn ($libelle, $valeur) => ['valeur' => $valeur, 'libelle' => $libelle])->values(),
-            'niveaux' => Niveau::orderBy('ordre')->get(['id', 'code', 'libelle', 'cycle']),
+            'niveaux' => Niveau::deClasse()->ordonnes()->get(['id', 'code', 'libelle', 'cycle']),
             'matieres' => $matieres->map(fn (Matiere $m) => [
                 'id' => $m->id,
                 'code' => $m->code,
@@ -184,19 +188,26 @@ class MatiereController extends Controller
     {
         $affectations = AffectationEnseignant::where('annee_scolaire_id', $anneeId)->where('classe_id', $classe->id)->get()->keyBy('matiere_id');
         $personnels = Personnel::with(['user:id,name,prenoms', 'matieres:id'])->get();
+        // Orthographe, composition francaise et expression orale : composantes du francais,
+        // enseignees par les professeurs de francais (V1).
+        $codes = Matiere::whereIn('code', ['FR', 'ORTHO', 'CF', 'EO'])->pluck('id', 'code');
+        $composantes = $codes->except('FR')->values();
+        $matieresDe = fn (Personnel $p) => $p->matieres->pluck('id')
+            ->when(isset($codes['FR']) && $p->matieres->contains('id', $codes['FR']), fn ($m) => $m->merge($composantes))->unique()->values();
 
         return [
+            'professeur_principal_id' => $classe->professeur_principal_id,
             'matieres' => Resultats::matieres($classe->niveau_id)->reject(fn ($m) => $m['conduite'])->map(fn ($m) => [
                 'id' => $m['id'],
                 'libelle' => $m['libelle'],
                 'coefficient' => $m['coefficient'],
                 'personnel_id' => $affectations->get($m['id'])?->personnel_id,
             ])->values(),
-            // Professeurs proposes : ceux qui enseignent la matiere d'abord (V1 matiere_prof).
+            // Professeurs proposes pour une matiere : ceux qui l'enseignent (V1 matiere_prof).
             'personnels' => $personnels->filter(fn (Personnel $p) => $p->user)->map(fn (Personnel $p) => [
                 'id' => $p->id,
                 'nom' => trim($p->user->name.' '.$p->user->prenoms),
-                'matieres' => $p->matieres->pluck('id'),
+                'matieres' => $matieresDe($p),
             ])->sortBy('nom')->values(),
         ];
     }

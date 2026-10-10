@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { TabsPage } from './tabs.page';
-import { permissionGuard } from '../../core/guards/permission.guard';
+import { permissionGuard, superAdminGuard } from '../../core/guards/permission.guard';
 
 export const TABS_ROUTES: Routes = [
   {
@@ -25,12 +25,12 @@ export const TABS_ROUTES: Routes = [
       },
       {
         path: 'evaluations',
-        canActivate: [permissionGuard(['notes.saisir', 'notes.voir', 'moyennes.gerer', 'bulletins.voir'])],
+        canActivate: [permissionGuard(['notes.saisir', 'notes.saisir_toutes', 'notes.voir', 'moyennes.gerer', 'bulletins.voir'])],
         loadComponent: () => import('../evaluations/notes.page').then((m) => m.NotesPage),
       },
       {
         path: 'evaluations/resultats',
-        canActivate: [permissionGuard(['notes.voir', 'moyennes.gerer', 'bulletins.voir', 'notes.saisir'])],
+        canActivate: [permissionGuard(['notes.voir', 'moyennes.gerer', 'bulletins.voir', 'notes.saisir', 'notes.saisir_toutes'])],
         loadComponent: () => import('../evaluations/resultats.page').then((m) => m.ResultatsPage),
       },
       {
@@ -99,7 +99,7 @@ export const TABS_ROUTES: Routes = [
       },
       {
         path: 'reductions',
-        canActivate: [permissionGuard('reductions.gerer')],
+        canActivate: [permissionGuard(['reductions.gerer', 'reductions.voir'])],
         loadComponent: () => import('../reductions/reductions.page').then((m) => m.ReductionsPage),
       },
       {
@@ -121,6 +121,46 @@ export const TABS_ROUTES: Routes = [
         path: 'depenses/point',
         canActivate: [permissionGuard('depenses.voir')],
         loadComponent: () => import('../depenses/point-depenses.page').then((m) => m.PointDepensesPage),
+      },
+      {
+        // Entrees : banque saisie, caisse = paiements des eleves (total par caissier).
+        path: 'entrees',
+        canActivate: [permissionGuard(['entrees.gerer', 'entrees.voir'])],
+        loadComponent: () => import('../entrees/entrees.page').then((m) => m.EntreesPage),
+      },
+      {
+        path: 'entrees/nouvelle',
+        canActivate: [permissionGuard('entrees.gerer')],
+        loadComponent: () => import('../entrees/entree-formulaire.page').then((m) => m.EntreeFormulairePage),
+      },
+      {
+        path: 'entrees/:id/modifier',
+        canActivate: [permissionGuard('entrees.modifier')],
+        loadComponent: () => import('../entrees/entree-formulaire.page').then((m) => m.EntreeFormulairePage),
+      },
+      {
+        // Menu Bilans : points des reductions, des depenses et des entrees (page des points).
+        path: 'bilans/reductions',
+        canActivate: [permissionGuard(['reductions.gerer', 'reductions.voir'])],
+        data: { mode: 'reductions' },
+        loadComponent: () => import('../points/point.page').then((m) => m.PointPage),
+      },
+      {
+        path: 'bilans/depenses',
+        canActivate: [permissionGuard('depenses.voir')],
+        data: { mode: 'depenses' },
+        loadComponent: () => import('../points/point.page').then((m) => m.PointPage),
+      },
+      {
+        path: 'bilans/entrees',
+        canActivate: [permissionGuard('entrees.voir')],
+        data: { mode: 'entrees' },
+        loadComponent: () => import('../points/point.page').then((m) => m.PointPage),
+      },
+      {
+        path: 'bilans/financier',
+        canActivate: [permissionGuard('rapports.voir')],
+        loadComponent: () => import('../bilans/bilan-financier.page').then((m) => m.BilanFinancierPage),
       },
       {
         path: 'depenses/:id/modifier',
@@ -145,7 +185,8 @@ export const TABS_ROUTES: Routes = [
       },
       {
         path: 'inscriptions',
-        canActivate: [permissionGuard('inscriptions.gerer')],
+        // Consultation seule possible (inscriptions.voir : comptable).
+        canActivate: [permissionGuard(['inscriptions.gerer', 'inscriptions.voir'])],
         loadComponent: () => import('../inscriptions/inscriptions.page').then((m) => m.InscriptionsPage),
       },
       {
@@ -156,13 +197,19 @@ export const TABS_ROUTES: Routes = [
         loadComponent: () => import('../points/point.page').then((m) => m.PointPage),
       },
       {
+        // Mises a jour depuis l'inscription en ligne (elements en attente).
+        path: 'inscriptions/mises-a-jour',
+        canActivate: [permissionGuard(['inscriptions.gerer', 'inscriptions.voir', 'reglements.voir', 'reglements.modifier'])],
+        loadComponent: () => import('../inscriptions/mises-a-jour-en-ligne.page').then((m) => m.MisesAJourEnLignePage),
+      },
+      {
         path: 'inscriptions/nouvelle',
         canActivate: [permissionGuard('inscriptions.gerer')],
         loadComponent: () => import('../inscriptions/inscription-formulaire.page').then((m) => m.InscriptionFormulairePage),
       },
       {
         path: 'inscriptions/:id',
-        canActivate: [permissionGuard('inscriptions.gerer')],
+        canActivate: [permissionGuard(['inscriptions.gerer', 'inscriptions.voir'])],
         loadComponent: () => import('../inscriptions/inscription-detail.page').then((m) => m.InscriptionDetailPage),
       },
       {
@@ -183,7 +230,7 @@ export const TABS_ROUTES: Routes = [
       },
       {
         path: 'parametres',
-        canActivate: [permissionGuard(['classes.gerer', 'matieres.gerer', 'notes.arreter', 'etablissement.gerer', 'tarifs.gerer', 'annees_scolaires.gerer', 'sms.gerer'])],
+        canActivate: [permissionGuard(['classes.gerer', 'matieres.gerer', 'notes.arreter', 'etablissement.gerer', 'tarifs.gerer', 'annees_scolaires.gerer', 'sms.gerer', 'depenses.modifier'])],
         loadComponent: () => import('../parametres/parametres.page').then((m) => m.ParametresPage),
       },
       {
@@ -207,9 +254,29 @@ export const TABS_ROUTES: Routes = [
         loadComponent: () => import('../parametres/parametres-annees.page').then((m) => m.ParametresAnneesPage),
       },
       {
+        path: 'parametres/banques',
+        canActivate: [permissionGuard(['etablissement.gerer', 'depenses.modifier'])],
+        loadComponent: () => import('../parametres/parametres-banques.page').then((m) => m.ParametresBanquesPage),
+      },
+      {
+        path: 'parametres/synchronisation',
+        canActivate: [permissionGuard('etablissement.gerer')],
+        loadComponent: () => import('../parametres/parametres-synchronisation.page').then((m) => m.ParametresSynchronisationPage),
+      },
+      {
+        path: 'parametres/migration',
+        canActivate: [superAdminGuard],
+        loadComponent: () => import('../parametres/parametres-migration.page').then((m) => m.ParametresMigrationPage),
+      },
+      {
         path: 'parametres/sms',
         canActivate: [permissionGuard('sms.gerer')],
         loadComponent: () => import('../parametres/parametres-sms.page').then((m) => m.ParametresSmsPage),
+      },
+      {
+        path: 'parametres/dettes',
+        canActivate: [permissionGuard('tarifs.gerer')],
+        loadComponent: () => import('../parametres/parametres-dettes.page').then((m) => m.ParametresDettesPage),
       },
       {
         path: 'parametres/ordre-paiement',

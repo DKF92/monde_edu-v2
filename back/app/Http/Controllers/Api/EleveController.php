@@ -12,6 +12,7 @@ use App\Models\Inscription;
 use App\Models\MoyenneGenerale;
 use App\Models\Reglement;
 use App\Support\FicheEleve;
+use App\Support\Personnes;
 use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -106,7 +107,7 @@ class EleveController extends Controller
             ->join('annees_scolaires', 'annees_scolaires.id', '=', 'inscriptions.annee_scolaire_id')
             ->orderByDesc('annees_scolaires.libelle')
             ->select('inscriptions.*', 'annees_scolaires.libelle as annee_libelle')
-            ->with(['classe:id,libelle', 'niveau:id,libelle', 'niveauASuivre:id,libelle', 'enregistrePar:id,name', 'fraisEleves.typeFrais'])
+            ->with(['classe:id,libelle', 'niveau:id,libelle', 'niveauASuivre:id,libelle', 'enregistrePar:id,name,prenoms', 'fraisEleves.typeFrais'])
             ->get();
 
         $moyennes = MoyenneGenerale::where('eleve_id', $eleve->id)
@@ -127,7 +128,7 @@ class EleveController extends Controller
             'langue_vivante_2' => $i->langue_vivante_2,
             'inscrit_en_ligne' => (bool) $i->inscrit_en_ligne,
             'date_inscription' => $i->date_inscription?->toDateString(),
-            'enregistre_par' => $i->enregistrePar?->name,
+            'enregistre_par' => Personnes::agent($i->enregistrePar),
             'decision_finale' => $i->decision_finale,
             'moyenne_annuelle' => $i->moyenne_annuelle,
             'niveau_a_suivre' => $i->niveauASuivre?->libelle,

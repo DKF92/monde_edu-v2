@@ -28,7 +28,7 @@
 
   @foreach ($b['sections'] as $s)
     {{-- Sections par niveau et par classe : nouvelle page (nombreux tableaux). --}}
-    <h2 class="{{ in_array($s['numero'], ['5', '6'], true) ? 'saut' : '' }}">{{ $s['numero'] }}. {{ $s['titre'] }}</h2>
+    <h2 class="{{ !empty($s['saut']) ? 'saut' : '' }}">{{ $s['numero'] }}. {{ $s['titre'] }}</h2>
     @forelse ($s['sous'] as $sous)
       <div class="bloc">
         @if ($s['numero'] !== '1')
@@ -43,7 +43,7 @@
 
   <table class="pied">
     <tr>
-      <td class="signature" style="text-align: left"><span>Le caissier · {{ $b['caissier']['nom'] }}</span></td>
+      <td class="signature" style="text-align: left"><span>{{ $b['caissier']['id'] ? 'Le caissier · '.$b['caissier']['nom'] : 'Établi par · '.$b['edite_par'] }}</span></td>
       <td class="signature"><span>Visa du responsable</span></td>
     </tr>
   </table>

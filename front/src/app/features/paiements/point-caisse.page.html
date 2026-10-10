@@ -2,8 +2,8 @@
   <div class="me-page">
     <header class="me-entete-page">
       <div>
-        <h1>Caisse</h1>
-        <p>Point de vos encaissements : par type de frais et statut de l'élève.</p>
+        <h1>Point paiements</h1>
+        <p>Point des encaissements : par type de frais et statut de l'élève.</p>
       </div>
       <button type="button" class="me-bouton-principal" (click)="actions.encaisser()">
         <ion-icon name="cash-outline"></ion-icon>
@@ -17,6 +17,9 @@
         <span class="puce"><ion-icon name="calendar-outline"></ion-icon> {{ bilan()?.periode?.libelle || '…' }}</span>
         @if (bilan()?.criteres_libelle) {
           <span class="puce"><ion-icon name="people-outline"></ion-icon> {{ bilan()!.criteres_libelle }}</span>
+        }
+        @if (bilan()?.filtre_caissier) {
+          <span class="puce"><ion-icon name="person-outline"></ion-icon> {{ bilan()!.caissier_choisi === 'tous' ? 'Tous les caissiers (un bilan chacun)' : bilan()!.caissier.nom }}</span>
         }
         @if (filtres().periode !== 'jour') {
           <button type="button" class="me-lien" (click)="aujourdhuiBilan()">Revenir à aujourd'hui</button>
@@ -57,46 +60,24 @@
         @let b = bilan()!;
         <div class="titre-bilan">
           <h2>{{ b.titre }}</h2>
-          <p>{{ b.nombre_paiements }} paiement{{ b.nombre_paiements > 1 ? 's' : '' }} encaissé{{ b.nombre_paiements > 1 ? 's' : '' }} par {{ b.caissier.nom }}</p>
+          <p>{{ b.nombre_paiements }} paiement{{ b.nombre_paiements > 1 ? 's' : '' }} encaissé{{ b.nombre_paiements > 1 ? 's' : '' }} {{ b.caissier.id ? 'par ' + b.caissier.nom : 'par tous les caissiers' }}</p>
         </div>
 
-        <div class="tableau-bilan" role="table" [attr.aria-label]="b.titre">
-          <div class="ligne entete" role="row">
-            <span role="columnheader">Types de frais</span>
-            <span role="columnheader">Affectés</span>
-            <span role="columnheader">Non affectés</span>
-            <span role="columnheader">Total</span>
-          </div>
-          @for (l of b.lignes; track l.cle; let i = $index) {
-            @if (i === 0 || groupe(b.lignes[i - 1]) !== groupe(l)) {
-              <div class="groupe" role="row"><span role="cell">{{ groupe(l) }}</span></div>
-            }
-            <div class="ligne" role="row" [class.inactif]="!l.actif">
-              <span class="libelle" role="rowheader">{{ l.libelle }}</span>
-              @for (c of colonnes; track c) {
-                @if (applicable(l, c)) {
-                  <span role="cell" class="cellule" [class.total]="c === 'total'" [class.vide]="!l[c]" [attr.data-libelle]="libellesColonnes[c]">
-                    <span class="montant">{{ f(l[c]) }}</span>
-                    <button type="button" class="me-action oeil" [disabled]="!l[c]" [title]="'Voir les paiements : ' + l.libelle + ' · ' + libellesColonnes[c]" [attr.aria-label]="'Voir les paiements : ' + l.libelle + ' · ' + libellesColonnes[c]" (click)="liste(l, c)"><ion-icon name="eye-outline"></ion-icon></button>
-                  </span>
-                } @else {
-                  <span class="cellule na" role="cell" [attr.data-libelle]="libellesColonnes[c]" title="Non applicable">—</span>
-                }
-              }
-            </div>
-          } @empty {
-            <div class="me-etat-vide"><strong>Aucun type de frais actif.</strong></div>
-          }
-          <div class="ligne ligne-total" role="row">
-            <span class="libelle" role="rowheader">Total</span>
-            <span role="cell" class="cellule" data-libelle="Affectés"><span class="montant">{{ f(b.totaux.affecte) }}</span><button type="button" class="me-action oeil" [disabled]="!b.totaux.affecte" [title]="'Voir les paiements : total affectés'" [attr.aria-label]="'Voir les paiements : total affectés'" (click)="liste(undefined, 'affecte')"><ion-icon name="eye-outline"></ion-icon></button></span>
-            <span role="cell" class="cellule" data-libelle="Non affectés"><span class="montant">{{ f(b.totaux.non_affecte) }}</span><button type="button" class="me-action oeil" [disabled]="!b.totaux.non_affecte" [title]="'Voir les paiements : total non affectés'" [attr.aria-label]="'Voir les paiements : total non affectés'" (click)="liste(undefined, 'non_affecte')"><ion-icon name="eye-outline"></ion-icon></button></span>
-            <span role="cell" class="cellule total" data-libelle="Total"><span class="montant">{{ f(b.totaux.total) }}</span><button type="button" class="me-action oeil" [disabled]="!b.totaux.total" [title]="'Voir tous les paiements de la période'" [attr.aria-label]="'Voir tous les paiements de la période'" (click)="liste()"><ion-icon name="eye-outline"></ion-icon></button></span>
-          </div>
-        </div>
+        <ng-container *ngTemplateOutlet="tableau; context: { $implicit: b, cid: null, titre: b.titre }"></ng-container>
         <p class="aide">L'œil de chaque case ouvre la liste des paiements qui donnent ce montant (grisé si le montant est nul).</p>
       }
     </section>
+
+    <!-- ================= Filtre « Tous » : un bilan par caissier ================= -->
+    @for (pc of bilan()?.par_caissier ?? []; track pc.caissier.id) {
+      <section class="me-carte bilan" [class.attenue]="chargement()">
+        <div class="titre-bilan">
+          <h2>Bilan de {{ pc.caissier.nom }}</h2>
+          <p>{{ pc.nombre_paiements }} paiement{{ pc.nombre_paiements > 1 ? 's' : '' }} encaissé{{ pc.nombre_paiements > 1 ? 's' : '' }}</p>
+        </div>
+        <ng-container *ngTemplateOutlet="tableau; context: { $implicit: pc, cid: pc.caissier.id, titre: 'Bilan de ' + pc.caissier.nom }"></ng-container>
+      </section>
+    }
   </div>
 </ion-content>
 
@@ -169,6 +150,17 @@
           </div>
           <p class="me-aide-champ">Cycle, niveau et classe : un seul à la fois (remettez « Tous » pour changer).</p>
         </section>
+        @if (bilan()?.filtre_caissier) {
+          <section>
+            <h2>Caissier</h2>
+            <div class="ligne-filtres">
+              <div class="me-champ">
+                <app-selecteur idChamp="b-caissier" icone="person-outline" [options]="optionsCaissier()" [valeur]="valeurCaissier()" (valeurChange)="choisirCaissier($event)"></app-selecteur>
+              </div>
+            </div>
+            <p class="me-aide-champ">« Total général » : tous les caissiers ensemble. « Tous » : le total général puis un bilan par caissier.</p>
+          </section>
+        }
       </div>
       <footer>
         @if (nombreCriteres()) {
@@ -181,3 +173,41 @@
     </div>
   </ng-template>
 </ion-modal>
+
+<!-- ================= Tableau d'un bilan (general ou d'un caissier) ================= -->
+<ng-template #tableau let-b let-cid="cid" let-titre="titre">
+      <div class="tableau-bilan" role="table" [attr.aria-label]="titre">
+        <div class="ligne entete" role="row">
+          <span role="columnheader">Types de frais</span>
+          <span role="columnheader">Affectés</span>
+          <span role="columnheader">Non affectés</span>
+          <span role="columnheader">Total</span>
+        </div>
+        @for (l of b.lignes; track l.cle; let i = $index) {
+          @if (i === 0 || groupe(b.lignes[i - 1]) !== groupe(l)) {
+            <div class="groupe" role="row"><span role="cell">{{ groupe(l) }}</span></div>
+          }
+          <div class="ligne" role="row" [class.inactif]="!l.actif">
+            <span class="libelle" role="rowheader">{{ l.libelle }}</span>
+            @for (c of colonnes; track c) {
+              @if (applicable(l, c)) {
+                <span role="cell" class="cellule" [class.total]="c === 'total'" [class.vide]="!l[c]" [attr.data-libelle]="libellesColonnes[c]">
+                  <span class="montant">{{ f(l[c]) }}</span>
+                  <button type="button" class="me-action oeil" [disabled]="!l[c]" [title]="'Voir les paiements : ' + l.libelle + ' · ' + libellesColonnes[c]" [attr.aria-label]="'Voir les paiements : ' + l.libelle + ' · ' + libellesColonnes[c]" (click)="liste(l, c, cid)"><ion-icon name="eye-outline"></ion-icon></button>
+                </span>
+              } @else {
+                <span class="cellule na" role="cell" [attr.data-libelle]="libellesColonnes[c]" title="Non applicable">—</span>
+              }
+            }
+          </div>
+        } @empty {
+          <div class="me-etat-vide"><strong>Aucun type de frais actif.</strong></div>
+        }
+        <div class="ligne ligne-total" role="row">
+          <span class="libelle" role="rowheader">Total</span>
+          <span role="cell" class="cellule" data-libelle="Affectés"><span class="montant">{{ f(b.totaux.affecte) }}</span><button type="button" class="me-action oeil" [disabled]="!b.totaux.affecte" [title]="'Voir les paiements : total affectés'" [attr.aria-label]="'Voir les paiements : total affectés'" (click)="liste(undefined, 'affecte', cid)"><ion-icon name="eye-outline"></ion-icon></button></span>
+          <span role="cell" class="cellule" data-libelle="Non affectés"><span class="montant">{{ f(b.totaux.non_affecte) }}</span><button type="button" class="me-action oeil" [disabled]="!b.totaux.non_affecte" [title]="'Voir les paiements : total non affectés'" [attr.aria-label]="'Voir les paiements : total non affectés'" (click)="liste(undefined, 'non_affecte', cid)"><ion-icon name="eye-outline"></ion-icon></button></span>
+          <span role="cell" class="cellule total" data-libelle="Total"><span class="montant">{{ f(b.totaux.total) }}</span><button type="button" class="me-action oeil" [disabled]="!b.totaux.total" [title]="'Voir tous les paiements de la période'" [attr.aria-label]="'Voir tous les paiements de la période'" (click)="liste(undefined, 'total', cid)"><ion-icon name="eye-outline"></ion-icon></button></span>
+        </div>
+      </div>
+</ng-template>

@@ -91,7 +91,7 @@
             <section class="me-carte bloc">
               <div class="entete-eleve">
                 <h2><ion-icon name="person-outline"></ion-icon> {{ s.eleve.nom }} {{ s.eleve.prenoms }}</h2>
-                <button type="button" class="me-action" title="Voir l'inscription" aria-label="Voir l'inscription" (click)="router.navigate(['/tabs/inscriptions', s.id])">
+                <button type="button" class="me-action" title="Voir l'inscription" aria-label="Voir l'inscription" (click)="voirInscription(s.id, s.eleve.id)">
                   <ion-icon name="eye-outline"></ion-icon>
                 </button>
               </div>

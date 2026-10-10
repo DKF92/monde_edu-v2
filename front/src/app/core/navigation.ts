@@ -18,7 +18,9 @@ import {
   addCircleOutline,
   alertCircleOutline,
   statsChartOutline,
+  globeOutline,
   pricetagOutline,
+  enterOutline,
 } from 'ionicons/icons';
 
 export type Teinte = 'bleu' | 'vert' | 'violet' | 'orange' | 'rose' | 'cyan';
@@ -33,6 +35,8 @@ export interface EntreeNavigation {
   /** L'entree est visible si l'utilisateur a AU MOINS une de ces permissions
    * (tableau vide = visible par tous). */
   permissions: string[];
+  /** Et au moins une de celles-ci (ex : bilan financier = rapports ET finances). */
+  aussi?: string[];
   /** false tant que l'ecran n'est pas developpe : l'entree reste visible
    * (l'utilisateur voit ce qui arrive) mais n'est pas cliquable. */
   disponible: boolean;
@@ -96,17 +100,16 @@ export const NAVIGATION: SectionNavigation[] = [
         icone: 'person-add-outline',
         teinte: 'vert',
         route: '/tabs/inscriptions',
-        permissions: ['inscriptions.gerer'],
+        permissions: ['inscriptions.gerer', 'inscriptions.voir'],
         disponible: true,
       },
       {
-        // Tableau passes / pas passes a la caisse / cas, affectes et non affectes.
-        libelle: 'Point inscriptions',
-        description: 'Passés à la caisse ou non',
-        icone: 'stats-chart-outline',
-        teinte: 'vert',
-        route: '/tabs/inscriptions/point',
-        permissions: ['inscriptions.gerer', 'rapports.voir'],
+        libelle: 'Mises à jour en ligne',
+        description: 'Changements repris du site de l\'État',
+        icone: 'globe-outline',
+        teinte: 'bleu',
+        route: '/tabs/inscriptions/mises-a-jour',
+        permissions: ['inscriptions.gerer', 'inscriptions.voir', 'reglements.voir', 'reglements.modifier'],
         disponible: true,
       },
       {
@@ -115,7 +118,7 @@ export const NAVIGATION: SectionNavigation[] = [
         icone: 'bar-chart-outline',
         teinte: 'violet',
         route: '/tabs/evaluations',
-        permissions: ['notes.saisir', 'notes.voir', 'moyennes.gerer', 'bulletins.voir'],
+        permissions: ['notes.saisir', 'notes.saisir_toutes', 'notes.voir', 'moyennes.gerer', 'bulletins.voir'],
         disponible: true,
       },
       {
@@ -141,16 +144,6 @@ export const NAVIGATION: SectionNavigation[] = [
   {
     titre: 'Finances',
     entrees: [
-      {
-        // Droit "Encaisser" (Rôles > Finances) : guichet et point de ses encaissements.
-        libelle: 'Caisse',
-        description: 'Encaisser / Point',
-        icone: 'cash-outline',
-        teinte: 'vert',
-        route: '/tabs/paiements',
-        permissions: ['reglements.encaisser'],
-        disponible: true,
-      },
       {
         // Guichet : le matricule de l'eleve est demande sur la page.
         libelle: 'Encaisser',
@@ -192,6 +185,60 @@ export const NAVIGATION: SectionNavigation[] = [
         disponible: true,
       },
       {
+        // Reductions et cas sociaux accordes (V1 liste_reduction / liste_cas).
+        libelle: 'Réductions',
+        description: 'Réductions et cas sociaux',
+        icone: 'pricetag-outline',
+        teinte: 'violet',
+        route: '/tabs/reductions',
+        permissions: ['reductions.gerer', 'reductions.voir'],
+        disponible: true,
+      },
+      {
+        libelle: 'Dépenses',
+        description: 'Sorties de caisse',
+        icone: 'receipt-outline',
+        teinte: 'rose',
+        route: '/tabs/depenses',
+        permissions: ['depenses.gerer', 'depenses.voir'],
+        disponible: true,
+      },
+      {
+        // Entrees banque saisies ; entrees caisse = paiements (total par caissier).
+        libelle: 'Entrées',
+        description: 'Caisse et banque',
+        icone: 'enter-outline',
+        teinte: 'vert',
+        route: '/tabs/entrees',
+        permissions: ['entrees.gerer', 'entrees.voir'],
+        disponible: true,
+      },
+    ],
+  },
+  {
+    titre: 'Bilans',
+    entrees: [
+      {
+        // Tableau passes / pas passes a la caisse / cas, affectes et non affectes.
+        libelle: 'Point inscriptions',
+        description: 'Passés à la caisse ou non',
+        icone: 'stats-chart-outline',
+        teinte: 'bleu',
+        route: '/tabs/inscriptions/point',
+        permissions: ['inscriptions.gerer', 'rapports.voir'],
+        disponible: true,
+      },
+      {
+        // Droit "Encaisser" (Rôles > Finances) : point de ses encaissements (ancienne entree « Caisse »).
+        libelle: 'Point paiements',
+        description: 'Point des encaissements',
+        icone: 'cash-outline',
+        teinte: 'vert',
+        route: '/tabs/paiements',
+        permissions: ['reglements.encaisser'],
+        disponible: true,
+      },
+      {
         // Dettes encaissees et situation des dettes (V1 Point_dette).
         libelle: 'Point dettes',
         description: 'Encaissements et situation',
@@ -202,22 +249,41 @@ export const NAVIGATION: SectionNavigation[] = [
         disponible: true,
       },
       {
-        // Reductions et cas sociaux accordes (V1 liste_reduction / liste_cas).
-        libelle: 'Réductions',
+        // Reductions et cas sociaux accordes sur la periode (meme page que les autres points).
+        libelle: 'Point réductions',
         description: 'Réductions et cas sociaux',
         icone: 'pricetag-outline',
         teinte: 'violet',
-        route: '/tabs/reductions',
-        permissions: ['reductions.gerer'],
+        route: '/tabs/bilans/reductions',
+        permissions: ['reductions.gerer', 'reductions.voir'],
         disponible: true,
       },
       {
-        libelle: 'Dépenses',
-        description: 'Sorties de caisse',
+        libelle: 'Point dépenses',
+        description: 'Par catégorie, caisse et banque',
         icone: 'receipt-outline',
-        teinte: 'rose',
-        route: '/tabs/depenses',
-        permissions: ['depenses.gerer', 'depenses.voir'],
+        teinte: 'orange',
+        route: '/tabs/bilans/depenses',
+        permissions: ['depenses.voir'],
+        disponible: true,
+      },
+      {
+        libelle: 'Point entrées',
+        description: 'Caisse et banque',
+        icone: 'enter-outline',
+        teinte: 'cyan',
+        route: '/tabs/bilans/entrees',
+        permissions: ['entrees.voir'],
+        disponible: true,
+      },
+      {
+        libelle: 'Bilan financier général',
+        description: 'Toutes les opérations de l\'année',
+        icone: 'bar-chart-outline',
+        teinte: 'bleu',
+        route: '/tabs/bilans/financier',
+        permissions: ['rapports.voir'],
+        aussi: ['reglements.voir', 'depenses.voir'],
         disponible: true,
       },
       {
@@ -258,7 +324,7 @@ export const NAVIGATION: SectionNavigation[] = [
         icone: 'settings-outline',
         teinte: 'bleu',
         route: '/tabs/parametres',
-        permissions: ['classes.gerer', 'matieres.gerer', 'notes.arreter', 'etablissement.gerer', 'tarifs.gerer', 'annees_scolaires.gerer', 'sms.gerer'],
+        permissions: ['classes.gerer', 'matieres.gerer', 'notes.arreter', 'etablissement.gerer', 'tarifs.gerer', 'annees_scolaires.gerer', 'sms.gerer', 'depenses.modifier'],
         disponible: true,
       },
     ],
@@ -297,5 +363,7 @@ export const ICONES_NAVIGATION = {
   addCircleOutline,
   alertCircleOutline,
   statsChartOutline,
+  globeOutline,
   pricetagOutline,
+  enterOutline,
 };

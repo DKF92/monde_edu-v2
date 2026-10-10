@@ -17,6 +17,11 @@
         @if (point()?.caissier) {
           <span class="puce"><ion-icon name="person-outline"></ion-icon> {{ point()!.caissier }}</span>
         }
+        @if (point()?.agent_nom) {
+          <span class="puce"><ion-icon name="person-outline"></ion-icon> Inscrits par {{ point()!.agent_nom }}</span>
+        } @else if (point()?.agent === 'tous') {
+          <span class="puce"><ion-icon name="person-outline"></ion-icon> Tous les éducateurs</span>
+        }
         @if (filtres().periode !== 'annee') {
           <button type="button" class="me-lien" (click)="anneeScolaire()">Toute l'année</button>
         }
@@ -29,9 +34,9 @@
           <button type="button" class="me-bouton-secondaire" (click)="listeInscrits()" [disabled]="!point()">
             <ion-icon name="list-outline"></ion-icon> Liste des inscrits
           </button>
-        } @else {
-          <button type="button" class="me-bouton-secondaire" (click)="router.navigateByUrl('/tabs/paiements/dettes')">
-            <ion-icon name="list-outline"></ion-icon> Liste des dettes
+        } @else if (listeDetail) {
+          <button type="button" class="me-bouton-secondaire" (click)="router.navigateByUrl(listeDetail.route)">
+            <ion-icon name="list-outline"></ion-icon> {{ listeDetail.libelle }}
           </button>
         }
         <button type="button" class="me-bouton-secondaire bouton-filtres" (click)="modaleFiltres.set(true)">
@@ -68,9 +73,16 @@
       <p class="aide">
         @if (mode === 'inscriptions') {
           L'œil de chaque case ouvre la liste des élèves concernés. « Passés à la caisse » : au moins un paiement à la fin de la période ;
-          « Cas sociaux » : élèves qui ont une réduction de type cas social. Le détail par genre, niveau, classe et agent est dans l'impression générale.
-        } @else {
+          « Cas sociaux » : élèves qui ont une réduction de type cas social. Le détail par genre, niveau, classe et éducateur est dans l'impression générale.
+        } @else if (mode === 'dettes') {
           L'œil du total encaissé ouvre la liste des paiements de dettes. La situation des dettes à ce jour et le détail par caissier, niveau et classe sont dans l'impression générale.
+        } @else if (mode === 'reductions') {
+          Réductions accordées sur la période (réductions d'inscription et de dette). Le détail par genre, niveau, classe et donneur d'ordre est dans l'impression générale.
+        } @else if (mode === 'depenses') {
+          Dépenses payées par la caisse et par la banque. Le détail par personne ayant saisi, par mois et par mode de paiement est dans l'impression générale.
+        } @else {
+          Caisse : paiements des élèves ; banque : entrées saisies dans Finances › Entrées. Les versements de la caisse à la banque sont un transfert : ils ne sont pas ajoutés au total.
+          Le détail par mois et par mode de paiement est dans l'impression générale.
         }
       </p>
     }
@@ -87,12 +99,12 @@
     <div class="tableau-bilan" role="table" [attr.aria-label]="s.titre">
       <div class="ligne entete" role="row">
         <span role="columnheader"></span>
-        @for (c of colonnes; track c) { <span role="columnheader">{{ p.colonnes[c] }}</span> }
+        @for (c of colonnes(); track c) { <span role="columnheader">{{ p.colonnes[c] }}</span> }
       </div>
       @for (l of s.lignes; track l.cle) {
         <div class="ligne" role="row">
           <span class="libelle" role="rowheader">{{ l.libelle }}</span>
-          @for (c of colonnes; track c) {
+          @for (c of colonnes(); track c) {
             <span role="cell" class="cellule" [class.total]="c === 'total'" [class.vide]="!l[c]" [attr.data-libelle]="p.colonnes[c]">
               <span class="montant">{{ v(p, l, c) }}</span>
               @if (oeil(s, l)) {
@@ -107,7 +119,7 @@
       @if (s.total) {
         <div class="ligne ligne-total" role="row">
           <span class="libelle" role="rowheader">{{ s.total.libelle }}</span>
-          @for (c of colonnes; track c) {
+          @for (c of colonnes(); track c) {
             <span role="cell" class="cellule" [class.total]="c === 'total'" [attr.data-libelle]="p.colonnes[c]">
               <span class="montant">{{ v(p, s.total, c) }}{{ c === 'total' && p.unite === 'eleves' && (s.total.unite ?? p.unite) === 'eleves' ? ' élève' + (s.total.total > 1 ? 's' : '') : '' }}</span>
               @if (oeil(s, null)) {
@@ -122,7 +134,7 @@
 </ng-template>
 
 <!-- ================= Liste des eleves d'une case ================= -->
-<ion-modal class="me-modale-formulaire tres-large" [isOpen]="!!liste()" (didDismiss)="liste.set(null)">
+<ion-modal #modaleListe class="me-modale-formulaire tres-large" [isOpen]="!!liste()" (didDismiss)="liste.set(null)">
   <ng-template>
     @let l = liste();
     <div class="me-modale">
@@ -132,7 +144,7 @@
           <h1>{{ l?.titre }}</h1>
           <p>{{ l?.eleves ? l!.eleves!.length + ' élève' + (l!.eleves!.length > 1 ? 's' : '') : 'Chargement…' }}</p>
         </div>
-        <button type="button" class="me-fermer" (click)="liste.set(null)" aria-label="Fermer"><ion-icon name="close-outline"></ion-icon></button>
+        <button type="button" class="me-fermer" (click)="fermerListe()" aria-label="Fermer"><ion-icon name="close-outline"></ion-icon></button>
       </header>
       <div class="corps liste-eleves">
         @if (!l?.eleves) {
@@ -165,7 +177,7 @@
         }
       </div>
       <footer>
-        <button type="button" class="me-bouton-texte" (click)="liste.set(null)">Fermer</button>
+        <button type="button" class="me-bouton-texte" (click)="fermerListe()">Fermer</button>
         <button type="button" class="me-bouton-principal" (click)="imprimerListe()" [disabled]="!l?.eleves?.length || impressionListe()">
           @if (impressionListe()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer la liste }
         </button>
@@ -188,7 +200,7 @@
       </header>
       <div class="corps">
         <section>
-          <h2>Période{{ mode === 'inscriptions' ? ' (date d\'inscription)' : ' (date du paiement)' }}</h2>
+          <h2>Période ({{ datePeriode }})</h2>
           <div class="ligne-filtres periode">
             <div class="me-champ date">
               <label for="pt-du">Du</label>
@@ -212,6 +224,7 @@
           @if (erreurDates()) { <span class="me-erreur-champ">{{ erreurDates() }}</span> }
           <button type="button" class="me-lien aujourdhui" (click)="aujourdhuiPoint()">Aujourd'hui</button>
         </section>
+        @if (criteresEleve) {
         <section>
           <h2>Élèves</h2>
           <div class="ligne-filtres criteres">
@@ -238,6 +251,16 @@
           </div>
           <p class="me-aide-champ">Cycle, niveau et classe : un seul à la fois (remettez « Tous » pour changer).</p>
         </section>
+        }
+        @if (mode === 'inscriptions' && point()?.agents?.length) {
+          <section>
+            <h2>Éducateur</h2>
+            <div class="ligne-filtres caissier">
+              <app-selecteur idChamp="pt-agent" icone="person-outline" [options]="optionsAgent()" [valeur]="valeurAgent()" (valeurChange)="choisirAgent($event)"></app-selecteur>
+            </div>
+            <p class="me-aide-champ">Inscriptions enregistrées par chacun. « Tous » affiche le total général puis un tableau par éducateur.</p>
+          </section>
+        }
         @if (mode === 'dettes') {
           <section>
             <h2>Caissier</h2>

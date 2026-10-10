@@ -31,13 +31,14 @@ import {
   radioButtonOffOutline,
   alertCircleOutline,
   layersOutline,
+  ticketOutline,
 } from 'ionicons/icons';
-import { ParametreService } from '../../core/services/parametre.service';
+import { ParametreService, ParametresBillet } from '../../core/services/parametre.service';
 import { GrilleColonne, TarifsNiveaux, TypeFrais, TypeReduction, TypeReductionSaisie } from '../../core/models/parametre.model';
 import { OptionSelecteur, SelecteurComponent } from '../../shared/selecteur.component';
 import { PaginationComponent, TAILLES_PAGE, paginer } from '../../shared/pagination.component';
 
-type Onglet = 'montants' | 'reductions' | 'frais';
+type Onglet = 'montants' | 'reductions' | 'frais' | 'recu';
 type Colonne = 'affecte' | 'non_affecte';
 
 /**
@@ -62,6 +63,11 @@ export class ParametresPaiementsPage implements OnInit {
   readonly router = inject(Router);
 
   readonly onglet = signal<Onglet>('montants');
+  /** Validite du billet d'entree en classe (eleve non solde) : date d'echeance + jours si echeance proche. */
+  readonly dateBillet = signal<string | null>(null);
+  readonly delaiBillet = signal<number | null>(null);
+  readonly seuilBillet = signal(15);
+  readonly enregistrementBillet = signal(false);
   readonly colonnes: Colonne[] = ['affecte', 'non_affecte'];
 
   // Pagination des listes (recapitulatif, reductions, types de frais).
@@ -165,6 +171,7 @@ export class ParametresPaiementsPage implements OnInit {
       radioButtonOffOutline,
       alertCircleOutline,
       layersOutline,
+      ticketOutline,
     });
   }
 
@@ -187,6 +194,32 @@ export class ParametresPaiementsPage implements OnInit {
       },
     });
     this.service.typesReductions().subscribe({ next: (liste) => this.typesReductions.set(liste) });
+    this.service.recu().subscribe({ next: (r) => this.appliquerBillet(r) });
+  }
+
+  private appliquerBillet(r: ParametresBillet): void {
+    this.dateBillet.set(r.date_validite_billet);
+    this.delaiBillet.set(r.delai_validite_recu);
+    this.seuilBillet.set(r.seuil_jours);
+  }
+
+  enregistrerDelaiBillet(): void {
+    const delai = this.delaiBillet();
+    if (!delai) return;
+    this.enregistrementBillet.set(true);
+    this.service.enregistrerRecu({ date_validite_billet: this.dateBillet() || null, delai_validite_recu: delai }).subscribe({
+      next: async (r) => {
+        this.appliquerBillet(r);
+        this.enregistrementBillet.set(false);
+        const toast = await this.toasts.create({ message: 'Validité du billet enregistrée.', duration: 2500, color: 'dark' });
+        await toast.present();
+      },
+      error: async (e) => {
+        this.enregistrementBillet.set(false);
+        const toast = await this.toasts.create({ message: e.error?.message || 'Enregistrement impossible.', duration: 3500, color: 'danger' });
+        await toast.present();
+      },
+    });
   }
 
   // ================================================================ Montants

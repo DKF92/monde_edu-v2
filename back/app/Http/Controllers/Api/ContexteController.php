@@ -52,6 +52,7 @@ class ContexteController extends Controller
             ->map(fn (Poste $role) => [
                 'id' => $role->id,
                 'nom' => $role->name,
+                'code' => $role->code,
                 'permissions' => $role->permissions->pluck('name')->values(),
             ]);
 
@@ -59,6 +60,8 @@ class ContexteController extends Controller
             'etablissement' => new EtablissementResource(Etablissement::findOrFail($tenant->id())),
             'annees' => $annees,
             'postes' => $postes,
+            // Memorise par l'application : serveur de secours sans internet.
+            'serveur_local' => Etablissement::findOrFail($tenant->id())->parametre('serveur_local'),
         ]);
     }
 }

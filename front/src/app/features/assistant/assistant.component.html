@@ -15,7 +15,7 @@
     <div class="fil" #fil>
       @if (!messages().length) {
         <div class="accueil">
-          <p class="bonjour">Bonjour {{ auth.user()?.prenoms || auth.user()?.name }} ! Posez votre question sur l'application : je vous guide pas à pas, je peux vérifier la situation d'un élève, d'une classe ou vos droits, et vous montrer une démonstration.</p>
+          <p class="bonjour">Bonjour {{ auth.user()?.prenoms || auth.user()?.name }} ! Posez votre question : je vous guide pas à pas dans l'application, je vous explique les règles (moyennes, élèves affectés, réductions, dettes, caisse…), je peux vérifier la situation d'un élève, d'une classe ou vos droits, et vous montrer une démonstration.</p>
           <p class="note">Je ne fais aucune modification : je vous explique comment faire.</p>
           @if (etat()?.suggestions?.length) {
             <div class="suggestions">

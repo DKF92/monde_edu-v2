@@ -21,12 +21,12 @@
   <h1>{{ $titre }}</h1>
   <div class="sous-titre">{{ $sous_titre ? $sous_titre.' · ' : '' }}{{ $lignes->count() }} réduction{{ $lignes->count() > 1 ? 's' : '' }} · édité le {{ $genere_le->format('d/m/Y à H:i') }} par {{ $edite_par }}</div>
   <table class="liste">
-    <tr><th class="c">N°</th><th>Matricule</th><th>Nom et prénoms</th><th>Classe</th><th class="c">Statut</th><th>Réduction</th><th class="d">Montant</th><th class="c">Date</th><th>Donneur d'ordre</th><th>Saisie par</th></tr>
+    <tr><th class="c">N°</th><th>Matricule</th><th style="width: 60mm">Nom et prénoms</th><th>Classe</th><th class="c">Statut</th><th>Réduction</th><th class="d">Montant</th><th class="c">Date</th><th>Donneur d'ordre</th><th>Saisie par</th></tr>
     @forelse ($lignes as $i => $l)
       <tr>
         <td class="c">{{ $i + 1 }}</td>
         <td>{{ $l['matricule'] }}</td>
-        <td>{{ $l['nom'] }} {{ $l['prenoms'] }}</td>
+        <td style="white-space: nowrap">{{ \App\Support\Noms::complet($l['nom'], $l['prenoms'], 57.8, 8) }}</td>
         <td>{{ $l['classe'] ?? $l['niveau'] }}</td>
         <td class="c">{{ $l['affecte'] ? 'AFF' : 'NAFF' }}</td>
         <td>{{ $l['type'] }}{{ $l['dette_annulee'] ? ' (annulée)' : '' }}</td>

@@ -21,8 +21,8 @@ use Illuminate\Validation\Rule;
  * pedagogiques avec un commentaire chiffre), observations et conclusion.
  *
  * Les textes libres (introduction, observations, difficultes, perspectives,
- * conclusion, signataire) sont rediges par l'etablissement et gardes dans le
- * parametre rapports_textes, par annee, type et periode.
+ * conclusion, signataire) sont rediges par l'etablissement et gardes dans la
+ * table rapports_textes (cle « {annee}-{type} » ou « {annee}-periode-{id} »).
  */
 class RapportCompileController extends Controller
 {
@@ -39,7 +39,7 @@ class RapportCompileController extends Controller
         $this->autoriser($request);
         $anneeId = PorteePedagogique::anneeId($tenant);
         $periodes = Periode::where('annee_scolaire_id', $anneeId)->orderBy('numero')->get();
-        $textes = (array) (Etablissement::findOrFail($tenant->id())->parametre('rapports_textes') ?? []);
+        $textes = DB::table('rapports_textes')->where('etablissement_id', $tenant->id())->pluck('textes', 'cle')->map(fn ($t) => json_decode($t, true));
 
         return response()->json([
             'types' => collect(self::TYPES)->map(fn ($t, $code) => ['code' => $code, 'titre' => $t[0], 'description' => $t[1]])->values(),
@@ -60,12 +60,18 @@ class RapportCompileController extends Controller
         $regles = collect(self::TEXTES)->mapWithKeys(fn ($t) => [$t => ['nullable', 'string', 'max:'.($t === 'signataire' ? 150 : 6000)]])->all();
         $data = $request->validate($regles);
 
-        $etablissement = Etablissement::findOrFail($tenant->id());
-        $tous = (array) ($etablissement->parametre('rapports_textes') ?? []);
-        $tous[$this->cle($anneeId, $type, $periode)] = array_map(fn ($v) => is_string($v) ? (trim($v) ?: null) : null, array_merge(array_fill_keys(self::TEXTES, null), $data));
-        $etablissement->definirParametres(['rapports_textes' => $tous]);
+        $textes = array_map(fn ($v) => is_string($v) ? (trim($v) ?: null) : null, array_merge(array_fill_keys(self::TEXTES, null), $data));
+        $cle = $this->cle($anneeId, $type, $periode);
+        $existe = DB::table('rapports_textes')->where('etablissement_id', $tenant->id())->where('cle', $cle);
+        $valeurs = ['textes' => json_encode($textes, JSON_UNESCAPED_UNICODE), 'modifie_par_id' => $request->user()->id, 'updated_at' => now()];
+        if ($existe->exists()) {
+            $existe->update($valeurs);
+        } else {
+            DB::table('rapports_textes')->insert($valeurs + ['etablissement_id' => $tenant->id(), 'annee_scolaire_id' => $anneeId, 'type' => $type,
+                'periode_id' => $periode?->id, 'cle' => $cle, 'created_at' => now()]);
+        }
 
-        return response()->json(['message' => 'Textes du rapport enregistrés.', 'textes' => $tous[$this->cle($anneeId, $type, $periode)]]);
+        return response()->json(['message' => 'Textes du rapport enregistrés.', 'textes' => $textes]);
     }
 
     public function document(Request $request, TenantContext $tenant, string $type)
@@ -75,7 +81,7 @@ class RapportCompileController extends Controller
         $anneeId = PorteePedagogique::anneeId($tenant);
         $periode = $this->periode($request, $anneeId, $type);
         $etablissement = Etablissement::findOrFail($tenant->id());
-        $textes = ((array) ($etablissement->parametre('rapports_textes') ?? []))[$this->cle($anneeId, $type, $periode)] ?? [];
+        $textes = json_decode((string) DB::table('rapports_textes')->where('etablissement_id', $tenant->id())->where('cle', $this->cle($anneeId, $type, $periode))->value('textes'), true) ?: [];
         $annee = AnneeScolaire::findOrFail($anneeId);
 
         $rapport = $this->construire($type, $annee, $periode, $etablissement, $textes);

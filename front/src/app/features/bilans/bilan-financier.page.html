@@ -1,0 +1,71 @@
+<ion-content class="me-page-admin">
+  <ion-refresher slot="fixed" (ionRefresh)="charger($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+
+  <div class="me-page">
+    <header class="me-entete-page">
+      <div>
+        <h1>Bilan financier général</h1>
+        <p>Toutes les opérations financières de l'année {{ bilan()?.annee ?? '' }} : frais, dettes, réductions, encaissements, dépenses et entrées banque.</p>
+      </div>
+      <div class="boutons-entete">
+        @for (r of raccourcis; track r.route) {
+          <button type="button" class="me-bouton-secondaire" (click)="router.navigateByUrl(r.route)"><ion-icon [name]="r.icone"></ion-icon> {{ r.libelle }}</button>
+        }
+        <button type="button" class="me-bouton-principal" (click)="imprimer()" [disabled]="!bilan() || impression()">
+          @if (impression()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer le bilan }
+        </button>
+      </div>
+    </header>
+
+    @if (chargement() && !bilan()) {
+      <section class="me-carte"><ion-skeleton-text [animated]="true" style="width: 100%; height: 260px"></ion-skeleton-text></section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>{{ erreur() }}</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (bilan()) {
+      @let b = bilan()!;
+      @for (s of b.sections; track s.titre; let i = $index) {
+        <section class="me-carte section-bilan" [class.synthese]="i === 0">
+          <div class="titre-section">
+            <h2>{{ i + 1 }}. {{ s.titre }}</h2>
+            @if (s.rapport.sous_titre) { <p>{{ s.rapport.sous_titre }}</p> }
+          </div>
+          @let r = s.rapport;
+          <div class="defilant">
+            <table class="tab">
+              <thead>
+                <tr>@for (col of r.colonnes; track col.cle) {<th [class]="alignement(col)">{{ col.libelle }}</th>}</tr>
+              </thead>
+              <tbody>
+                @for (g of r.groupes; track $index) {
+                  @if (g.titre) {
+                    <tr class="groupe"><td [attr.colspan]="r.colonnes.length">{{ g.titre }}</td></tr>
+                  }
+                  @for (l of g.lignes; track $index) {
+                    <tr>@for (col of r.colonnes; track col.cle) {<td [class]="alignement(col)" [class.fort]="col.fort">{{ valeur(l, col) }}</td>}</tr>
+                  }
+                  @if (g.total) {
+                    <tr class="sous-total">@for (col of r.colonnes; track col.cle; let first = $first) {<td [class]="alignement(col)">{{ first ? 'Total ' + g.titre : valeur(g.total, col) }}</td>}</tr>
+                  }
+                } @empty {
+                  <tr><td [attr.colspan]="r.colonnes.length" class="vide">Aucune donnée.</td></tr>
+                }
+                @if (r.total) {
+                  <tr class="total">@for (col of r.colonnes; track col.cle; let first = $first) {<td [class]="alignement(col)">{{ first ? 'Total général' : valeur(r.total, col) }}</td>}</tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      }
+      <p class="aide">Montants en F CFA. Dettes : années prises en compte dans Paramètres › Dettes. Les versements de la caisse à la banque sont un transfert : ils ne comptent pas deux fois dans le total des entrées.</p>
+    }
+  </div>
+</ion-content>

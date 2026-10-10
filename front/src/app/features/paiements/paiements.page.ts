@@ -22,7 +22,7 @@ import {
   closeCircleOutline,
   funnelOutline,
 } from 'ionicons/icons';
-import { CaisseService } from '../../core/services/caisse.service';
+import { CaisseService, FiltresJournal } from '../../core/services/caisse.service';
 import { ActionsCaisseService } from '../../core/services/actions-caisse.service';
 import { AuthService } from '../../core/services/auth.service';
 import { CriteresBilan, LIBELLES_MODE, ModePaiement, PageJournal, ReglementCaisse } from '../../core/models/caisse.model';
@@ -228,10 +228,34 @@ export class PaiementsPage implements OnDestroy {
     clearTimeout(this.minuterie);
   }
 
+  readonly impression = signal(false);
+
+  async imprimerListe(): Promise<void> {
+    this.impression.set(true);
+    try {
+      await this.caisse.imprimerJournal(this.filtresJournal(1, 50), 'Liste des paiements');
+    } finally {
+      this.impression.set(false);
+    }
+  }
+
   charger(evenement?: CustomEvent): void {
     this.liste.charger(
-      (page, parPage) =>
-        this.caisse.journal({
+      (page, parPage) => this.caisse.journal(this.filtresJournal(page, parPage)),
+      (r) => {
+        this.totaux.set(r.totaux);
+        this.totalParts.set(r.total_parts);
+        // Dates de la periode vues par le serveur (reprises si on passe a « Dates… »).
+        if (r.du) this.du.set(r.du);
+        if (r.au) this.au.set(r.au);
+        this.caissiers.set(r.caissiers);
+        (evenement?.target as HTMLIonRefresherElement | undefined)?.complete();
+      },
+    );
+  }
+
+  private filtresJournal(page: number, parPage: number): FiltresJournal {
+    return {
           page,
           par_page: parPage,
           periode: this.periode(),
@@ -246,17 +270,7 @@ export class PaiementsPage implements OnDestroy {
           dette: this.cellule()?.dette ?? false,
           affecte: this.cellule()?.affecte ?? null,
           ...this.criteresBilan(),
-        }),
-      (r) => {
-        this.totaux.set(r.totaux);
-        this.totalParts.set(r.total_parts);
-        // Dates de la periode vues par le serveur (reprises si on passe a « Dates… »).
-        if (r.du) this.du.set(r.du);
-        if (r.au) this.au.set(r.au);
-        this.caissiers.set(r.caissiers);
-        (evenement?.target as HTMLIonRefresherElement | undefined)?.complete();
-      },
-    );
+    };
   }
 
   choisirPeriode(p: Periode): void {

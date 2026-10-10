@@ -6,14 +6,17 @@ import { DocumentService } from './document.service';
 import { CaisseService } from './caisse.service';
 import { BilanCaisse, FiltresBilan, PeriodeBilan } from '../models/caisse.model';
 
-export type ModePoint = 'inscriptions' | 'dettes';
-export type ColonnePoint = 'affecte' | 'non_affecte' | 'total';
+export type ModePoint = 'inscriptions' | 'dettes' | 'reductions' | 'depenses' | 'entrees';
+/** affecte / non_affecte (points eleves) ou caisse / banque (depenses, entrees). */
+export type ColonnePoint = 'affecte' | 'non_affecte' | 'caisse' | 'banque' | 'total';
 
 export interface LignePoint {
   cle: string;
   libelle: string;
-  affecte: number;
-  non_affecte: number;
+  affecte?: number;
+  non_affecte?: number;
+  caisse?: number;
+  banque?: number;
   total: number;
   /** Unite propre a la ligne (sinon celle du point). */
   unite?: 'eleves' | 'montant';
@@ -26,6 +29,8 @@ export interface SectionPoint {
   lignes: LignePoint[];
   total: LignePoint | null;
   niveau_id?: number;
+  /** Tableau d'un educateur (filtre « Tous les educateurs », impression generale). */
+  agent_id?: number;
 }
 
 /** Point des inscrits / des dettes (tableaux du point de caisse). */
@@ -33,17 +38,24 @@ export interface Point extends Pick<BilanCaisse, 'mois_disponibles' | 'criteres'
   titre: string;
   periode: PeriodeBilan;
   unite: 'eleves' | 'montant';
-  colonnes: Record<ColonnePoint, string>;
+  colonnes: Partial<Record<ColonnePoint, string>>;
   sections: SectionPoint[];
   caissier_id: number | null;
   caissier: string | null;
   /** Point des dettes : caissiers ayant encaisse des dettes. */
   caissiers?: { id: number; nom: string }[];
   nombre_paiements?: number;
+  /** Point des inscrits : educateur filtre ('tous' = un tableau par educateur). */
+  agent?: 'tous' | number | null;
+  agent_nom?: string | null;
+  /** Liste « Educateur » (vide pour un educateur connecte : pas de filtre). */
+  agents?: { id: number; nom: string }[];
 }
 
 export interface FiltresPoint extends FiltresBilan {
   caissier_id?: number | null;
+  /** Point des inscrits : null = total general, 'tous' = un tableau par educateur, id = un educateur. */
+  agent?: 'tous' | number | null;
 }
 
 export interface EleveInscrit {
@@ -61,7 +73,7 @@ export interface EleveInscrit {
   du: number;
   paye: number;
   reste: number;
-  etat: 'paye' | 'cas' | 'non_paye';
+  etat: 'paye' | 'cas' | 'non_paye' | 'sans_classe';
 }
 
 @Injectable({ providedIn: 'root' })
@@ -102,6 +114,7 @@ export class PointsService {
     if (f.au) params = params.set('au', f.au);
     if (f.mois) params = params.set('mois', f.mois);
     if (f.caissier_id) params = params.set('caissier_id', f.caissier_id);
+    if (f.agent) params = params.set('agent', f.agent);
     return this.caisse.parametresCriteres(params, f);
   }
 }

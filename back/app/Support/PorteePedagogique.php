@@ -80,13 +80,14 @@ class PorteePedagogique
         }
         $personnel = self::personnel($request);
 
-        return $personnel ? $personnel->niveauxDeLAnnee($anneeId)->pluck('niveaux.id')->map(fn ($id) => (int) $id)->all() : [];
+        // Niveaux generaux choisis (TLE) => toutes leurs series (TLE A1, TLE A2, TLE D).
+        return $personnel ? \App\Models\Niveau::avecSeries($personnel->niveauxDeLAnnee($anneeId)->pluck('niveaux.id')->map(fn ($id) => (int) $id)->all()) : [];
     }
 
     /** Classes visibles (ids), null = toutes les classes de l'annee. */
     public static function classes(Request $request, int $anneeId): ?array
     {
-        if ($request->user()->can('moyennes.gerer')) {
+        if ($request->user()->canAny(['moyennes.gerer', 'notes.saisir_toutes'])) {
             return null;
         }
         $poste = self::poste($request);
@@ -130,7 +131,9 @@ class PorteePedagogique
     public static function peutSaisir(Request $request, int $anneeId, int $classeId, int $matiereId): bool
     {
         $user = $request->user();
-        if ($user->can('moyennes.gerer')) {
+        // Saisie a la place des professeurs : droit a part (informaticien),
+        // pas compris dans « Moyennes ».
+        if ($user->can('notes.saisir_toutes')) {
             return true;
         }
         if (! $user->can('notes.saisir')) {

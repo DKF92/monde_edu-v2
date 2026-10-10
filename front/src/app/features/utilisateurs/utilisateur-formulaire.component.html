@@ -34,18 +34,18 @@
               @if (erreur('prenoms'); as e) { <p class="erreur-champ">{{ e }}</p> }
             </div>
             <div class="champ">
-              <label for="u-email">Adresse e-mail <span class="requis">*</span></label>
+              <label for="u-email">Adresse e-mail</label>
               <input id="u-email" class="saisie" type="email" formControlName="email" autocomplete="off" inputmode="email" placeholder="nom@exemple.com" [class.invalide]="erreur('email')" (input)="effacerErreur('email')" />
               @if (erreur('email'); as e) {
                 <p class="erreur-champ">{{ e }}</p>
               } @else {
-                <p class="aide-champ">Identifiant de connexion.</p>
+                <p class="aide-champ">Facultative (connexion possible aussi par e-mail).</p>
               }
             </div>
             <div class="champ">
-              <label for="u-tel">Téléphone</label>
+              <label for="u-tel">Téléphone <span class="requis">*</span></label>
               <input id="u-tel" class="saisie" type="tel" formControlName="telephone" autocomplete="off" inputmode="tel" placeholder="07 00 00 00 00" [class.invalide]="erreur('telephone')" (input)="effacerErreur('telephone')" />
-              @if (erreur('telephone'); as e) { <p class="erreur-champ">{{ e }}</p> }
+              @if (erreur('telephone'); as e) { <p class="erreur-champ">{{ e }}</p> } @else { <p class="aide-champ">Identifiant de connexion.</p> }
             </div>
             <div class="champ">
               <span class="libelle">Sexe</span>

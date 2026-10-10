@@ -18,6 +18,9 @@ class EtablissementParametreController extends Controller
 {
     public const ENTETE = ['entete_ministere', 'entete_direction', 'entete_adresse', 'entete_telephone'];
 
+    /** Ranges dans la colonne JSON « parametres » (vide = valeur par defaut). */
+    private const PARAMETRES = [...self::ENTETE, 'serveur_local'];
+
     public const TYPES = ['maternelle', 'primaire', 'college', 'lycee', 'college_lycee', 'superieur', 'mixte'];
 
     public function show(Request $request, TenantContext $tenant)
@@ -50,17 +53,23 @@ class EtablissementParametreController extends Controller
             'entete_direction' => ['nullable', 'string', 'max:200'],
             'entete_adresse' => ['nullable', 'string', 'max:150'],
             'entete_telephone' => ['nullable', 'string', 'max:60'],
+            // Serveur de l'ecole (reseau local), utilise quand internet manque.
+            'serveur_local' => ['nullable', 'string', 'max:200', 'regex:#^https?://[^\s/?\#]+/?$#i'],
         ], [
             'nom.required' => 'Le nom de l\'établissement est obligatoire.',
             'email.email' => 'Cette adresse e-mail n\'est pas valide.',
             'indicatif_telephonique.regex' => 'Indicatif en chiffres, sans + (ex : 225).',
+            'serveur_local.regex' => 'Adresse attendue : http(s)://nom-ou-ip[:port] (ex : https://local.monecole.ci ou http://192.168.1.130:8000).',
         ]);
 
         $etablissement = Etablissement::findOrFail($tenant->id());
-        // En-tete des documents : dans les parametres (vide = valeur par defaut).
-        $entete = array_intersect_key($data, array_flip(self::ENTETE));
-        $etablissement->update(array_diff_key($data, $entete));
-        $etablissement->definirParametres(array_merge(array_fill_keys(self::ENTETE, null), $entete));
+        // En-tete des documents et serveur local : dans les parametres (vide = valeur par defaut).
+        if (isset($data['serveur_local'])) {
+            $data['serveur_local'] = rtrim($data['serveur_local'], '/');
+        }
+        $parametres = array_intersect_key($data, array_flip(self::PARAMETRES));
+        $etablissement->update(array_diff_key($data, $parametres));
+        $etablissement->definirParametres(array_merge(array_fill_keys(self::PARAMETRES, null), $parametres));
 
         return response()->json(['data' => $this->presenter($etablissement)]);
     }
@@ -124,6 +133,7 @@ class EtablissementParametreController extends Controller
             'entete_direction' => $e->parametre('entete_direction'),
             'entete_adresse' => $e->parametre('entete_adresse'),
             'entete_telephone' => $e->parametre('entete_telephone'),
+            'serveur_local' => $e->parametre('serveur_local'),
             // Adresse construite sur l'hote de la requete (fonctionne aussi depuis
             // un telephone du reseau local, contrairement a APP_URL).
             'logo_url' => $e->logo_path ? url('storage/'.$e->logo_path) : null,

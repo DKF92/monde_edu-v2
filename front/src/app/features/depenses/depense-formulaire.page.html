@@ -6,7 +6,7 @@
           <ion-icon name="chevron-back-outline"></ion-icon> Dépenses
         </button>
         <h1>{{ modification() ? 'Modifier la dépense' + (existante() ? ' n° ' + existante()!.numero : '') : 'Nouvelle dépense' }}</h1>
-        <p>{{ modification() ? 'Correction historisée avec son motif.' : 'Sortie de caisse : un numéro lui est attribué à l\'enregistrement.' }}</p>
+        <p>{{ modification() ? 'Correction historisée avec son motif.' : 'Dépense payée par la caisse ou par la banque : un numéro lui est attribué à l\'enregistrement.' }}</p>
       </div>
     </header>
 
@@ -19,6 +19,35 @@
             <label for="d-motif">Motif de la modification <span class="me-requis">*</span></label>
             <textarea id="d-motif" class="me-saisie zone" rows="2" maxlength="500" [value]="motif()" [class.invalide]="erreurs()['motif']" (input)="motif.set(valeurTexte($event)); effacer('motif')"></textarea>
             @if (erreurs()['motif']) { <span class="me-erreur-champ">{{ erreurs()['motif'] }}</span> }
+          </div>
+        }
+
+        <div class="me-champ">
+          <span class="libelle">Payée par <span class="me-requis">*</span></span>
+          <div class="me-segments" role="radiogroup" aria-label="Dépense payée par">
+            <button type="button" [class.actif]="source() === 'caisse'" (click)="source.set('caisse')"><ion-icon name="cash-outline"></ion-icon> La caisse</button>
+            <button type="button" [class.actif]="source() === 'banque'" (click)="source.set('banque')"><ion-icon name="business-outline"></ion-icon> La banque</button>
+          </div>
+        </div>
+
+        @if (source() === 'banque') {
+          <div class="grille bloc-banque">
+            <div class="me-champ">
+              <span class="libelle">Banque <span class="me-requis">*</span></span>
+              <app-selecteur idChamp="d-banque" icone="business-outline" [options]="optionsBanque()" [valeur]="banqueId()" (valeurChange)="banqueId.set($event); effacer('banque_id')"></app-selecteur>
+              @if (erreurs()['banque_id']) { <span class="me-erreur-champ">{{ erreurs()['banque_id'] }}</span> }
+              @if (options() && !options()!.banques.length) {
+                <span class="me-aide-champ">Aucune banque enregistrée : ajoutez-la dans Paramètres › Banques.</span>
+              }
+            </div>
+            <div class="me-champ">
+              <span class="libelle">Retrait effectué par <span class="me-requis">*</span></span>
+              <app-selecteur idChamp="d-retrait" icone="person-outline" [options]="optionsRetrait()" [valeur]="retraitParId()" (valeurChange)="retraitParId.set($event); effacer('retrait_par_id')"></app-selecteur>
+              @if (erreurs()['retrait_par_id']) { <span class="me-erreur-champ">{{ erreurs()['retrait_par_id'] }}</span> }
+              @if (options() && !options()!.retraits.length) {
+                <span class="me-aide-champ">Personne n'est habilité : donnez le droit « Opérations bancaires » à un poste (Administration › Rôles).</span>
+              }
+            </div>
           </div>
         }
 

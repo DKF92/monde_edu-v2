@@ -27,6 +27,8 @@ class Points
         'paye' => 'Passés à la caisse',
         'cas' => 'Cas sociaux',
         'non_paye' => 'Pas passés à la caisse',
+        // Statut 0 : inscription sans classe (pas encore placee par l'educateur).
+        'sans_classe' => 'Pas dans une classe',
     ];
 
     // ------------------------------------------------------------ Inscriptions
@@ -35,7 +37,11 @@ class Points
      * @param  array{du: ?string, au: ?string}  $periode
      * @param  ?array<int>  $niveaux  niveaux autorises (educateur), null = tous
      */
-    public static function inscriptions(int $anneeId, array $periode, array $criteres, ?array $niveaux, bool $general = false): array
+    /**
+     * @param  bool  $parAgent  un tableau par educateur (agent qui a enregistre
+     *                          l'inscription) en plus du total (filtre « Tous »)
+     */
+    public static function inscriptions(int $anneeId, array $periode, array $criteres, ?array $niveaux, bool $general = false, bool $parAgent = false): array
     {
         $lignes = self::requeteInscriptions($anneeId, $periode, $criteres, $niveaux)
             ->groupBy('i.niveau_id', 'i.classe_id', 'i.affecte', 'e.sexe', 'i.enregistre_par_id', 'etat')
@@ -46,7 +52,7 @@ class Points
         $section = fn (string $cle, string $titre, Collection $l, ?string $partie = null, ?string $sousTitre = null) => self::sectionInscriptions($cle, $titre, $l, $sousTitre) + ['partie' => $partie ?? $titre];
         $sections = [$section('total', 'Total des inscrits', $lignes, null, $periode['libelle'] ?? null)];
 
-        $niveauxListe = DB::table('niveaux')->whereIn('id', $lignes->pluck('niveau_id')->unique())->orderBy('ordre')->get(['id', 'libelle']);
+        $niveauxListe = DB::table('niveaux')->whereIn('id', $lignes->pluck('niveau_id')->unique())->orderBy('ordre')->orderBy('libelle')->get(['id', 'libelle']);
         // A l'ecran, seul le point total (les filtres font le reste) ; le detail
         // par genre, niveau, classe et agent est reserve a l'impression generale.
         if ($general) {
@@ -57,16 +63,21 @@ class Points
                 $sections[] = $section('niveau-'.$n->id, 'Total inscrits '.$n->libelle, $lignes->where('niveau_id', $n->id), 'Total inscrits par niveau') + ['niveau_id' => $n->id];
             }
             $classes = DB::table('classes')->whereIn('id', $lignes->pluck('classe_id')->filter()->unique())->get(['id', 'libelle', 'niveau_id'])
-                ->sortBy(fn ($c) => [$niveauxListe->search(fn ($n) => $n->id === $c->niveau_id), $c->libelle]);
+                ->sortBy(fn ($c) => [$niveauxListe->search(fn ($n) => $n->id === $c->niveau_id), \App\Support\NomClasse::cleTri($c->libelle)]);
             foreach ($classes as $c) {
                 $sections[] = $section('classe-'.$c->id, 'Total inscrits '.$c->libelle, $lignes->where('classe_id', $c->id), 'Total inscrits par classe') + ['classe_id' => $c->id];
             }
             if ($lignes->whereNull('classe_id')->isNotEmpty()) {
                 $sections[] = $section('sans-classe', 'Total inscrits sans classe', $lignes->whereNull('classe_id'), 'Total inscrits par classe');
             }
+        }
+        // Un tableau par educateur (celui qui a enregistre l'inscription) :
+        // impression generale ou filtre « Tous les educateurs ».
+        if ($general || $parAgent) {
             $agents = DB::table('users')->whereIn('id', $lignes->pluck('enregistre_par_id')->filter()->unique())->get(['id', 'name', 'prenoms']);
             foreach ($agents->sortBy('name') as $u) {
-                $sections[] = $section('agent-'.$u->id, 'Total inscrits par '.trim($u->name.' '.$u->prenoms), $lignes->where('enregistre_par_id', $u->id), 'Total inscrits par agent');
+                $sections[] = $section('agent-'.$u->id, 'Total inscrits par '.trim($u->prenoms.' '.$u->name), $lignes->where('enregistre_par_id', $u->id), 'Total inscrits par éducateur')
+                    + ['agent_id' => (int) $u->id];
             }
         }
 
@@ -86,7 +97,7 @@ class Points
             ->leftJoin('classes as c', 'c.id', '=', 'i.classe_id')
             ->join('niveaux as n', 'n.id', '=', 'i.niveau_id')
             ->orderBy('n.ordre')->orderBy('c.libelle')->orderBy('e.nom')->orderBy('e.prenoms')
-            ->get(['i.id as inscription_id', 'e.id as eleve_id', 'e.matricule', 'e.nom', 'e.prenoms', 'e.sexe', 'i.affecte', 'i.redoublant',
+            ->get(['i.id as inscription_id', 'e.id as eleve_id', 'e.matricule', 'e.nom', 'e.prenoms', 'e.sexe', 'i.affecte', 'i.redoublant', 'i.statut',
                 'n.libelle as niveau', 'c.libelle as classe', 'i.date_inscription', 'i.montant_total_du', 'i.montant_total_reduit', 'i.montant_total_paye',
                 DB::raw(self::etatSql($periode['au'] ?? null).' AS etat')])
             ->map(fn ($l) => [
@@ -105,6 +116,7 @@ class Points
                 'paye' => (int) $l->montant_total_paye,
                 'reste' => max(0, (int) $l->montant_total_du - (int) $l->montant_total_reduit - (int) $l->montant_total_paye),
                 'etat' => $l->etat,
+                'statut' => (int) $l->statut,
             ]);
     }
 
@@ -120,7 +132,7 @@ class Points
         return self::criteresInscription($q, $criteres);
     }
 
-    /** 'cas' (reduction de type CAS), 'paye' (paiement jusqu'a $fin) ou 'non_paye'. */
+    /** 'sans_classe' (statut 0), 'cas' (reduction de type CAS), 'paye' (paiement jusqu'a $fin) ou 'non_paye'. */
     private static function etatSql(?string $fin): string
     {
         $cas = "EXISTS (SELECT 1 FROM reductions r JOIN frais_eleves fe ON fe.id = r.frais_eleve_id JOIN types_reductions tr ON tr.id = r.type_reduction_id
@@ -128,7 +140,7 @@ class Points
         $fin = $fin ? " AND DATE(g.date_paiement) <= '".preg_replace('/[^0-9-]/', '', $fin)."'" : '';
         $paye = "EXISTS (SELECT 1 FROM reglements g WHERE g.inscription_id = i.id{$fin})";
 
-        return "(CASE WHEN {$cas} THEN 'cas' WHEN {$paye} THEN 'paye' ELSE 'non_paye' END)";
+        return "(CASE WHEN i.classe_id IS NULL THEN 'sans_classe' WHEN {$cas} THEN 'cas' WHEN {$paye} THEN 'paye' ELSE 'non_paye' END)";
     }
 
     private static function sectionInscriptions(string $cle, string $titre, Collection $lignes, ?string $sousTitre): array
@@ -178,7 +190,9 @@ class Points
         $situation = self::criteresInscription(DB::table('dettes as d')
             ->join('inscriptions as i', fn ($j) => $j->on('i.eleve_id', '=', 'd.eleve_id')->where('i.annee_scolaire_id', $anneeId))
             ->join('eleves as e', 'e.id', '=', 'd.eleve_id')
-            ->where('d.etablissement_id', app(TenantContext::class)->id()), $criteres)
+            ->where('d.etablissement_id', app(TenantContext::class)->id())
+            // Seulement les dettes prises en compte (parametre dettes_annees).
+            ->whereIn('d.annee_scolaire_id', \App\Models\Dette::anneesPrisesEnCompte($anneeId) ?? []), $criteres)
             ->groupBy('i.affecte', 'i.niveau_id', 'i.classe_id', 'd.is_annulee')
             ->selectRaw('i.affecte, i.niveau_id, i.classe_id, d.is_annulee, SUM(d.montant) AS montant, SUM(d.montant_reduit) AS reduit, SUM(d.montant_paye) AS paye,
                 SUM(GREATEST(d.montant - d.montant_reduit - d.montant_paye, 0)) AS reste,
@@ -201,13 +215,13 @@ class Points
                 $sections[] = self::sectionEncaisse('caissier-'.$u->id, 'Total encaissé par '.trim($u->name.' '.$u->prenoms), $encaisse->where('caissier_id', $u->id), null)
                     + ['partie' => 'Dettes encaissées par caissier'];
             }
-            $niveaux = DB::table('niveaux')->whereIn('id', $situation->pluck('niveau_id')->unique())->orderBy('ordre')->get(['id', 'libelle']);
+            $niveaux = DB::table('niveaux')->whereIn('id', $situation->pluck('niveau_id')->unique())->orderBy('ordre')->orderBy('libelle')->get(['id', 'libelle']);
             foreach ($niveaux as $n) {
                 $sections[] = self::sectionSituation('niveau-'.$n->id, 'Situation des dettes '.$n->libelle, $situation->where('niveau_id', $n->id))
                     + ['partie' => 'Situation des dettes par niveau'];
             }
             $classes = DB::table('classes')->whereIn('id', $situation->pluck('classe_id')->filter()->unique())->get(['id', 'libelle', 'niveau_id'])
-                ->sortBy(fn ($c) => [$niveaux->search(fn ($n) => $n->id === $c->niveau_id), $c->libelle]);
+                ->sortBy(fn ($c) => [$niveaux->search(fn ($n) => $n->id === $c->niveau_id), \App\Support\NomClasse::cleTri($c->libelle)]);
             foreach ($classes as $c) {
                 $sections[] = self::sectionSituation('classe-'.$c->id, 'Situation des dettes '.$c->libelle, $situation->where('classe_id', $c->id))
                     + ['partie' => 'Situation des dettes par classe'];
@@ -267,6 +281,8 @@ class Points
             ->when(($c['redoublant'] ?? null) !== null, fn (Builder $q) => $q->where('i.redoublant', $c['redoublant']))
             ->when($c['classe_id'] ?? null, fn (Builder $q, $id) => $q->where('i.classe_id', $id))
             ->when($c['niveau_id'] ?? null, fn (Builder $q, $id) => $q->where('i.niveau_id', $id))
-            ->when($c['cycle'] ?? null, fn (Builder $q, $cycle) => $q->whereIn('i.niveau_id', DB::table('niveaux')->where('cycle', $cycle)->select('id')));
+            ->when($c['cycle'] ?? null, fn (Builder $q, $cycle) => $q->whereIn('i.niveau_id', DB::table('niveaux')->where('cycle', $cycle)->select('id')))
+            // Point des inscrits : inscriptions enregistrees par un educateur.
+            ->when($c['enregistre_par_id'] ?? null, fn (Builder $q, $id) => $q->where('i.enregistre_par_id', $id));
     }
 }

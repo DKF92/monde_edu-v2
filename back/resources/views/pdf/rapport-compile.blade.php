@@ -11,8 +11,6 @@
 @include('pdf._style-caisse')
 <style>
   @page { margin: 14mm 13mm 18mm; }
-  .pied-page { position: fixed; bottom: -11mm; left: 0; right: 0; font-size: 7.5pt; color: #8a93a6; border-top: 0.5pt solid #d9deea; padding-top: 2mm; }
-  .pied-page .num:after { content: counter(page); }
   .saut { page-break-before: always; }
 
   .garde { text-align: center; }
@@ -51,13 +49,6 @@
 </style>
 </head>
 <body>
-  <div class="pied-page">
-    <table><tr>
-      <td>{{ $etablissement->nom }} · {{ $r['titre'] }}{{ $r['type'] === 'periode' ? '' : ' '.$annee }}</td>
-      <td style="text-align: right">Page <span class="num"></span></td>
-    </tr></table>
-  </div>
-
   {{-- ================= Page de garde ================= --}}
   <div class="garde">
     @include('pdf._entete-caisse', ['titreDocument' => null])

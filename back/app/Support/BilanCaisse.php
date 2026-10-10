@@ -148,7 +148,7 @@ class BilanCaisse
      *
      * @return list<array{numero: string, titre: string, sous: list<array{numero: string, titre: string, bilan: array}>}>
      */
-    public static function general(int $anneeId, int $caissierId, array $periode, array $criteres): array
+    public static function general(int $anneeId, ?int $caissierId, array $periode, array $criteres, array $caissiers = []): array
     {
         $c = self::criteres($criteres);
         $dispo = self::criteresDisponibles($anneeId);
@@ -180,19 +180,30 @@ class BilanCaisse
         // Pour cycle / niveau / classe, le critere de la section remplace celui choisi (meme perimetre).
         $sansPerimetre = ['cycle' => null, 'niveau_id' => null, 'classe_id' => null];
 
+        // Tous les caissiers : un bilan par caissier juste apres le bilan general (liste [id => nom]).
+        $parCaissier = $caissiers ? [[
+            'numero' => '2',
+            'titre' => 'Bilan par caissier',
+            'sous' => collect($caissiers)->values()->map(fn ($x, $i) => [
+                'numero' => '2.'.($i + 1), 'titre' => 'Bilan de '.$x['nom'], 'bilan' => self::calculer($anneeId, $x['id'], $periode, $c),
+            ])->all(),
+        ]] : [];
+        $n = $caissiers ? 2 : 1;
+
         return [
             ['numero' => '1', 'titre' => 'Bilan général', 'sous' => [['numero' => '1', 'titre' => 'Bilan général', 'bilan' => $calcul([])]]],
-            $section('2', 'Bilan par genre', array_filter([
+            ...$parCaissier,
+            $section((string) ++$n, 'Bilan par genre', array_filter([
                 $c['sexe'] !== 'M' ? ['Bilan filles', ['sexe' => 'F']] : null,
                 $c['sexe'] !== 'F' ? ['Bilan garçons', ['sexe' => 'M']] : null,
             ])),
-            $section('3', 'Bilan par redoublement', array_filter([
+            $section((string) ++$n, 'Bilan par redoublement', array_filter([
                 $c['redoublant'] !== true ? ['Bilan non redoublants', ['redoublant' => false]] : null,
                 $c['redoublant'] !== false ? ['Bilan redoublants', ['redoublant' => true]] : null,
             ])),
-            $section('4', 'Bilan par cycle', $cycles->map(fn ($x) => ['Bilan '.mb_strtolower($x['libelle']), ['cycle' => $x['valeur']] + $sansPerimetre])->all()),
-            $section('5', 'Bilan par niveau', $niveaux->map(fn ($x) => ['Bilan '.$x['libelle'], ['niveau_id' => $x['id']] + $sansPerimetre])->all()),
-            $section('6', 'Bilan par classe', $classes->map(fn ($x) => ['Bilan '.$x['libelle'], ['classe_id' => $x['id']] + $sansPerimetre])->all()),
+            $section((string) ++$n, 'Bilan par cycle', $cycles->map(fn ($x) => ['Bilan '.mb_strtolower($x['libelle']), ['cycle' => $x['valeur']] + $sansPerimetre])->all()),
+            $section((string) ++$n, 'Bilan par niveau', $niveaux->map(fn ($x) => ['Bilan '.$x['libelle'], ['niveau_id' => $x['id']] + $sansPerimetre])->all()) + ['saut' => true],
+            $section((string) ++$n, 'Bilan par classe', $classes->map(fn ($x) => ['Bilan '.$x['libelle'], ['classe_id' => $x['id']] + $sansPerimetre])->all()) + ['saut' => true],
         ];
     }
 
@@ -216,14 +227,14 @@ class BilanCaisse
     /**
      * @return array{lignes: list<array>, totaux: array{affecte: int, non_affecte: int, total: int}, nombre_paiements: int}
      */
-    public static function calculer(int $anneeId, int $caissierId, array $periode, array $criteres = []): array
+    public static function calculer(int $anneeId, ?int $caissierId, array $periode, array $criteres = []): array
     {
         $criteres = self::criteres($criteres);
         $base = fn () => self::appliquerCriteres(DB::table('reglement_lignes')
             ->join('reglements', 'reglements.id', '=', 'reglement_lignes.reglement_id')
             ->where('reglements.etablissement_id', app(TenantContext::class)->id())
             ->where('reglements.annee_scolaire_id', $anneeId)
-            ->where('reglements.caissier_id', $caissierId)
+            ->when($caissierId, fn ($q, $id) => $q->where('reglements.caissier_id', $id))
             ->when($periode['du'], fn ($q, $d) => $q->whereDate('reglements.date_paiement', '>=', $d))
             ->when($periode['au'], fn ($q, $d) => $q->whereDate('reglements.date_paiement', '<=', $d)), $criteres);
 

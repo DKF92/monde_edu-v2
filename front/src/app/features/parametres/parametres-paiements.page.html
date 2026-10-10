@@ -20,6 +20,9 @@
       <button type="button" role="tab" [class.actif]="onglet() === 'frais'" [attr.aria-selected]="onglet() === 'frais'" (click)="onglet.set('frais')">
         <ion-icon name="receipt-outline"></ion-icon> Types de frais
       </button>
+      <button type="button" role="tab" [class.actif]="onglet() === 'recu'" [attr.aria-selected]="onglet() === 'recu'" (click)="onglet.set('recu')">
+        <ion-icon name="ticket-outline"></ion-icon> Reçu et billet
+      </button>
     </nav>
 
     @if (chargement()) {
@@ -300,6 +303,36 @@
             (pageChange)="pageReductions.set($event)"
             (tailleChange)="tailleReductions.set($event)"
           ></app-pagination>
+        </section>
+      }
+
+      <!-- ============================================================ Recu et billet d'entree -->
+      @if (onglet() === 'recu') {
+        <p class="me-note">
+          <ion-icon name="information-circle-outline"></ion-icon>
+          <span>
+            Chaque reçu de paiement est suivi d'un <strong>billet d'autorisation d'entrée en classe</strong>.
+            Élève qui n'a pas soldé : billet valable jusqu'à la <strong>date d'échéance</strong>. S'il paie à moins de
+            {{ seuilBillet() }} jours de cette date (ou après, ou sans date), son billet est valable le
+            <strong>nombre de jours</strong> indiqué à partir du jour du paiement. Élève soldé : valable jusqu'en fin d'année.
+          </span>
+        </p>
+        <section class="me-carte bloc">
+          <div class="me-grille">
+            <div class="me-champ">
+              <label for="date-billet">Date d'échéance du billet</label>
+              <input id="date-billet" class="me-saisie" type="date" [value]="dateBillet() ?? ''" (input)="dateBillet.set($any($event.target).value || null)" />
+            </div>
+            <div class="me-champ">
+              <label for="delai-billet">Nombre de jours (échéance proche) <span class="me-requis">*</span></label>
+              <input id="delai-billet" class="me-saisie" type="number" min="1" max="366" inputmode="numeric" [value]="delaiBillet() ?? ''" (input)="delaiBillet.set(+$any($event.target).value || null)" />
+            </div>
+          </div>
+          <div style="margin-top: 14px">
+            <button type="button" class="me-bouton-principal" (click)="enregistrerDelaiBillet()" [disabled]="!delaiBillet() || enregistrementBillet()">
+              @if (enregistrementBillet()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="checkmark-outline"></ion-icon> Enregistrer }
+            </button>
+          </div>
         </section>
       }
 

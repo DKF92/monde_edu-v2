@@ -28,6 +28,7 @@ import { CaisseService } from '../../core/services/caisse.service';
 import { ActionsCaisseService } from '../../core/services/actions-caisse.service';
 import { LIBELLES_MODE, ModePaiement, ResultatCaisse, ResultatEncaissement, SituationCaisse } from '../../core/models/caisse.model';
 import { LIBELLES_STATUT, TONS_STATUT } from '../../core/models/inscription.model';
+import { AuthService } from '../../core/services/auth.service';
 
 /**
  * Guichet (V1 modal_paiement) : recherche de l'eleve, situation (frais par
@@ -48,6 +49,7 @@ export class EncaisserPage implements OnDestroy {
   private readonly alertes = inject(AlertController);
   private readonly toasts = inject(ToastController);
   readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
 
   readonly libellesMode = LIBELLES_MODE;
   readonly modes = Object.keys(LIBELLES_MODE) as ModePaiement[];
@@ -364,5 +366,14 @@ export class EncaisserPage implements OnDestroy {
   private async notifier(message: string, erreur = false): Promise<void> {
     const toast = await this.toasts.create({ message, duration: 3500, position: 'bottom', color: erreur ? 'danger' : 'dark' });
     await toast.present();
+  }
+
+  /** Fiche d'inscription si le poste a le droit Inscriptions, sinon dossier de l'eleve (caissier). */
+  voirInscription(inscriptionId: number, eleveId: number | undefined): void {
+    if (this.auth.aPermission('inscriptions.gerer') || !eleveId) {
+      this.router.navigate(['/tabs/inscriptions', inscriptionId]);
+    } else {
+      this.router.navigate(['/tabs/eleves', eleveId]);
+    }
   }
 }

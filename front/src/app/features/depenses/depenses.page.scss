@@ -88,7 +88,7 @@ $tableau: 760px;
   border-bottom: 1px solid var(--me-bordure);
 
   @media (min-width: 760px) {
-    grid-template-columns: minmax(0, 1fr) repeat(2, minmax(0, 230px));
+    grid-template-columns: minmax(0, 1fr) repeat(3, minmax(0, 210px));
   }
 }
 
@@ -262,13 +262,11 @@ $tableau: 760px;
 
   .me-action {
     border: 1px solid var(--me-bordure);
-    background: var(--me-surface);
   }
 
   @container (min-width: #{$tableau}) {
     .me-action {
       border: none;
-      background: none;
     }
   }
 }

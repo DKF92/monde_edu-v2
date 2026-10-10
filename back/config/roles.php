@@ -36,8 +36,13 @@ return [
         'eleves.voir',
         'eleves.gerer',
         'inscriptions.gerer',
+        // Consulter la liste et les fiches d'inscription sans rien modifier (comptable).
+        'inscriptions.voir',
 
         'notes.saisir',
+        // Saisir les notes de toutes les classes et matieres a la place des
+        // professeurs (informaticien) ; donnable a n'importe quel poste.
+        'notes.saisir_toutes',
         'notes.voir',
         'moyennes.gerer',
         // Arreter les notes et cloturer les periodes : reserve au directeur.
@@ -50,10 +55,18 @@ return [
         'reglements.voir',
         'reglements.modifier',
         'dettes.gerer',
+        // Consulter et imprimer les reductions sans en accorder (V1 econome).
+        'reductions.voir',
         'reductions.gerer',
         'depenses.gerer',
         'depenses.voir',
         'depenses.modifier',
+        // Personnel habilite a faire les retraits bancaires (depenses banque).
+        'depenses.retrait_banque',
+        // Entrees banque (versements, subventions, dons...) ; la caisse = les paiements.
+        'entrees.gerer',
+        'entrees.voir',
+        'entrees.modifier',
 
         'rapports.voir',
     ],
@@ -83,11 +96,13 @@ return [
             'eleves.voir' => ['Voir les élèves', 'Consulter les fiches élèves.'],
             'eleves.gerer' => ['Gérer les élèves', 'Créer et modifier les fiches élèves.'],
             'inscriptions.gerer' => ['Inscriptions', 'Inscrire les élèves dans les classes.'],
+            'inscriptions.voir' => ['Consulter les inscriptions', 'Voir la liste des inscrits et leurs fiches, sans rien modifier.'],
         ],
         'Pédagogie' => [
             'notes.saisir' => ['Saisir les notes', 'Saisir les notes de ses classes.'],
+            'notes.saisir_toutes' => ['Saisir les notes pour les professeurs', 'Saisir les notes de toutes les classes et matières à la place des professeurs.'],
             'notes.voir' => ['Voir les notes', 'Consulter les notes.'],
-            'moyennes.gerer' => ['Moyennes', 'Calculer les moyennes et les rangs.'],
+            'moyennes.gerer' => ['Moyennes', 'Calculer les moyennes et les rangs (ne permet pas de saisir les notes des professeurs).'],
             'notes.arreter' => ['Arrêter les notes', 'Arrêter les notes des classes et clôturer les périodes (trimestres, semestres).'],
             'bulletins.voir' => ['Bulletins', 'Consulter et imprimer les bulletins.'],
             'absences.gerer' => ['Absences', 'Saisir les absences et retards.'],
@@ -98,10 +113,15 @@ return [
             'reglements.voir' => ['Voir les paiements', 'Consulter les paiements et la situation financière.'],
             'reglements.modifier' => ['Modifier / supprimer un paiement', 'Corriger ou supprimer un paiement, avec un motif obligatoire (historisé).'],
             'dettes.gerer' => ['Dettes', 'Gérer les dettes des années précédentes.'],
+            'reductions.voir' => ['Voir les réductions', 'Consulter et imprimer les réductions et cas sociaux accordés.'],
             'reductions.gerer' => ['Réductions', 'Accorder des réductions et des cas sociaux.'],
             'depenses.gerer' => ['Enregistrer les dépenses', 'Saisir les sorties de caisse ; sans « Voir les dépenses », on ne voit que les siennes.'],
             'depenses.voir' => ['Voir les dépenses', 'Toutes les dépenses, le point mensuel et le solde de caisse.'],
             'depenses.modifier' => ['Modifier / supprimer une dépense', 'Corriger ou supprimer une dépense, avec un motif obligatoire (historisé).'],
+            'depenses.retrait_banque' => ['Opérations bancaires', 'Peut faire les retraits et les versements à la banque : proposé comme « Retrait effectué par » (dépenses banque) et « Versement effectué par » (entrées banque).'],
+            'entrees.gerer' => ['Enregistrer les entrées', 'Saisir les entrées banque (versements, subventions, dons) ; sans « Voir les entrées », on ne voit que les siennes.'],
+            'entrees.voir' => ['Voir les entrées', 'Toutes les entrées banque, le total des encaissements de chaque caissier et le point des entrées.'],
+            'entrees.modifier' => ['Modifier / supprimer une entrée', 'Corriger ou supprimer une entrée banque, avec un motif obligatoire (historisé).'],
         ],
         'Rapports' => [
             'rapports.voir' => ['Rapports', 'Tableaux de bord et points financiers.'],
@@ -138,9 +158,37 @@ return [
             'code' => 'directeur_etudes',
             'description' => 'Suivi pédagogique : classes, matières, notes, moyennes.',
             'permissions' => [
+                'utilisateurs.gerer', 'annees_scolaires.gerer',
                 'eleves.voir', 'eleves.gerer', 'inscriptions.gerer', 'classes.voir', 'classes.gerer',
                 'matieres.gerer', 'emplois_du_temps.gerer', 'notes.voir', 'moyennes.gerer', 'notes.arreter',
                 'bulletins.voir', 'absences.gerer', 'rapports.voir', 'periodes.choisir',
+            ],
+        ],
+        // V1 directeurEtudAdj (pages DirecteurAdjoint) : le travail du DE sans
+        // l'arret des notes ni les comptes.
+        'Adjoint au directeur des etudes' => [
+            'code' => 'adjoint_directeur_etudes',
+            'description' => 'Seconde le directeur des études : classes, matières, moyennes, bulletins, absences.',
+            'permissions' => [
+                'eleves.voir', 'classes.voir', 'matieres.gerer', 'emplois_du_temps.gerer', 'notes.voir',
+                'moyennes.gerer', 'bulletins.voir', 'absences.gerer', 'rapports.voir', 'periodes.choisir',
+            ],
+        ],
+        // Pas de menu en V1 (poste prevu, commente) : consultation pour le
+        // secretariat du directeur des etudes, plus les absences.
+        'Secretaire du directeur des etudes' => [
+            'code' => 'secretaire_directeur_etudes',
+            'description' => 'Secrétariat du directeur des études : élèves, listes de classe, notes, bulletins, absences.',
+            'permissions' => ['eleves.voir', 'classes.voir', 'notes.voir', 'bulletins.voir', 'absences.gerer', 'periodes.choisir'],
+        ],
+        // V1 corspFich : dossiers eleves, inscriptions, classes, moyennes,
+        // absences, conduite, bulletins, inscriptions en ligne.
+        'Correspondant fichier' => [
+            'code' => 'correspondant_fichier',
+            'description' => 'Tient le fichier des élèves : dossiers, inscriptions, classes, notes et moyennes, bulletins, absences.',
+            'permissions' => [
+                'eleves.voir', 'eleves.gerer', 'inscriptions.gerer', 'classes.voir', 'classes.gerer', 'notes.saisir',
+                'notes.voir', 'moyennes.gerer', 'bulletins.voir', 'absences.gerer', 'rapports.voir', 'periodes.choisir',
             ],
         ],
         'Directeur administratif' => [
@@ -149,14 +197,14 @@ return [
             'description' => 'Gestion administrative et financière.',
             'permissions' => [
                 'utilisateurs.gerer', 'eleves.voir', 'tarifs.gerer', 'reglements.voir',
-                'dettes.gerer', 'depenses.gerer', 'depenses.voir', 'rapports.voir',
+                'dettes.gerer', 'depenses.gerer', 'depenses.voir', 'depenses.retrait_banque', 'entrees.gerer', 'entrees.voir', 'rapports.voir',
             ],
         ],
         'Educateur' => [
             'code' => 'educateur',
             'niveaux' => true,
             'description' => 'Inscrit les élèves dans les classes de ses niveaux, suit les absences.',
-            'permissions' => ['eleves.voir', 'inscriptions.gerer', 'classes.voir', 'absences.gerer', 'notes.voir', 'bulletins.voir', 'periodes.choisir'],
+            'permissions' => ['eleves.voir', 'eleves.gerer', 'inscriptions.gerer', 'classes.voir', 'absences.gerer', 'notes.voir', 'bulletins.voir', 'periodes.choisir'],
         ],
         'Professeur' => [
             'code' => 'professeur',
@@ -174,13 +222,19 @@ return [
             'code' => 'comptable',
             'sensible' => true,
             'description' => 'Suit les paiements et les dépenses.',
-            'permissions' => ['reglements.voir', 'depenses.gerer', 'depenses.voir', 'rapports.voir'],
+            'permissions' => [
+                'utilisateurs.gerer', 'eleves.voir', 'inscriptions.voir', 'classes.voir', 'tarifs.gerer', 'reglements.voir', 'dettes.gerer',
+                'reductions.gerer', 'depenses.gerer', 'depenses.voir', 'entrees.gerer', 'entrees.voir', 'sms.gerer', 'rapports.voir',
+            ],
         ],
         'Econome' => [
             'code' => 'econome',
             'sensible' => true,
             'description' => 'Gère les dépenses de l\'établissement.',
-            'permissions' => ['depenses.gerer', 'depenses.voir', 'depenses.modifier', 'rapports.voir'],
+            'permissions' => [
+                'eleves.voir', 'reglements.voir', 'reductions.voir', 'depenses.gerer', 'depenses.voir',
+                'depenses.modifier', 'depenses.retrait_banque', 'entrees.gerer', 'entrees.voir', 'entrees.modifier', 'rapports.voir',
+            ],
         ],
         'Secretaire' => [
             'code' => 'secretaire',
@@ -189,8 +243,12 @@ return [
         ],
         'Informaticien' => [
             'code' => 'informaticien',
-            'description' => 'Support informatique et comptes utilisateurs.',
-            'permissions' => ['utilisateurs.gerer', 'etablissement.gerer'],
+            'description' => 'Support informatique, comptes, matières, imports, notes et moyennes, classes.',
+            'permissions' => [
+                'utilisateurs.gerer', 'etablissement.gerer', 'annees_scolaires.gerer', 'eleves.voir', 'eleves.gerer',
+                'inscriptions.gerer', 'classes.voir', 'classes.gerer', 'matieres.gerer', 'emplois_du_temps.gerer',
+                'notes.saisir', 'notes.saisir_toutes', 'notes.voir', 'moyennes.gerer', 'bulletins.voir', 'rapports.voir', 'periodes.choisir',
+            ],
         ],
         'Parent' => [
             'code' => 'parent',

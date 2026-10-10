@@ -16,6 +16,11 @@
         </p>
       </div>
       <div class="boutons-entete">
+        <button type="button" class="me-bouton-secondaire" (click)="router.navigateByUrl('/tabs/inscriptions/mises-a-jour')">
+          <ion-icon name="globe-outline"></ion-icon>
+          <span>Mises à jour en ligne</span>
+        </button>
+      @if (peutGerer()) {
         <button
           type="button"
           class="me-bouton-secondaire"
@@ -30,6 +35,7 @@
           <ion-icon name="person-add-outline"></ion-icon>
           <span>Nouvelle inscription</span>
         </button>
+      }
       </div>
     </header>
 
@@ -42,7 +48,11 @@
           </span>
           <div>
             <strong>{{ maj.enCours() ? 'Mise à jour depuis l\'inscription en ligne…' : 'Mise à jour en ligne terminée' }}</strong>
-            <small>{{ maj.traitees().length }} / {{ maj.total() }} vérifiée{{ maj.traitees().length > 1 ? 's' : '' }} · {{ maj.trouvees() }} trouvée{{ maj.trouvees() > 1 ? 's' : '' }} et mise{{ maj.trouvees() > 1 ? 's' : '' }} à jour</small>
+            <small>
+              {{ maj.nbTraitees() }} / {{ maj.total() }} vérifiée{{ maj.nbTraitees() > 1 ? 's' : '' }} · {{ maj.trouvees() }} trouvée{{ maj.trouvees() > 1 ? 's' : '' }} et mise{{ maj.trouvees() > 1 ? 's' : '' }} à jour
+              · {{ maj.introuvables() }} introuvable{{ maj.introuvables() > 1 ? 's' : '' }} en ligne
+              @if (maj.enCours()) { · continue même si vous changez de page }
+            </small>
           </div>
           @if (maj.enCours()) {
             <button type="button" class="me-bouton-texte" (click)="maj.arreter()"><ion-icon name="stop-circle-outline"></ion-icon> Arrêter</button>
@@ -107,6 +117,8 @@
         <app-selecteur idChamp="filtre-affectation" icone="ribbon-outline" [options]="optionsAffectation" [valeur]="affectation()" (valeurChange)="appliquer('affectation', $event)"></app-selecteur>
         <app-selecteur idChamp="filtre-redoublant" icone="repeat-outline" [options]="optionsRedoublement" [valeur]="redoublement()" (valeurChange)="appliquer('redoublement', $event)"></app-selecteur>
         <app-selecteur idChamp="filtre-en-ligne" icone="globe-outline" [options]="optionsEnLigne" [valeur]="enLigne()" (valeurChange)="appliquer('enLigne', $event)"></app-selecteur>
+        <app-selecteur idChamp="filtre-sexe" icone="people-outline" [options]="optionsSexe" [valeur]="sexe()" (valeurChange)="appliquer('sexe', $event)"></app-selecteur>
+        <app-selecteur idChamp="filtre-photo" icone="camera-outline" [options]="optionsPhoto" [valeur]="photo()" (valeurChange)="appliquer('photo', $event)"></app-selecteur>
       </div>
 
       @if (liste.chargementInitial()) {
@@ -138,10 +150,12 @@
         <div class="tableau" role="table" aria-label="Inscriptions" [class.attenue]="liste.actualisation()">
           <div class="ligne entete-tableau" role="row">
             <span role="columnheader">Élève</span>
+            <span role="columnheader">Genre</span>
             <span role="columnheader">Classe</span>
             <span role="columnheader">Statut</span>
-            <span role="columnheader" class="a-droite">Total dû</span>
-            <span role="columnheader" class="a-droite">Reste à payer</span>
+            <span role="columnheader">Affectation</span>
+            <span role="columnheader">Inscrit le</span>
+            <span role="columnheader">Inscrit par</span>
             <span role="columnheader" class="a-droite">Actions</span>
           </div>
 
@@ -166,14 +180,17 @@
                   <strong>{{ l.eleve.nom }} {{ l.eleve.prenoms }}</strong>
                   <small>
                     <span class="matricule">{{ l.eleve.matricule }}</span>
-                    @if (l.affecte) { · Affecté(e) }
                     @if (l.redoublant) { · Redoublant(e) }
+                    @if (l.boursier) { · Boursier(e) }
                     @if (l.inscrit_en_ligne) {
                       <ion-icon name="globe-outline" title="Préinscrit(e) en ligne"></ion-icon>
+                    } @else if (l.en_ligne_introuvable) {
+                      <span class="me-badge attention" title="Déjà scanné(e) : aucune inscription en ligne trouvée (rescanné(e) à chaque mise à jour)">Introuvable en ligne</span>
                     }
                   </small>
                 </span>
               </div>
+              <span class="cellule" role="cell" data-libelle="Genre">{{ l.eleve.sexe === 'F' ? 'Fille' : l.eleve.sexe === 'M' ? 'Garçon' : '—' }}</span>
               <span class="cellule" role="cell" data-libelle="Classe">
                 @if (l.classe) {
                   <strong>{{ l.classe.libelle }}</strong>
@@ -184,16 +201,21 @@
               <span class="cellule" role="cell" data-libelle="Statut">
                 <span [class]="'me-badge ' + tons[l.statut]">{{ libellesStatut[l.statut] }}</span>
               </span>
-              <span class="cellule montant" role="cell" data-libelle="Total dû">{{ l.classe ? montant(l.total_du) : '—' }}</span>
-              <span class="cellule montant" role="cell" data-libelle="Reste à payer" [class.a-payer]="l.reste > 0">{{ l.classe ? montant(l.reste) : '—' }}</span>
+              <span class="cellule" role="cell" data-libelle="Affectation">
+                <span [class]="'me-badge ' + (l.affecte ? 'info' : '')">{{ l.affecte ? 'Affecté(e)' : 'Non affecté(e)' }}</span>
+              </span>
+              <span class="cellule" role="cell" data-libelle="Inscrit le">{{ dateCourte(l.date_inscription) }}</span>
+              <span class="cellule texte-coupe" role="cell" data-libelle="Inscrit par" [title]="l.enregistre_par ?? ''">{{ l.enregistre_par ?? '—' }}</span>
               <span class="cellule actions" role="cell">
                 <button type="button" class="me-action" title="Voir l'inscription" aria-label="Voir l'inscription" (click)="$event.stopPropagation(); ouvrir(l)">
                   <ion-icon name="eye-outline"></ion-icon>
                 </button>
+                @if (peutGerer()) {
                 <button type="button" class="me-action" title="Modifier" aria-label="Modifier" (click)="modifier(l, $event)">
                   <ion-icon name="create-outline"></ion-icon>
                 </button>
-                @if (!l.total_paye) {
+                }
+                @if (l.statut < 2 && peutGerer()) {
                   <button type="button" class="me-action danger" title="Annuler l'inscription" aria-label="Annuler l'inscription" [disabled]="annulation() === l.id" (click)="annuler(l, $event)">
                     <ion-icon name="close-circle-outline"></ion-icon>
                   </button>
@@ -209,10 +231,12 @@
                   <button type="button" class="me-lien" (click)="reinitialiserFiltres()">Effacer les filtres</button>
                 } @else {
                   <strong>Aucune inscription pour le moment</strong>
+                  @if (peutGerer()) {
                   <span>Commencez par saisir le matricule d'un élève.</span>
                   <button type="button" class="me-bouton-principal" (click)="router.navigateByUrl('/tabs/inscriptions/nouvelle')">
                     <ion-icon name="person-add-outline"></ion-icon> Nouvelle inscription
                   </button>
+                  }
                 }
               </div>
             }

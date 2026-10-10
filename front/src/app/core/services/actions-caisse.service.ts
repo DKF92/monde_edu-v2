@@ -61,13 +61,13 @@ export class ActionsCaisseService {
   }
 
   /** Motif obligatoire (modification ou suppression d'un paiement) ; null si abandon. */
-  async motif(action: 'modifier' | 'supprimer', numero: string, objet: 'paiement' | 'dépense' = 'paiement'): Promise<string | null> {
-    const article = objet === 'paiement' ? 'le paiement' : 'la dépense';
+  async motif(action: 'modifier' | 'supprimer', numero: string, objet: 'paiement' | 'dépense' | 'entrée' = 'paiement'): Promise<string | null> {
+    const article = objet === 'paiement' ? 'le paiement' : objet === 'entrée' ? "l'entrée" : 'la dépense';
     const alerte = await this.alertes.create({
       header: action === 'supprimer' ? `Supprimer ${article} n° ${numero} ?` : `Modifier ${article} n° ${numero}`,
       message:
         action === 'supprimer'
-          ? (objet === 'paiement' ? 'Le paiement sera retiré et les montants payés recalculés. ' : 'La dépense sera retirée du point de caisse. ') + "Le motif est obligatoire et conservé dans l'historique."
+          ? (objet === 'paiement' ? 'Le paiement sera retiré et les montants payés recalculés. ' : objet === 'entrée' ? "L'entrée sera retirée des points. " : 'La dépense sera retirée du point de caisse. ') + "Le motif est obligatoire et conservé dans l'historique."
           : "Le motif est obligatoire et conservé dans l'historique.",
       cssClass: 'alerte-me',
       inputs: [{ name: 'motif', type: 'textarea', placeholder: 'Motif (obligatoire)', attributes: { maxlength: 500 } }],

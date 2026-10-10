@@ -29,7 +29,7 @@ class ResultatController extends Controller
 {
     public function index(Request $request, TenantContext $tenant)
     {
-        $this->autoriser($request, ['notes.voir', 'moyennes.gerer', 'bulletins.voir', 'notes.saisir']);
+        $this->autoriser($request, ['notes.voir', 'moyennes.gerer', 'bulletins.voir', 'notes.saisir', 'notes.saisir_toutes']);
         [$classe, $periode, $periodes] = $this->contexte($request, $tenant);
         $resultats = $this->resultats($classe, $periode, $periodes);
         $enfants = PorteePedagogique::eleves($request);
@@ -162,6 +162,13 @@ class ResultatController extends Controller
             'eleves' => $eleves,
             'absences' => $absences,
             'professeurs' => $professeurs,
+            // Signature « Le directeur des etudes » : compte actif qui a ce poste dans l'etablissement.
+            'directeur_etudes' => DB::table('model_has_roles as mr')->join('roles as r', 'r.id', '=', 'mr.role_id')
+                ->join('users as u', 'u.id', '=', 'mr.model_id')
+                ->where('mr.etablissement_id', $tenant->id())->where('r.code', 'directeur_etudes')
+                ->where('mr.model_type', (new \App\Models\User())->getMorphClass())
+                ->where(fn ($q) => $q->whereNull('u.statut')->orWhere('u.statut', 'actif'))
+                ->orderBy('u.id')->selectRaw("TRIM(CONCAT(u.name, ' ', COALESCE(u.prenoms, ''))) AS nom")->value('nom'),
             'annee' => $classe->anneeScolaire?->libelle,
             'classe' => $classe->load(['professeurPrincipal.user', 'niveau']),
             'periode_libelle' => $periode?->libelle ?? 'Annuel',

@@ -6,6 +6,7 @@ import { addIcons } from 'ionicons';
 import { chevronBackOutline, calendarOutline, schoolOutline, cloudOfflineOutline, informationCircleOutline } from 'ionicons/icons';
 import { GrilleConduite, PageAbsences, PedagogieService } from '../../core/services/pedagogie.service';
 import { OptionSelecteur, SelecteurComponent } from '../../shared/selecteur.component';
+import { estEnAttente } from '../../core/interceptors/reseau.interceptor';
 
 /**
  * Notes de conduite /20 (V1 EDUCATEUR enregistrer_cond) d'une classe pour une
@@ -97,6 +98,10 @@ export class ConduitePage {
       .subscribe({
         next: (r) => {
           this.enregistrement.set(false);
+          if (estEnAttente(r)) {
+            this.notifier(r.message);
+            return;
+          }
           this.appliquer(r);
           this.notifier('Notes de conduite enregistrées.');
         },

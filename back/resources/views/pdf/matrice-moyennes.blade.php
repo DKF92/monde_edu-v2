@@ -33,7 +33,7 @@
     <thead>
       <tr>
         <th>N°</th>
-        <th class="g">Élève</th>
+        <th class="g" style="width: 50mm">Élève</th>
         @foreach ($matieres as $m)<th>{{ $m['code'] }}<small>coef {{ $m['coefficient'] }}</small></th>@endforeach
         @if ($annuel)
           @foreach ($periodes as $p)<th>{{ $p['libelle'] }}<small>poids {{ $p['poids'] }}</small></th>@endforeach
@@ -51,7 +51,7 @@
       @foreach (collect($eleves)->sortBy(fn ($e) => [$e['rang'] ?? 9999, $e['nom']]) as $e)
         <tr>
           <td>{{ $loop->iteration }}</td>
-          <td class="g"><strong>{{ $e['nom'] }}</strong> {{ $e['prenoms'] }}</td>
+          <td class="g" style="white-space: nowrap"><strong>{{ $e['nom'] }}</strong> {{ \App\Support\Noms::ajuster((string) $e['nom'], $e['prenoms'], 48.6, $nbMatieres > 10 ? 6.8 : 7.6, true) }}</td>
           @foreach ($matieres as $m)
             @php($v = $e['moyennes'][$m['id']]['moyenne'] ?? null)
             <td class="{{ $v !== null && $v < 10 ? 'faible' : '' }}">{{ $n($v) }}</td>

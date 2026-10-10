@@ -1,0 +1,95 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/parametres')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Paramètres
+        </button>
+        <h1>Synchronisation</h1>
+        <p>Échanges entre le serveur de l'école (qui fait foi) et le serveur en ligne.</p>
+      </div>
+      @if (etat()?.role === 'local' && etat()?.configuree) {
+        <button type="button" class="me-bouton-principal" (click)="lancer()" [disabled]="lancement()">
+          @if (lancement()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="sync-outline"></ion-icon> Synchroniser maintenant }
+        </button>
+      }
+    </header>
+
+    @if (chargement() && !etat()) {
+      <section class="me-carte bloc"><ion-skeleton-text [animated]="true" style="width: 100%; height: 140px"></ion-skeleton-text></section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger l'état de la synchronisation</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else if (etat()) {
+      @let e = etat()!;
+      @if (!e.configuree) {
+        <p class="me-note">
+          <ion-icon name="information-circle-outline"></ion-icon>
+          <span>
+            Synchronisation non configurée sur ce serveur ({{ e.role === 'local' ? 'serveur de l\'école' : 'serveur en ligne' }}) :
+            il faut renseigner SYNC_URL et SYNC_CLE dans son fichier .env (voir SYNCHRONISATION.md).
+            Les changements restent notés et partiront à la mise en service.
+          </span>
+        </p>
+      }
+
+      <section class="compteurs">
+        <div class="me-carte compteur">
+          <span class="me-pastille teinte-bleu"><ion-icon name="server-outline"></ion-icon></span>
+          <span><strong>{{ e.role === 'local' ? 'École' : 'En ligne' }}</strong><small>Ce serveur</small></span>
+        </div>
+        <div class="me-carte compteur">
+          <span class="me-pastille teinte-violet"><ion-icon name="cloud-upload-outline"></ion-icon></span>
+          <span><strong>{{ e.en_attente }}</strong><small>Changement{{ e.en_attente > 1 ? 's' : '' }} en attente d'envoi</small></span>
+        </div>
+        <div class="me-carte compteur">
+          <span class="me-pastille teinte-vert"><ion-icon name="time-outline"></ion-icon></span>
+          <span>
+            <strong>{{ dateHeure(e.role === 'local' ? e.derniere_synchro : e.derniere_reception) }}</strong>
+            <small>{{ e.role === 'local' ? 'Dernière synchronisation' : 'Dernière réception de l\'école' }}</small>
+          </span>
+        </div>
+        <div class="me-carte compteur">
+          <span class="me-pastille teinte-orange"><ion-icon name="alert-circle-outline"></ion-icon></span>
+          <span><strong>{{ e.rejets_non_vus }}</strong><small>Saisie{{ e.rejets_non_vus > 1 ? 's' : '' }} refusée{{ e.rejets_non_vus > 1 ? 's' : '' }} non vue{{ e.rejets_non_vus > 1 ? 's' : '' }}</small></span>
+        </div>
+      </section>
+
+      @if (e.serveur_en_ligne) {
+        <p class="me-aide-champ">Serveur en ligne : {{ e.serveur_en_ligne }}</p>
+      }
+      @if (e.derniere_erreur) {
+        <p class="me-erreur-champ erreur-synchro"><ion-icon name="alert-circle-outline"></ion-icon> Dernière erreur : {{ e.derniere_erreur }}</p>
+      }
+
+      <section class="me-carte bloc">
+        <h2>Saisies faites en ligne refusées à l'école</h2>
+        <p class="me-aide-champ">Une note, une conduite ou une absence saisie en ligne est refusée si, entre-temps, la période a été clôturée ou les notes arrêtées à l'école. Son auteur est averti à sa connexion.</p>
+        @if (rejets().length) {
+          <ul class="rejets">
+            @for (r of rejets(); track r.id) {
+              <li [class.vu]="r.vu">
+                <div>
+                  <strong>{{ r.libelle }}</strong>
+                  <small>{{ dateHeure(r.date) }} · {{ r.auteur ?? 'auteur inconnu' }} · {{ r.motif }}</small>
+                </div>
+                @if (r.vu) {
+                  <span class="me-badge succes"><ion-icon name="checkmark-circle-outline"></ion-icon> Vu</span>
+                } @else {
+                  <button type="button" class="me-bouton-secondaire" (click)="marquerVu(r)">Marquer vu</button>
+                }
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="texte-doux">Aucune saisie refusée.</p>
+        }
+      </section>
+    }
+  </div>
+</ion-content>

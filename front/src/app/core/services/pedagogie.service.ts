@@ -25,6 +25,7 @@ export interface ParametresMatieres {
 }
 
 export interface EnseignantsClasse {
+  professeur_principal_id: number | null;
   matieres: { id: number; libelle: string; coefficient: number; personnel_id: number | null }[];
   personnels: { id: number; nom: string; matieres: number[] }[];
 }
@@ -309,8 +310,8 @@ export class PedagogieService {
   enseignants(classeId: number): Observable<EnseignantsClasse> {
     return this.http.get<EnseignantsClasse>(`${this.api}/classes/${classeId}/enseignants`);
   }
-  enregistrerEnseignants(classeId: number, enseignants: { matiere_id: number; personnel_id: number | null }[]): Observable<EnseignantsClasse> {
-    return this.http.put<EnseignantsClasse>(`${this.api}/classes/${classeId}/enseignants`, { enseignants });
+  enregistrerEnseignants(classeId: number, enseignants: { matiere_id: number; personnel_id: number | null }[], professeurPrincipalId: number | null): Observable<EnseignantsClasse> {
+    return this.http.put<EnseignantsClasse>(`${this.api}/classes/${classeId}/enseignants`, { enseignants, professeur_principal_id: professeurPrincipalId });
   }
 
   // Notes

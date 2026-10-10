@@ -27,6 +27,7 @@ import {
   chevronDownOutline,
   chevronUpOutline,
 } from 'ionicons/icons';
+import { AuthService } from '../../core/services/auth.service';
 import { InscriptionService } from '../../core/services/inscription.service';
 import { MiseAJourEnLigneService } from '../../core/services/mise-a-jour-en-ligne.service';
 import {
@@ -60,6 +61,9 @@ export class InscriptionsPage implements OnDestroy {
   private readonly toasts = inject(ToastController);
   readonly router = inject(Router);
   readonly maj = inject(MiseAJourEnLigneService);
+  private readonly auth = inject(AuthService);
+  /** Sans ce droit (inscriptions.voir seul, comptable) : consultation seule. */
+  readonly peutGerer = computed(() => this.auth.aPermission('inscriptions.gerer'));
 
   readonly libellesStatut = LIBELLES_STATUT;
   readonly tons = TONS_STATUT;
@@ -83,6 +87,10 @@ export class InscriptionsPage implements OnDestroy {
   readonly redoublement = signal(0);
   /** 0 = tous, 1 = inscrits en ligne, 2 = pas inscrits en ligne. */
   readonly enLigne = signal(0);
+  /** 0 = tous, 1 = garcons, 2 = filles. */
+  readonly sexe = signal(0);
+  /** 0 = tous, 1 = avec photo, 2 = sans photo. */
+  readonly photo = signal(0);
   readonly page = signal(1);
   readonly taille = signal(TAILLES_PAGE[0]);
 
@@ -118,13 +126,25 @@ export class InscriptionsPage implements OnDestroy {
     { valeur: 2, libelle: 'Non redoublants' },
   ];
 
+  readonly optionsSexe: OptionSelecteur[] = [
+    { valeur: 0, libelle: 'Filles et garçons' },
+    { valeur: 1, libelle: 'Garçons' },
+    { valeur: 2, libelle: 'Filles' },
+  ];
+
+  readonly optionsPhoto: OptionSelecteur[] = [
+    { valeur: 0, libelle: 'Avec et sans photo' },
+    { valeur: 1, libelle: 'Avec photo' },
+    { valeur: 2, libelle: 'Sans photo' },
+  ];
+
   readonly optionsEnLigne: OptionSelecteur[] = [
     { valeur: 0, libelle: 'En ligne : oui et non' },
     { valeur: 1, libelle: 'Inscrits en ligne' },
     { valeur: 2, libelle: 'Pas inscrits en ligne' },
   ];
 
-  readonly filtresActifs = computed(() => !!this.recherche().trim() || this.statut() !== null || !!this.niveau() || !!this.affectation() || !!this.redoublement() || !!this.enLigne());
+  readonly filtresActifs = computed(() => !!this.recherche().trim() || this.statut() !== null || !!this.niveau() || !!this.affectation() || !!this.redoublement() || !!this.enLigne() || !!this.sexe() || !!this.photo());
 
   /** Titre du tableau : suit les filtres choisis. */
   readonly titre = computed(() => {
@@ -135,6 +155,8 @@ export class InscriptionsPage implements OnDestroy {
     if (this.affectation()) morceaux.push(this.affectation() === 1 ? 'affectés' : 'non affectés');
     if (this.redoublement()) morceaux.push(this.redoublement() === 1 ? 'redoublants' : 'non redoublants');
     if (this.enLigne()) morceaux.push(this.enLigne() === 1 ? 'inscrits en ligne' : 'pas inscrits en ligne');
+    if (this.sexe()) morceaux.push(this.sexe() === 1 ? 'garçons' : 'filles');
+    if (this.photo()) morceaux.push(this.photo() === 1 ? 'avec photo' : 'sans photo');
     if (this.statut() !== null) morceaux.push(this.libellesStatut[this.statut()!].toLowerCase());
     if (this.recherche().trim()) morceaux.push(`pour « ${this.recherche().trim()} »`);
     return morceaux.join(' · ');
@@ -203,6 +225,8 @@ export class InscriptionsPage implements OnDestroy {
           affecte: this.affectation() ? this.affectation() === 1 : null,
           redoublant: this.redoublement() ? this.redoublement() === 1 : null,
           en_ligne: this.enLigne() ? this.enLigne() === 1 : null,
+          sexe: this.sexe() ? (this.sexe() === 1 ? 'M' : 'F') : null,
+          photo: this.photo() ? this.photo() === 1 : null,
         }),
       (r) => {
         this.compteurs.set(r.compteurs);
@@ -227,7 +251,7 @@ export class InscriptionsPage implements OnDestroy {
     this.charger();
   }
 
-  appliquer(filtre: 'niveau' | 'affectation' | 'redoublement' | 'enLigne', valeur: number): void {
+  appliquer(filtre: 'niveau' | 'affectation' | 'redoublement' | 'enLigne' | 'sexe' | 'photo', valeur: number): void {
     this.filtrer(() => this[filtre].set(valeur));
   }
 
@@ -247,6 +271,8 @@ export class InscriptionsPage implements OnDestroy {
       this.affectation.set(0);
       this.redoublement.set(0);
       this.enLigne.set(0);
+      this.sexe.set(0);
+      this.photo.set(0);
       this.statut.set(null);
     });
   }
@@ -310,7 +336,7 @@ export class InscriptionsPage implements OnDestroy {
     await alerte.present();
     if ((await alerte.onDidDismiss()).role === 'confirm') {
       this.bilanDeplie.set(false);
-      this.maj.demarrer(n);
+      this.maj.demarrer();
     }
   }
 
@@ -319,7 +345,9 @@ export class InscriptionsPage implements OnDestroy {
     await toast.present();
   }
 
-  montant(valeur: number): string {
-    return valeur.toLocaleString('fr-FR') + ' F';
+  dateCourte(valeur: string | null): string {
+    if (!valeur) return '—';
+    const d = new Date(valeur.replace(' ', 'T'));
+    return isNaN(d.getTime()) ? valeur : d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   }
 }

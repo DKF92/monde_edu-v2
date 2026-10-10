@@ -5,6 +5,7 @@ import { addIcons } from 'ionicons';
 import { bookOutline, schoolOutline, calendarOutline, ribbonOutline, closeOutline, documentTextOutline, saveOutline } from 'ionicons/icons';
 import { CatalogueOfficiels, RapportsAvancesService, TextesRapport, TypeRapportOfficiel } from '../../core/services/rapports-avances.service';
 import { OptionSelecteur, SelecteurComponent } from '../../shared/selecteur.component';
+import { estEnAttente } from '../../core/interceptors/reseau.interceptor';
 
 const VIDES: TextesRapport = { introduction: null, observations: null, difficultes: null, perspectives: null, conclusion: null, signataire: null };
 
@@ -159,6 +160,11 @@ export class RapportsOfficielsComponent implements OnInit {
     this.action.set(generer ? 'generer' : 'enregistrer');
     this.service.enregistrerTextes(type, periode, this.textes()).subscribe({
       next: async (r) => {
+        if (estEnAttente(r)) {
+          this.notifier(r.message);
+          this.action.set(null);
+          return;
+        }
         this.catalogue.update((c) => (c ? { ...c, textes: { ...c.textes, [this.cle()]: r.textes } } : c));
         if (generer) {
           await this.service.imprimerOfficiel(type, periode, this.titreType());

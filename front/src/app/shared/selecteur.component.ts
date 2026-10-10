@@ -4,6 +4,7 @@ import {
   EventEmitter,
   HostListener,
   Input,
+  OnChanges,
   Output,
   inject,
   signal,
@@ -28,7 +29,9 @@ let compteur = 0;
  * Liste deroulante de la charte : contrairement a un <select> natif, la liste
  * ouverte fait exactement la largeur du champ, et reprend le style des cartes
  * de choix (coche, badges). S'ouvre vers le haut s'il manque de place en bas.
- * Un selecteur a une seule option (ou desactive) est affiche grise.
+ * Un selecteur a une seule option (ou desactive) est affiche grise ; si rien
+ * n'est encore choisi, cette option unique est choisie d'office (sinon le
+ * champ resterait vide sans moyen de le remplir).
  */
 @Component({
   selector: 'app-selecteur',
@@ -37,7 +40,7 @@ let compteur = 0;
   templateUrl: './selecteur.component.html',
   styleUrl: './selecteur.component.scss',
 })
-export class SelecteurComponent {
+export class SelecteurComponent implements OnChanges {
   private readonly hote = inject<ElementRef<HTMLElement>>(ElementRef);
 
   @Input() options: OptionSelecteur[] = [];
@@ -60,6 +63,14 @@ export class SelecteurComponent {
 
   constructor() {
     addIcons({ chevronDownOutline, checkmarkCircle, ellipseOutline });
+  }
+
+  ngOnChanges(): void {
+    const unique = this.options.length === 1 ? this.options[0] : null;
+    if (unique && !unique.desactivee && !this.desactive && !this.chargement && this.valeur !== unique.valeur) {
+      // Apres le cycle de detection en cours (le parent change sa valeur).
+      queueMicrotask(() => this.valeurChange.emit(unique.valeur));
+    }
   }
 
   get grise(): boolean {

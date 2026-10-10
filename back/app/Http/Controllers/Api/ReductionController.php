@@ -20,7 +20,8 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * Menu Reductions (droit reductions.gerer) : liste des reductions de l'annee
+ * Menu Reductions (reductions.voir : liste et impressions ; reductions.gerer :
+ * en plus accorder et supprimer) : liste des reductions de l'annee
  * (filtres, impression, impression generale), recherche d'un eleve par
  * matricule puis formulaire de reduction d'inscription ou de dette, suppression.
  */
@@ -54,7 +55,7 @@ class ReductionController extends Controller
     {
         [$annee, $f] = $this->filtres($request, $tenant);
         $lignes = Reductions::requete($annee->id, $f)->get()->map(fn ($l) => Reductions::presenter($l))
-            ->sortBy(fn ($l) => [$l['niveau_ordre'], $l['classe'], $l['nom'], $l['prenoms']])->values();
+            ->sortBy(fn ($l) => [$l['niveau_ordre'], \App\Support\NomClasse::cleTri((string) $l['classe']), $l['nom'], $l['prenoms']])->values();
         $general = $request->boolean('general');
         $sousTitre = collect([
             ($f['cible'] ?? null) ? Reductions::CIBLES[$f['cible']] : null,
@@ -123,7 +124,7 @@ class ReductionController extends Controller
         ];
 
         if ($data['cible'] === 'dette') {
-            $dettes = Dette::with('anneeScolaire')->where('eleve_id', $eleve->id)->where('is_annulee', false)->get()
+            $dettes = Dette::with('anneeScolaire')->where('eleve_id', $eleve->id)->where('is_annulee', false)->prisesEnCompte($anneeId)->get()
                 ->sortBy(fn (Dette $d) => $d->anneeScolaire?->libelle)->values();
             abort_if($dettes->isEmpty(), 422, 'Cet élève n\'a pas de dette.');
             abort_if($dettes->every(fn (Dette $d) => $d->resteAPayer() <= 0), 422, 'Cet élève a épuré sa dette.');
@@ -210,7 +211,8 @@ class ReductionController extends Controller
     /** @return array{0: AnneeScolaire, 1: array} */
     private function filtres(Request $request, TenantContext $tenant): array
     {
-        $this->autoriser($request);
+        // Consulter / imprimer : reductions.voir suffit (V1 econome, fondateur).
+        abort_unless($request->user()->can('reductions.gerer') || $request->user()->can('reductions.voir'), 403);
         $data = $request->validate([
             'cible' => ['nullable', Rule::in(array_keys(Reductions::CIBLES))],
             'type_reduction_id' => ['nullable', 'integer'],

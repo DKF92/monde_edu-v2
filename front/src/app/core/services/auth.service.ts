@@ -2,6 +2,7 @@ import { Injectable, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { stockage } from './stockage-hors-ligne';
 import {
   AnneeScolaire,
   Etablissement,
@@ -86,6 +87,14 @@ export class AuthService {
     return lettres.toUpperCase() || '?';
   });
 
+  /**
+   * Poste Super admin : code du poste, ou a defaut le droit reserve « postes
+   * proteges » qu'il est seul a avoir (poste memorise avant l'ajout du code).
+   */
+  estSuperAdmin(): boolean {
+    return this.poste()?.code === 'super_admin' || this.aPermission('utilisateurs.gerer_sensibles');
+  }
+
   /** Libelle du poste choisi (ex: "Directeur des etudes"). */
   readonly role = computed(() => this.posteSignal()?.nom ?? '');
 
@@ -99,8 +108,9 @@ export class AuthService {
     return this.permissions().includes(permission);
   }
 
-  login(email: string, password: string): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(`${environment.apiUrl}/login`, { email, password }).pipe(
+  /** Identifiant : adresse e-mail ou numero de telephone. */
+  login(identifiant: string, password: string): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(`${environment.apiUrl}/login`, { identifiant, password }).pipe(
       tap((reponse) => {
         this.effacerSession();
 
@@ -137,6 +147,9 @@ export class AuthService {
       this.http.post(`${environment.apiUrl}/logout`, {}).subscribe({ error: () => undefined });
     }
     this.effacerSession();
+    // Donnees consultees gardees pour le hors ligne : effacees a la deconnexion
+    // (les saisies en attente, rattachees a leur auteur, sont conservees).
+    void stockage.vider('reponses');
   }
 
   /** Apres modification dans Parametres > Etablissement (nom, sigle, ville...). */
@@ -144,6 +157,17 @@ export class AuthService {
     const actuel = this.etablissementActifSignal();
     if (actuel) {
       this.enregistrer(this.etablissementActifSignal, STORAGE_ETABLISSEMENT_ACTIF, { ...actuel, ...modif });
+    }
+  }
+
+  /**
+   * Droits du poste actif a jour (poste modifie dans Roles, nouvelle
+   * fonctionnalite) : sans cela, ils restent ceux du moment ou l'espace de
+   * travail a ete choisi.
+   */
+  rafraichirPoste(poste: Poste): void {
+    if (poste.id === this.posteSignal()?.id) {
+      this.enregistrer(this.posteSignal, STORAGE_POSTE, poste);
     }
   }
 

@@ -11,11 +11,13 @@ use App\Models\Etablissement;
 use App\Models\FraisEleve;
 use App\Models\GrilleTarifaire;
 use App\Models\Inscription;
+use App\Models\MiseAJourEnLigne;
 use App\Models\Niveau;
 use App\Models\Personnel;
 use App\Models\Tuteur;
 use App\Models\TypeFrais;
 use App\Services\InscriptionEnLigneService;
+use App\Support\Document;
 use App\Support\FicheEleve;
 use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
@@ -57,7 +59,7 @@ class InscriptionController extends Controller
 
     public function index(Request $request, TenantContext $tenant)
     {
-        $this->autoriser($request);
+        $this->autoriserLecture($request);
 
         $anneeId = $this->anneeId($tenant);
         $niveaux = $this->niveauxAutorises($request, $tenant);
@@ -69,6 +71,10 @@ class InscriptionController extends Controller
             ->when($request->filled('affecte'), fn (Builder $q) => $q->where('inscriptions.affecte', $request->boolean('affecte')))
             ->when($request->filled('redoublant'), fn (Builder $q) => $q->where('inscriptions.redoublant', $request->boolean('redoublant')))
             ->when($request->filled('en_ligne'), fn (Builder $q) => $q->where('inscriptions.inscrit_en_ligne', $request->boolean('en_ligne')))
+            ->when(in_array($request->query('sexe'), ['M', 'F'], true), fn (Builder $q) => $q->whereIn('inscriptions.eleve_id', Eleve::where('sexe', $request->query('sexe'))->select('id')))
+            ->when($request->filled('photo'), fn (Builder $q) => $request->boolean('photo')
+                ? $q->whereIn('inscriptions.eleve_id', Eleve::whereNotNull('photo_path')->where('photo_path', '<>', '')->select('id'))
+                : $q->whereNotIn('inscriptions.eleve_id', Eleve::whereNotNull('photo_path')->where('photo_path', '<>', '')->select('id')))
             ->when($request->string('recherche')->trim()->isNotEmpty(), function (Builder $q) use ($request) {
                 $recherche = $request->string('recherche')->trim()->value();
                 $q->whereHas('eleve', fn (Builder $e) => $e->where(fn (Builder $w) => $w
@@ -82,8 +88,10 @@ class InscriptionController extends Controller
 
         $page = (clone $base)
             ->when($request->filled('statut'), fn (Builder $q) => $q->where('inscriptions.statut', $request->integer('statut')))
-            ->with(['eleve', 'niveau:id,libelle,ordre', 'classe:id,libelle'])
+            ->with(['eleve', 'niveau:id,libelle,ordre', 'classe:id,libelle', 'enregistrePar:id,name,prenoms'])
             ->join('eleves', 'eleves.id', '=', 'inscriptions.eleve_id')
+            // Non inscrits en ligne : ceux deja scannes sans recu passent en premier.
+            ->when($request->filled('en_ligne') && ! $request->boolean('en_ligne'), fn (Builder $q) => $q->orderByRaw('inscriptions.en_ligne_introuvable_le IS NULL'))
             ->orderBy('eleves.nom')->orderBy('eleves.prenoms')
             ->select('inscriptions.*')
             ->paginate(min(max($request->integer('par_page', 20), 1), 100));
@@ -102,7 +110,7 @@ class InscriptionController extends Controller
     /** Listes du formulaire : niveaux et classes (avec effectifs), formats du matricule... */
     public function options(Request $request, TenantContext $tenant)
     {
-        $this->autoriser($request);
+        $this->autoriserLecture($request);
 
         $anneeId = $this->anneeId($tenant);
         $autorises = $this->niveauxAutorises($request, $tenant);
@@ -113,7 +121,12 @@ class InscriptionController extends Controller
             ->orderBy('libelle')
             ->get();
 
-        $niveaux = Niveau::whereIn('id', $classes->pluck('niveau_id'))->orderBy('ordre')->get();
+        $niveaux = Niveau::whereIn('id', $classes->pluck('niveau_id'))->ordonnes()->get();
+        // Effectifs de toutes les classes en une requete (pas une par classe).
+        $effectifs = Inscription::whereIn('inscriptions.classe_id', $classes->pluck('id'))
+            ->join('eleves', 'eleves.id', '=', 'inscriptions.eleve_id')->groupBy('inscriptions.classe_id')
+            ->selectRaw("inscriptions.classe_id, SUM(eleves.sexe = 'M') AS garcons, SUM(eleves.sexe = 'F') AS filles, COUNT(*) AS total")
+            ->get()->keyBy('classe_id');
 
         return response()->json([
             'annee' => AnneeScolaire::find($anneeId)?->libelle,
@@ -122,14 +135,16 @@ class InscriptionController extends Controller
                 'code' => $n->code,
                 'libelle' => $n->libelle,
                 'ordre' => $n->ordre,
-                'classes' => $classes->where('niveau_id', $n->id)->map(fn (Classe $c) => $this->presenterClasse($c))->values(),
+                'classes' => $classes->where('niveau_id', $n->id)->map(fn (Classe $c) => $this->presenterClasse($c, null, $effectifs->get($c->id) ?? (object) ['garcons' => 0, 'filles' => 0, 'total' => 0]))->values(),
                 // Montants d'inscription renseignes (Parametres > Paiements) : sinon pas d'inscription.
                 'tarifs' => [
                     'affecte' => $this->tarifDefini($anneeId, $n->id, true),
                     'non_affecte' => $this->tarifDefini($anneeId, $n->id, false),
                 ],
             ])->values(),
-            'tous_niveaux' => Niveau::orderBy('ordre')->get(['id', 'code', 'libelle', 'ordre']),
+            // Tous les niveaux (libelles) ; de_classe = proposes dans les listes (series, pas TLE seul).
+            'tous_niveaux' => Niveau::ordonnes()->withCount('series')->get(['id', 'code', 'libelle', 'ordre'])
+                ->map(fn (Niveau $n) => $n->only(['id', 'code', 'libelle', 'ordre']) + ['de_classe' => ! $n->series_count]),
             'niveaux_restreints' => $autorises !== null,
             'formats_matricule' => $etablissement->parametre('formats_matricule'),
             'verification_en_ligne' => (bool) $etablissement->parametre('verification_en_ligne'),
@@ -153,7 +168,7 @@ class InscriptionController extends Controller
         $affecte = (bool) $data['affecte'];
         $grille = GrilleTarifaire::with('lignes')
             ->where('annee_scolaire_id', $this->anneeId($tenant))
-            ->where('niveau_id', $data['niveau_id'])
+            ->where('niveau_id', Niveau::generalId((int) $data['niveau_id']))
             ->where('affecte', $affecte)
             ->first();
         $montants = $grille?->lignes->pluck('montant', 'type_frais_id') ?? collect();
@@ -216,7 +231,7 @@ class InscriptionController extends Controller
             'matricule' => $matricule,
             'eleve' => $this->presenterEleve($eleve),
             'precedente' => $precedente ? $this->presenterPrecedente($precedente) : null,
-            'dettes' => $this->dettesOuvertes($eleve, $precedente),
+            'dettes' => $this->dettesOuvertes($eleve, (int) $anneeId, $precedente),
         ]);
     }
 
@@ -245,14 +260,16 @@ class InscriptionController extends Controller
         }
 
         $donnees = $resultat['donnees'];
-        $niveaux = Niveau::pluck('id', 'code');
+        // Niveau en ligne : niveau general (2NDE) ou, s'il est donne, avec serie (2NDE A).
+        $niveaux = Niveau::pluck('id', 'code')->union(Niveau::pluck('id', 'libelle')->mapWithKeys(fn ($id, $l) => [strtoupper($l) => $id]));
+        $trouverNiveau = fn (?string $v) => $niveaux[strtoupper(trim((string) $v))] ?? $niveaux[str_replace(' ', '', strtoupper((string) $v))] ?? null;
         $codeMena = Etablissement::findOrFail($tenant->id())->parametre('code_mena');
 
         return [
             'trouve' => true,
             'donnees' => $donnees,
-            'niveau_precedent_id' => $niveaux[strtoupper($donnees['niveau_precedent'] ?? '')] ?? null,
-            'niveau_suivant_id' => $niveaux[strtoupper($donnees['niveau_suivant'] ?? '')] ?? null,
+            'niveau_precedent_id' => $trouverNiveau($donnees['niveau_precedent'] ?? null),
+            'niveau_suivant_id' => $trouverNiveau($donnees['niveau_suivant'] ?? null),
             'autre_etablissement' => $codeMena && isset($donnees['code_etablissement'])
                 && ltrim($codeMena, '0') !== ltrim($donnees['code_etablissement'], '0'),
         ];
@@ -262,7 +279,8 @@ class InscriptionController extends Controller
      * "Mettre a jour" (liste des inscriptions) : les inscriptions de l'annee
      * sans verification en ligne sont consultees sur le site de l'Etat, par
      * petits lots (l'ecran enchaine les appels en arriere-plan) ; si le recu
-     * existe, la base est mise a jour directement (voir appliquerEnLigne()).
+     * existe, la base est mise a jour (directement ou en attente selon le
+     * statut, voir appliquerEnLigne()) et la mise a jour est notee.
      * Si le site ne repond pas, le lot s'arrete (site_indisponible).
      */
     public function miseAJourEnLigne(Request $request, TenantContext $tenant, InscriptionEnLigneService $service)
@@ -284,15 +302,11 @@ class InscriptionController extends Controller
         $traitees = [];
         $siteIndisponible = null;
         foreach ($lot as $inscription) {
-            $resultat = $this->consulterEnLigne($service, $tenant, $inscription->eleve->matricule, $annee->libelle);
-            if (! $resultat['trouve'] && ! empty($resultat['erreur'])) {
+            $ligne = $this->traiterEnLigne($inscription, $annee->libelle, $tenant, $request->user()->id);
+            if ($ligne['erreur']) {
                 // Panne du site : on s'arrete, cette inscription sera reprise.
-                $siteIndisponible = $resultat['erreur'];
+                $siteIndisponible = $ligne['erreur'];
                 break;
-            }
-            $ligne = ['id' => $inscription->id, 'eleve' => trim($inscription->eleve->nom.' '.$inscription->eleve->prenoms), 'trouve' => $resultat['trouve'], 'remarques' => []];
-            if ($resultat['trouve']) {
-                $ligne['remarques'] = $this->appliquerEnLigne($inscription, $resultat, $tenant);
             }
             $traitees[] = $ligne;
             $apresId = $inscription->id;
@@ -308,34 +322,119 @@ class InscriptionController extends Controller
 
     /**
      * Inscriptions de l'annee (niveaux du poste) jamais verifiees en ligne,
-     * encore modifiables : statut < 2 (aucun paiement).
+     * quel que soit leur statut (ce qui est applique : appliquerEnLigne()).
      */
     private function aVerifierEnLigne(Request $request, TenantContext $tenant): Builder
     {
-        $niveaux = $this->niveauxAutorises($request, $tenant);
-
-        return Inscription::where('inscriptions.annee_scolaire_id', $this->anneeId($tenant))
-            ->where('inscriptions.inscrit_en_ligne', false)
-            ->where('inscriptions.statut', '<', Inscription::PAIEMENT)
-            ->when($niveaux !== null, fn (Builder $q) => $q->whereIn('inscriptions.niveau_id', $niveaux));
+        return self::inscriptionsAVerifier((int) $this->anneeId($tenant), $this->niveauxAutorises($request, $tenant));
     }
 
     /**
-     * Reporte le recu en ligne dans la base (memes regles que l'ecran
-     * d'inscription) : identite de l'eleve, contact du parent, statut
-     * affecte (tant qu'aucun paiement), provenance ou decision de l'annee
-     * precedente si elle manque, photo si l'eleve n'en a pas.
-     * Le niveau et la classe ne changent pas : un ecart est seulement signale.
+     * Inscriptions a scanner : pas encore trouvees en ligne (les
+     * « introuvables » deja scannees sont rescannees a chaque fois).
+     *
+     * @param  ?array<int>  $niveaux  niveaux du poste (educateur), null = tous
+     */
+    public static function inscriptionsAVerifier(int $anneeId, ?array $niveaux): Builder
+    {
+        return Inscription::where('inscriptions.annee_scolaire_id', $anneeId)
+            ->where('inscriptions.inscrit_en_ligne', false)
+            ->when($niveaux !== null, fn (Builder $q) => $q->whereIn('inscriptions.niveau_id', $niveaux ?: [0]));
+    }
+
+    /**
+     * Scanne une inscription sur le site de l'Etat : recu trouve -> repris
+     * (appliquerEnLigne) ; aucun recu -> marquee « introuvable en ligne »
+     * (date du scan + ligne du journal) ; site en panne -> erreur, rien ne change.
+     *
+     * @return array{id: int, eleve: string, trouve: bool, introuvable: bool, remarques: list<string>, erreur: ?string}
+     */
+    public function traiterEnLigne(Inscription $inscription, string $annee, TenantContext $tenant, ?int $userId): array
+    {
+        $inscription->loadMissing('eleve.tuteurs', 'niveau');
+        $ligne = ['id' => $inscription->id, 'eleve' => trim($inscription->eleve->nom.' '.$inscription->eleve->prenoms),
+            'trouve' => false, 'introuvable' => false, 'remarques' => [], 'erreur' => null];
+        $resultat = $this->consulterEnLigne(app(InscriptionEnLigneService::class), $tenant, $inscription->eleve->matricule, $annee);
+
+        if (! $resultat['trouve'] && ! empty($resultat['erreur'])) {
+            $ligne['erreur'] = $resultat['erreur'];
+
+            return $ligne;
+        }
+        if (! $resultat['trouve']) {
+            $this->marquerIntrouvable($inscription, $userId);
+            $ligne['introuvable'] = true;
+            $ligne['remarques'] = ['Aucune inscription en ligne trouvée'];
+
+            return $ligne;
+        }
+
+        // Trouvee (eventuellement apres des scans sans resultat).
+        if ($inscription->en_ligne_introuvable_le) {
+            $inscription->update(['en_ligne_introuvable_le' => null]);
+        }
+        MiseAJourEnLigne::where('inscription_id', $inscription->id)->where('type', MiseAJourEnLigne::INTROUVABLE)->delete();
+        $ligne['trouve'] = true;
+        $ligne['remarques'] = $this->appliquerEnLigne($inscription, $resultat, $tenant, $userId);
+
+        return $ligne;
+    }
+
+    /** Scan sans recu : date sur l'inscription, une ligne « introuvable » par inscription dans le journal. */
+    private function marquerIntrouvable(Inscription $inscription, ?int $userId): void
+    {
+        $inscription->update(['en_ligne_introuvable_le' => now()]);
+        $journal = MiseAJourEnLigne::where('inscription_id', $inscription->id)->where('type', MiseAJourEnLigne::INTROUVABLE)->first();
+        if ($journal) {
+            $journal->update(['tentatives' => $journal->tentatives + 1, 'statut_inscription' => (int) $inscription->statut, 'user_id' => $userId]);
+            $journal->touch();
+
+            return;
+        }
+        MiseAJourEnLigne::create([
+            'annee_scolaire_id' => $inscription->annee_scolaire_id,
+            'inscription_id' => $inscription->id,
+            'eleve_id' => $inscription->eleve_id,
+            'type' => MiseAJourEnLigne::INTROUVABLE,
+            'tentatives' => 1,
+            'statut_inscription' => (int) $inscription->statut,
+            'changements' => [],
+            'remarques' => ['Aucune inscription en ligne trouvée'],
+            'en_attente' => false,
+            'user_id' => $userId,
+        ]);
+    }
+
+    /**
+     * Reporte le recu en ligne dans la base et note la mise a jour (liste
+     * Inscriptions > Mises a jour en ligne).
+     * - Toujours appliques : identite de l'eleve, contact du parent,
+     *   provenance ou decision de l'annee precedente, photo s'il n'en a pas.
+     * - Statut affecte et niveau, selon le statut de l'inscription :
+     *   statut 0 (sans classe) : appliques directement ;
+     *   statut 1 (classe choisie) : statut affecte applique (frais recalcules),
+     *   niveau en attente (l'educateur modifie l'inscription) ;
+     *   statut > 1 (paiement) : tous deux en attente (le caissier supprime
+     *   d'abord les paiements, puis l'educateur modifie l'inscription).
      *
      * @return list<string> remarques pour l'ecran
      */
-    private function appliquerEnLigne(Inscription $inscription, array $resultat, TenantContext $tenant): array
+    private function appliquerEnLigne(Inscription $inscription, array $resultat, TenantContext $tenant, ?int $userId = null): array
     {
         $recu = $resultat['donnees'];
         $eleve = $inscription->eleve;
+        $statut = (int) $inscription->statut;
         $remarques = [];
+        $changements = [];
+        $niveauDemande = null;
+        $affecteDemande = null;
+        $noter = function (string $champ, string $libelle, $avant, $apres, bool $applique = true) use (&$changements) {
+            $changements[] = ['champ' => $champ, 'libelle' => $libelle, 'avant' => $avant, 'apres' => $apres, 'applique' => $applique];
+        };
+        $texteAffecte = fn (bool $affecte) => $affecte ? 'Affecté(e)' : 'Non affecté(e)';
 
-        DB::transaction(function () use ($inscription, $recu, $resultat, $eleve, &$remarques) {
+        DB::transaction(function () use ($inscription, $recu, $resultat, $eleve, $statut, $noter, $texteAffecte, &$remarques, &$niveauDemande, &$affecteDemande) {
+            // Identite de l'eleve
             $identite = array_filter([
                 'nom' => isset($recu['nom']) ? mb_strtoupper(trim($recu['nom'])) : null,
                 'prenoms' => isset($recu['prenoms']) ? mb_strtoupper(trim($recu['prenoms'])) : null,
@@ -343,6 +442,13 @@ class InscriptionController extends Controller
                 'lieu_naissance' => $recu['lieu_naissance'] ?? null,
                 'sexe' => in_array($recu['sexe'] ?? null, ['M', 'F'], true) ? $recu['sexe'] : null,
             ], fn ($v) => $v !== null && $v !== '');
+            $libelles = ['nom' => 'Nom', 'prenoms' => 'Prénoms', 'date_naissance' => 'Date de naissance', 'lieu_naissance' => 'Lieu de naissance', 'sexe' => 'Sexe'];
+            foreach ($identite as $champ => $valeur) {
+                $avant = $eleve->{$champ} instanceof \DateTimeInterface ? $eleve->{$champ}->format('Y-m-d') : $eleve->{$champ};
+                if ((string) $avant !== (string) $valeur) {
+                    $noter($champ, $libelles[$champ], $avant, $valeur);
+                }
+            }
             $eleve->update($identite);
 
             // Contact du parent : sur le contact principal sans numero, ou
@@ -352,12 +458,15 @@ class InscriptionController extends Controller
                 $cible = $eleve->tuteurs->first(fn (Tuteur $t) => $t->pivot->is_contact_principal && ! $t->telephone1);
                 if ($cible) {
                     $cible->update(['telephone1' => $contact]);
+                    $noter('contact_parent', 'Contact du parent', null, $contact);
                 } elseif ($eleve->tuteurs->isEmpty()) {
                     $tuteur = Tuteur::create(['nom' => '', 'prenoms' => '', 'telephone1' => $contact]);
                     $eleve->tuteurs()->attach($tuteur->id, ['lien_parente' => 'tuteur_legal', 'is_contact_principal' => true, 'is_payeur' => false]);
+                    $noter('contact_parent', 'Contact du parent', null, $contact);
                 }
             }
 
+            // Provenance / decision de l'annee precedente
             $champs = ['inscrit_en_ligne' => true, 'inscription_en_ligne' => $recu];
             $precedente = $this->inscriptionPrecedente($eleve, $inscription->annee_scolaire_id);
             $decision = in_array($recu['decision'] ?? null, self::DECISIONS, true) ? $recu['decision'] : null;
@@ -368,26 +477,56 @@ class InscriptionController extends Controller
                         'moyenne_annuelle' => $recu['moyenne'] ?? null,
                         'niveau_a_suivre_id' => $resultat['niveau_suivant_id'] ?? null,
                     ], fn ($v) => $v !== null));
+                    $noter('decision_precedente', 'Décision '.$precedente->anneeScolaire?->libelle, null, $decision);
                     $remarques[] = 'Décision '.$precedente->anneeScolaire?->libelle.' reprise';
                 }
             } else {
-                $champs += array_filter([
+                $origine = array_filter([
                     'decision_origine' => $inscription->decision_origine ? null : $decision,
                     'moyenne_origine' => $inscription->moyenne_origine ? null : ($recu['moyenne'] ?? null),
                     'classe_origine' => $inscription->classe_origine ? null : ($recu['niveau_precedent'] ?? null),
                 ], fn ($v) => $v !== null);
-                if ($decision) {
+                $libellesOrigine = ['decision_origine' => "Décision d'origine", 'moyenne_origine' => "Moyenne d'origine", 'classe_origine' => "Classe d'origine"];
+                foreach ($origine as $champ => $valeur) {
+                    $noter($champ, $libellesOrigine[$champ], null, $valeur);
+                }
+                $champs += $origine;
+                if ($decision && ($decision === 'REDOUBLE') !== (bool) $inscription->redoublant) {
                     $champs['redoublant'] = $decision === 'REDOUBLE';
+                    $noter('redoublant', 'Redoublant', $inscription->redoublant ? 'Oui' : 'Non', $champs['redoublant'] ? 'Oui' : 'Non');
                 }
             }
 
-            $affecteChange = isset($recu['affecte']) && (bool) $recu['affecte'] !== (bool) $inscription->affecte;
-            if ($affecteChange && $this->aDesPaiements($inscription)) {
-                $remarques[] = 'Statut '.($recu['affecte'] ? 'affecté' : 'non affecté').' en ligne non repris (paiements déjà enregistrés)';
-                $affecteChange = false;
-            } elseif ($affecteChange) {
-                $champs['affecte'] = (bool) $recu['affecte'];
-                $remarques[] = $recu['affecte'] ? 'Devient affecté(e)' : 'Devient non affecté(e)';
+            // Statut affecte : direct sans paiement, en attente sinon.
+            $affecteChange = false;
+            $affecteEnLigne = isset($recu['affecte']) ? (bool) $recu['affecte'] : null;
+            if ($affecteEnLigne !== null && $affecteEnLigne !== (bool) $inscription->affecte) {
+                if ($statut >= Inscription::PAIEMENT) {
+                    $affecteDemande = $affecteEnLigne;
+                    $noter('affecte', 'Statut', $texteAffecte((bool) $inscription->affecte), $texteAffecte($affecteEnLigne), false);
+                    $remarques[] = 'Statut '.mb_strtolower($texteAffecte($affecteEnLigne)).' en attente (paiements enregistrés)';
+                } else {
+                    $champs['affecte'] = $affecteEnLigne;
+                    $affecteChange = true;
+                    $noter('affecte', 'Statut', $texteAffecte((bool) $inscription->affecte), $texteAffecte($affecteEnLigne));
+                    $remarques[] = $affecteEnLigne ? 'Devient affecté(e)' : 'Devient non affecté(e)';
+                }
+            }
+
+            // Niveau : direct sans classe (statut 0), en attente sinon.
+            $niveauEnLigne = $resultat['niveau_suivant_id'] ?? null;
+            if ($niveauEnLigne && ! MiseAJourEnLigne::memeNiveau($inscription->niveau_id, (int) $niveauEnLigne)) {
+                $avant = $inscription->niveau?->libelle;
+                $apres = Niveau::find($niveauEnLigne)?->libelle ?? ($recu['niveau_suivant'] ?? null);
+                if ($statut === Inscription::SANS_CLASSE) {
+                    $champs['niveau_id'] = (int) $niveauEnLigne;
+                    $noter('niveau', 'Niveau', $avant, $apres);
+                    $remarques[] = 'Niveau '.$apres.' repris';
+                } else {
+                    $niveauDemande = (int) $niveauEnLigne;
+                    $noter('niveau', 'Niveau', $avant, $apres, false);
+                    $remarques[] = 'Niveau en ligne : '.$apres.' (en attente)';
+                }
             }
 
             $inscription->update($champs);
@@ -396,14 +535,29 @@ class InscriptionController extends Controller
             }
         });
 
-        if (($resultat['niveau_suivant_id'] ?? null) && $resultat['niveau_suivant_id'] !== $inscription->niveau_id) {
-            $remarques[] = 'Niveau en ligne : '.$recu['niveau_suivant'].' (à vérifier)';
-        }
         if ($resultat['autre_etablissement'] ?? false) {
             $remarques[] = 'Préinscrit(e) dans un autre établissement';
         }
         if (! $eleve->photo_path && ! empty($recu['photo_url'])) {
             $this->sauverPhotoEnLigne($eleve, $recu['photo_url'], $tenant);
+            if ($eleve->fresh()?->photo_path) {
+                $changements[] = ['champ' => 'photo', 'libelle' => 'Photo', 'avant' => null, 'apres' => 'ajoutée', 'applique' => true];
+            }
+        }
+
+        if ($changements || $remarques) {
+            MiseAJourEnLigne::create([
+                'annee_scolaire_id' => $inscription->annee_scolaire_id,
+                'inscription_id' => $inscription->id,
+                'eleve_id' => $eleve->id,
+                'statut_inscription' => $statut,
+                'changements' => $changements,
+                'remarques' => $remarques ?: null,
+                'en_attente' => $niveauDemande !== null || $affecteDemande !== null,
+                'niveau_demande_id' => $niveauDemande,
+                'affecte_demande' => $affecteDemande,
+                'user_id' => $userId,
+            ]);
         }
 
         return $remarques;
@@ -460,9 +614,32 @@ class InscriptionController extends Controller
 
     public function show(Request $request, TenantContext $tenant, int $id)
     {
-        $this->autoriser($request);
+        $this->autoriserLecture($request);
 
         return response()->json(['data' => $this->detail($this->trouver($request, $tenant, $id), $request, $tenant)]);
+    }
+
+    /** Fiche d'inscription imprimable (V1 recu_inscr), avec l'en-tete officiel des documents. */
+    public function fiche(Request $request, TenantContext $tenant, int $id)
+    {
+        $this->autoriserLecture($request);
+        $inscription = $this->trouver($request, $tenant, $id);
+        $detail = $this->detail($inscription, $request, $tenant);
+        $photo = null;
+        $chemin = $inscription->eleve->photo_path;
+        if ($chemin && Storage::disk('public')->exists($chemin)) {
+            $fichier = Storage::disk('public')->path($chemin);
+            $photo = 'data:'.(mime_content_type($fichier) ?: 'image/jpeg').';base64,'.base64_encode(file_get_contents($fichier));
+        }
+
+        return Document::repondre('pdf.fiche-inscription', Document::entete(Etablissement::findOrFail($tenant->id())) + [
+            'd' => $detail,
+            'photo' => $photo,
+            'annee' => $detail['annee'],
+            'decisions' => self::DECISIONS,
+            'genere_le' => now(),
+            'edite_par' => trim($request->user()->prenoms.' '.$request->user()->name),
+        ], 'fiche-inscription-'.$inscription->eleve->matricule, $request->query('format'));
     }
 
     public function update(Request $request, TenantContext $tenant, int $id)
@@ -484,17 +661,24 @@ class InscriptionController extends Controller
             ]]);
         }
 
+        $niveauChange = (int) $champs['niveau_id'] !== (int) $inscription->niveau_id;
+        $nouvelleClasse = isset($data['inscription']['classe_id']) ? Classe::find($data['inscription']['classe_id']) : null;
         $tarifChange = $inscription->classe_id && (
             (bool) $champs['affecte'] !== (bool) $inscription->affecte
-            || (isset($data['inscription']['classe_id']) && Classe::find($data['inscription']['classe_id'])?->niveau_id !== $inscription->niveau_id)
+            || $niveauChange
+            || ($nouvelleClasse && $nouvelleClasse->niveau_id !== $inscription->niveau_id)
         );
         if ($tarifChange && $this->aDesPaiements($inscription)) {
             throw ValidationException::withMessages(['inscription.affecte' => [
                 'Des paiements sont déjà enregistrés : le statut affecté et le niveau ne peuvent plus changer.',
             ]]);
         }
+        // Nouveau niveau sans classe de ce niveau : l'ancienne classe et ses frais
+        // sont retires, l'inscription repasse au statut 0 (classe a choisir).
+        $retirerClasse = $niveauChange && $inscription->classe_id
+            && (! $nouvelleClasse || (int) $nouvelleClasse->niveau_id !== (int) $champs['niveau_id']);
 
-        DB::transaction(function () use ($inscription, $data, $champs, $tarifChange, $tenant) {
+        DB::transaction(function () use ($inscription, $data, $champs, $tarifChange, $retirerClasse, $tenant) {
             $this->enregistrerEleve($inscription->eleve, $data);
 
             $precedente = $this->inscriptionPrecedente($inscription->eleve, $inscription->annee_scolaire_id);
@@ -505,8 +689,16 @@ class InscriptionController extends Controller
             $inscription->update($champs);
 
             $classeId = $data['inscription']['classe_id'] ?? null;
-            if ($classeId && $classeId !== $inscription->classe_id) {
+            if ($retirerClasse) {
+                $inscription->update(['classe_id' => null]);
+                $inscription->fraisEleves()->delete();
+                $inscription->recalculerTotaux();
+            } elseif ($classeId && $classeId !== $inscription->classe_id) {
                 $this->attribuerClasse($inscription, Classe::findOrFail($classeId), $tenant);
+                // Niveau ou statut affecte change en meme temps : frais du nouveau tarif.
+                if ($tarifChange) {
+                    $this->copierFrais($inscription);
+                }
             } elseif ($tarifChange) {
                 $this->copierFrais($inscription);
             }
@@ -665,7 +857,7 @@ class InscriptionController extends Controller
     private function tarifDefini(?int $anneeId, int $niveauId, bool $affecte): bool
     {
         return GrilleTarifaire::where('annee_scolaire_id', $anneeId)
-            ->where('niveau_id', $niveauId)
+            ->where('niveau_id', Niveau::generalId($niveauId))
             ->where('affecte', $affecte)
             ->whereHas('lignes', fn (Builder $q) => $q->where('montant', '>', 0))
             ->exists();
@@ -702,7 +894,7 @@ class InscriptionController extends Controller
     {
         $grille = GrilleTarifaire::with('lignes')
             ->where('annee_scolaire_id', $inscription->annee_scolaire_id)
-            ->where('niveau_id', $inscription->niveau_id)
+            ->where('niveau_id', Niveau::generalId($inscription->niveau_id))
             ->where('affecte', $inscription->affecte)
             ->first();
         $montants = $grille?->lignes->pluck('montant', 'type_frais_id') ?? collect();
@@ -996,6 +1188,12 @@ class InscriptionController extends Controller
         abort_unless($request->user()->can('inscriptions.gerer'), 403);
     }
 
+    /** Liste, fiche et options des filtres : aussi en consultation seule (inscriptions.voir, comptable). */
+    private function autoriserLecture(Request $request): void
+    {
+        abort_unless($request->user()->canAny(['inscriptions.gerer', 'inscriptions.voir']), 403);
+    }
+
     private function anneeId(TenantContext $tenant): ?int
     {
         return $tenant->anneeScolaireId() ?? AnneeScolaire::where('is_active', true)->value('id');
@@ -1015,13 +1213,14 @@ class InscriptionController extends Controller
             ->first();
     }
 
-    private function dettesOuvertes(Eleve $eleve, ?Inscription $precedente = null): array
+    private function dettesOuvertes(Eleve $eleve, int $anneeId, ?Inscription $precedente = null): array
     {
-        $dettes = Dette::with('anneeScolaire')->where('eleve_id', $eleve->id)->where('is_annulee', false)->get()
+        $dettes = Dette::with('anneeScolaire')->where('eleve_id', $eleve->id)->where('is_annulee', false)->prisesEnCompte($anneeId)->get()
             ->map(fn (Dette $d) => ['id' => $d->id, 'annee' => $d->anneeScolaire?->libelle, 'montant' => (int) $d->montant, 'reste' => (int) $d->resteAPayer(), 'a_creer' => false]);
 
         // Reste de l'annee precedente qui deviendra une dette a l'enregistrement.
         if ($precedente && $precedente->resteAPayer() > 0
+            && in_array((int) $precedente->annee_scolaire_id, Dette::anneesPrisesEnCompte($anneeId) ?? [(int) $precedente->annee_scolaire_id], true)
             && ! $dettes->contains('annee', $precedente->anneeScolaire?->libelle)) {
             $dettes->push(['id' => null, 'annee' => $precedente->anneeScolaire?->libelle, 'montant' => (int) $precedente->resteAPayer(), 'reste' => (int) $precedente->resteAPayer(), 'a_creer' => true]);
         }
@@ -1031,9 +1230,9 @@ class InscriptionController extends Controller
 
     // ------------------------------------------------------------ Presentation
 
-    private function presenterClasse(Classe $classe, ?int $saufInscriptionId = null): array
+    private function presenterClasse(Classe $classe, ?int $saufInscriptionId = null, ?object $inscrits = null): array
     {
-        $inscrits = $classe->inscriptions()
+        $inscrits ??= $classe->inscriptions()
             ->when($saufInscriptionId, fn (Builder $q) => $q->whereKeyNot($saufInscriptionId))
             ->join('eleves', 'eleves.id', '=', 'inscriptions.eleve_id')
             ->selectRaw("SUM(eleves.sexe = 'M') AS garcons, SUM(eleves.sexe = 'F') AS filles, COUNT(*) AS total")
@@ -1094,25 +1293,31 @@ class InscriptionController extends Controller
             'affecte' => (bool) $i->affecte,
             'redoublant' => (bool) $i->redoublant,
             'inscrit_en_ligne' => (bool) $i->inscrit_en_ligne,
+            // Deja scannee sans recu trouve sur le site de l'Etat.
+            'en_ligne_introuvable' => ! $i->inscrit_en_ligne && $i->en_ligne_introuvable_le !== null,
             'date_inscription' => $i->date_inscription?->toDateTimeString(),
-            'total_du' => (int) $i->montant_total_du,
-            'total_reduit' => (int) $i->montant_total_reduit,
-            'total_paye' => (int) $i->montant_total_paye,
-            'reste' => (int) max(0, $i->resteAPayer()),
+            // Liste des inscrits : aucun montant ni paiement (consultable par d'autres postes).
+            'enregistre_par' => $i->enregistrePar ? trim($i->enregistrePar->prenoms.' '.$i->enregistrePar->name) : null,
+            'boursier' => (bool) $i->boursier,
         ];
     }
 
     private function detail(Inscription $inscription, Request $request, TenantContext $tenant): array
     {
-        $inscription->load(['eleve.tuteurs', 'niveau', 'classe', 'anneeScolaire', 'niveauASuivre:id,libelle', 'enregistrePar:id,name', 'fraisEleves.typeFrais']);
+        $inscription->load(['eleve.tuteurs', 'niveau', 'classe', 'anneeScolaire', 'niveauASuivre:id,libelle', 'enregistrePar:id,name,prenoms', 'fraisEleves.typeFrais']);
         $eleve = $inscription->eleve;
         $precedente = $this->inscriptionPrecedente($eleve, $inscription->annee_scolaire_id);
         $minimum = GrilleTarifaire::where('annee_scolaire_id', $inscription->annee_scolaire_id)
-            ->where('niveau_id', $inscription->niveau_id)->where('affecte', $inscription->affecte)
+            ->where('niveau_id', Niveau::generalId($inscription->niveau_id))->where('affecte', $inscription->affecte)
             ->value('montant_minimum_inscription');
         $frais = $inscription->fraisEleves->sortBy(fn (FraisEleve $f) => [$f->typeFrais->ordre, $f->type_frais_id]);
 
         return array_merge($this->presenterLigne($inscription), [
+            // Fiche : montants de l'inscription (absents de la liste des inscrits).
+            'total_du' => (int) $inscription->montant_total_du,
+            'total_reduit' => (int) $inscription->montant_total_reduit,
+            'total_paye' => (int) $inscription->montant_total_paye,
+            'reste' => (int) max(0, $inscription->resteAPayer()),
             'annee' => $inscription->anneeScolaire?->libelle,
             'eleve' => $this->presenterEleve($eleve),
             'langue_vivante_2' => $inscription->langue_vivante_2,
@@ -1124,7 +1329,7 @@ class InscriptionController extends Controller
             'decision_finale' => $inscription->decision_finale,
             'niveau_a_suivre' => $inscription->niveauASuivre?->libelle,
             'inscription_en_ligne' => $inscription->inscription_en_ligne,
-            'enregistre_par' => $inscription->enregistrePar?->name,
+            'enregistre_par' => \App\Support\Personnes::agent($inscription->enregistrePar),
             'precedente' => $precedente ? $this->presenterPrecedente($precedente) : null,
             'frais' => $frais->whereNull('quantite_due')->map(fn (FraisEleve $f) => [
                 'id' => $f->id,
@@ -1141,7 +1346,7 @@ class InscriptionController extends Controller
                 'quantite_due' => (int) $f->quantite_due,
                 'quantite_remise' => (int) $f->quantite_remise,
             ])->values(),
-            'dettes' => $this->dettesOuvertes($eleve),
+            'dettes' => $this->dettesOuvertes($eleve, (int) $inscription->annee_scolaire_id),
             'montant_minimum' => $minimum !== null ? (int) $minimum : null,
             'grille_definie' => $minimum !== null,
             'modifiable_tarif' => ! $this->aDesPaiements($inscription),

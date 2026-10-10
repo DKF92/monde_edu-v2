@@ -16,3 +16,9 @@ export function permissionGuard(permission: string | string[]): CanActivateFn {
     return permissions.some((p) => auth.aPermission(p)) ? true : router.createUrlTree(['/tabs/dashboard']);
   };
 }
+
+/** Ecrans reserves au poste Super admin (ex : Parametres > Migration V1). */
+export const superAdminGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  return auth.estSuperAdmin() ? true : inject(Router).createUrlTree(['/tabs/dashboard']);
+};

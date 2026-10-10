@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { IonContent, IonSpinner, IonIcon } from '@ionic/angular';
 import { addIcons } from 'ionicons';
 import {
-  mailOutline,
+  personOutline,
   lockClosedOutline,
   eyeOutline,
   eyeOffOutline,
@@ -32,13 +32,14 @@ export class LoginPage {
   readonly motDePasseVisible = signal(false);
 
   readonly formulaire = this.fb.group({
-    email: ['', [Validators.required, Validators.email]],
+    // Adresse e-mail ou numero de telephone (identifiant de la V1).
+    identifiant: ['', [Validators.required]],
     password: ['', [Validators.required]],
   });
 
   constructor() {
     addIcons({
-      mailOutline,
+      personOutline,
       lockClosedOutline,
       eyeOutline,
       eyeOffOutline,
@@ -47,7 +48,7 @@ export class LoginPage {
     });
   }
 
-  champInvalide(nom: 'email' | 'password'): boolean {
+  champInvalide(nom: 'identifiant' | 'password'): boolean {
     const champ = this.formulaire.controls[nom];
     return champ.invalid && champ.touched;
   }
@@ -61,9 +62,9 @@ export class LoginPage {
     this.chargement.set(true);
     this.erreur.set(null);
 
-    const { email, password } = this.formulaire.getRawValue();
+    const { identifiant, password } = this.formulaire.getRawValue();
 
-    this.auth.login(email!.trim(), password!).subscribe({
+    this.auth.login(identifiant!.trim(), password!).subscribe({
       next: (r) => {
         this.chargement.set(false);
         this.formulaire.controls.password.reset();
@@ -84,11 +85,11 @@ export class LoginPage {
     }
     if (erreur.status === 422) {
       // Message metier renvoye par l'API ("Identifiants incorrects.", "Ce compte est desactive.").
-      const message = erreur.error?.errors?.email?.[0];
+      const message = erreur.error?.errors?.identifiant?.[0] ?? erreur.error?.errors?.email?.[0];
       if (message && /desactive/i.test(message)) {
         return 'Ce compte est désactivé. Contactez l\'administration de votre établissement.';
       }
-      return 'Adresse e-mail ou mot de passe incorrect.';
+      return 'Identifiant (e-mail ou téléphone) ou mot de passe incorrect.';
     }
     if (erreur.status === 429) {
       return 'Trop de tentatives. Patientez une minute avant de réessayer.';

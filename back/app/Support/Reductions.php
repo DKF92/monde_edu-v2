@@ -132,6 +132,9 @@ class Reductions
             ->where('r.etablissement_id', app(TenantContext::class)->id())
             ->where('r.is_active', true)
             ->where(fn ($w) => $w->whereNull('r.frais_eleve_id')->orWhere('ir.annee_scolaire_id', $anneeId))
+            // Reductions de dette : seulement les dettes prises en compte (Parametres > Dettes, defaut n-1).
+            ->when(Dette::anneesPrisesEnCompte($anneeId), fn (Builder $q, array $annees) => $q
+                ->where(fn ($w) => $w->whereNull('r.dette_id')->orWhereIn('d.annee_scolaire_id', $annees)))
             ->when(($f['cible'] ?? null) === 'inscription', fn (Builder $q) => $q->whereNotNull('r.frais_eleve_id'))
             ->when(($f['cible'] ?? null) === 'dette', fn (Builder $q) => $q->whereNotNull('r.dette_id'))
             ->when($f['type_reduction_id'] ?? null, fn (Builder $q, $id) => $q->where('r.type_reduction_id', $id))
@@ -209,7 +212,7 @@ class Reductions
             $sections[] = $section('genre', 'Réductions par genre', $lignes->groupBy(fn ($l) => $l['sexe'] === 'F' ? 'Filles' : 'Garçons'));
             $sections[] = $section('cible', 'Réductions d\'inscription et de dette', $lignes->groupBy(fn ($l) => self::CIBLES[$l['cible']]));
             $sections[] = $section('niveau', 'Réductions par niveau', $lignes->sortBy('niveau_ordre')->groupBy('niveau'));
-            $sections[] = $section('classe', 'Réductions par classe', $lignes->sortBy(fn ($l) => [$l['niveau_ordre'], $l['classe']])->groupBy(fn ($l) => $l['classe'] ?? $l['niveau'].' (sans classe)'));
+            $sections[] = $section('classe', 'Réductions par classe', $lignes->sortBy(fn ($l) => [$l['niveau_ordre'], \App\Support\NomClasse::cleTri((string) $l['classe'])])->groupBy(fn ($l) => $l['classe'] ?? $l['niveau'].' (sans classe)'));
             $sections[] = $section('agent', 'Réductions par donneur d\'ordre', $lignes->groupBy(fn ($l) => $l['motif'] ?: '—'));
         }
 

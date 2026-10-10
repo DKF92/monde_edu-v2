@@ -115,8 +115,8 @@ class UtilisateurController extends Controller
                 'matricule' => $this->nouveauMatricule($tenant, $postes->first()),
                 'name' => $data['nom'],
                 'prenoms' => $data['prenoms'] ?? null,
-                'email' => $data['email'],
-                'telephone' => $data['telephone'] ?? null,
+                'email' => $data['email'] ?? null,
+                'telephone' => \App\Support\MigrationV1\Conversions::telephone($data['telephone'])[0],
                 'sexe' => $data['sexe'] ?? null,
                 'password' => $motDePasse,
                 'statut' => 'actif',
@@ -154,8 +154,8 @@ class UtilisateurController extends Controller
             $user->update([
                 'name' => $data['nom'],
                 'prenoms' => $data['prenoms'] ?? null,
-                'email' => $data['email'],
-                'telephone' => $data['telephone'] ?? null,
+                'email' => $data['email'] ?? null,
+                'telephone' => \App\Support\MigrationV1\Conversions::telephone($data['telephone'])[0],
                 'sexe' => $data['sexe'] ?? null,
             ]);
 
@@ -307,8 +307,13 @@ class UtilisateurController extends Controller
         return $request->validate([
             'nom' => ['required', 'string', 'max:80'],
             'prenoms' => ['nullable', 'string', 'max:180'],
-            'email' => ['required', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user?->id)],
-            'telephone' => ['nullable', 'string', 'max:20'],
+            // Connexion par telephone (identifiant V1) : telephone obligatoire, e-mail facultatif.
+            'email' => ['nullable', 'email', 'max:150', Rule::unique('users', 'email')->ignore($user?->id)],
+            'telephone' => ['required', 'string', 'max:20', function ($attribut, $valeur, $echec) {
+                if (\App\Support\MigrationV1\Conversions::telephone($valeur)[0] === null) {
+                    $echec('Numéro de téléphone invalide (10 chiffres, ex. 07 00 00 00 00).');
+                }
+            }],
             'sexe' => ['nullable', Rule::in(['M', 'F'])],
             'postes' => [$user?->id === $request->user()->id ? 'nullable' : 'required', 'array', 'min:1'],
             'postes.*' => ['integer'],
@@ -323,6 +328,7 @@ class UtilisateurController extends Controller
             'quartier' => ['nullable', 'string', 'max:150'],
         ], [
             'email.unique' => 'Cette adresse e-mail est deja utilisee par un autre compte.',
+            'telephone.required' => 'Le numéro de téléphone sert d\'identifiant de connexion : il est obligatoire.',
             'postes.required' => 'Choisissez au moins un poste.',
             'postes.min' => 'Choisissez au moins un poste.',
             'niveaux.*.exists' => 'Un des niveaux choisis n\'existe pas.',
@@ -409,13 +415,15 @@ class UtilisateurController extends Controller
     {
         $anneeId = $this->anneeId($tenant);
 
-        $ouverts = Niveau::whereHas('classes', fn (Builder $q) => $q
+        $avecClasse = fn (Builder $q) => $q
             ->where('classes.etablissement_id', $tenant->id())
-            ->where('classes.annee_scolaire_id', $anneeId))
+            ->where('classes.annee_scolaire_id', $anneeId);
+        // Educateurs (V1 choix) : niveau GENERAL (TLE), ouvert si une de ses series a une classe.
+        $ouverts = Niveau::generaux()->where(fn (Builder $q) => $q->whereHas('classes', $avecClasse)->orWhereHas('series.classes', $avecClasse))
             ->orderBy('ordre')
             ->get();
 
-        return $ouverts->isNotEmpty() ? $ouverts : Niveau::orderBy('ordre')->get();
+        return $ouverts->isNotEmpty() ? $ouverts : Niveau::generaux()->orderBy('ordre')->get();
     }
 
     /**

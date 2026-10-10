@@ -13,6 +13,7 @@ import {
   ParametresSms,
   RechargementSms,
   ParametresClasses,
+  ParametresDettes,
   ParametresInscriptions,
   ParametresInscriptionsSaisie,
   TarifsNiveaux,
@@ -22,6 +23,13 @@ import {
 } from '../models/parametre.model';
 
 /** Parametres de l'etablissement : classes, inscriptions, paiements. */
+/** Validite du billet d'entree en classe. */
+export interface ParametresBillet {
+  date_validite_billet: string | null;
+  delai_validite_recu: number;
+  seuil_jours: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ParametreService {
   private readonly http = inject(HttpClient);
@@ -46,6 +54,24 @@ export class ParametreService {
 
   enregistrerInscriptions(saisie: ParametresInscriptionsSaisie): Observable<ParametresInscriptions> {
     return this.http.put<ParametresInscriptions>(`${this.url}/inscriptions`, saisie);
+  }
+
+  /** Dettes prises en compte : nombre d'annees en arriere (1 = seulement n-1). */
+  dettes(): Observable<ParametresDettes> {
+    return this.http.get<ParametresDettes>(`${this.url}/dettes`);
+  }
+
+  enregistrerDettes(dettesAnnees: number): Observable<ParametresDettes> {
+    return this.http.put<ParametresDettes>(`${this.url}/dettes`, { dettes_annees: dettesAnnees });
+  }
+
+  /** Billet d'entree en classe : date d'echeance et nombre de jours (Parametres paiements). */
+  recu(): Observable<ParametresBillet> {
+    return this.http.get<ParametresBillet>(`${this.url}/paiements/recu`);
+  }
+
+  enregistrerRecu(saisie: Pick<ParametresBillet, 'date_validite_billet' | 'delai_validite_recu'>): Observable<ParametresBillet> {
+    return this.http.put<ParametresBillet>(`${this.url}/paiements/recu`, saisie);
   }
 
   tarifs(): Observable<TarifsNiveaux> {

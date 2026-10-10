@@ -24,10 +24,10 @@
 
   <h2>Récapitulatif par élève</h2>
   <table class="tab">
-    <tr><th>Classe</th><th>Matricule</th><th>Nom et prénoms</th><th class="d">Heures</th><th class="d">Justifiées</th><th class="d">Non justifiées</th></tr>
+    <tr><th>Classe</th><th>Matricule</th><th style="width: 62mm">Nom et prénoms</th><th class="d">Heures</th><th class="d">Justifiées</th><th class="d">Non justifiées</th></tr>
     @forelse ($par_eleve as $r)
       <tr>
-        <td>{{ $r['classe'] }}</td><td>{{ $r['eleve']['matricule'] }}</td><td>{{ $r['eleve']['nom'] }} {{ $r['eleve']['prenoms'] }}</td>
+        <td>{{ $r['classe'] }}</td><td>{{ $r['eleve']['matricule'] }}</td><td style="white-space: nowrap">{{ \App\Support\Noms::complet($r['eleve']['nom'], $r['eleve']['prenoms'], 59.9, 8.2) }}</td>
         <td class="d">{{ $h($r['heures']) }}</td><td class="d">{{ $h($r['justifiees']) }}</td>
         <td class="d {{ $r['heures'] - $r['justifiees'] > 0 ? 'non' : '' }}">{{ $h($r['heures'] - $r['justifiees']) }}</td>
       </tr>
@@ -39,11 +39,11 @@
 
   <h2>Détail</h2>
   <table class="tab">
-    <tr><th>Date</th><th>Classe</th><th>Nom et prénoms</th><th>Période</th><th class="d">Heures</th><th class="c">Justifiée</th><th>Motif</th></tr>
+    <tr><th>Date</th><th>Classe</th><th style="width: 55mm">Nom et prénoms</th><th>Période</th><th class="d">Heures</th><th class="c">Justifiée</th><th>Motif</th></tr>
     @foreach ($absences as $a)
       <tr>
         <td>{{ \Illuminate\Support\Carbon::parse($a['date_debut'])->format('d/m/Y') }}{{ $a['date_fin'] && $a['date_fin'] !== $a['date_debut'] ? ' au '.\Illuminate\Support\Carbon::parse($a['date_fin'])->format('d/m/Y') : '' }}</td>
-        <td>{{ $a['classe'] }}</td><td>{{ $a['eleve']['nom'] ?? '' }} {{ $a['eleve']['prenoms'] ?? '' }}</td><td>{{ $a['periode'] }}</td>
+        <td>{{ $a['classe'] }}</td><td style="white-space: nowrap">{{ \App\Support\Noms::complet($a['eleve']['nom'] ?? '', $a['eleve']['prenoms'] ?? '', 52.9, 8.2) }}</td><td>{{ $a['periode'] }}</td>
         <td class="d">{{ $h($a['nombre_heures']) }}</td><td class="c">{{ $a['is_justifiee'] ? 'Oui' : 'Non' }}</td><td>{{ $a['motif'] }}</td>
       </tr>
     @endforeach

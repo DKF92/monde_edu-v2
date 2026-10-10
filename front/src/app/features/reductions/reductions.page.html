@@ -5,14 +5,16 @@
         <h1>Réductions</h1>
         <p>Réductions et cas sociaux accordés{{ donnees()?.annee ? ' en ' + donnees()!.annee : '' }}.</p>
       </div>
-      <div class="boutons-entete">
-        <button type="button" class="me-bouton-secondaire" (click)="ouvrirMatricule('dette')">
-          <ion-icon name="alert-circle-outline"></ion-icon> Réduction dette
-        </button>
-        <button type="button" class="me-bouton-principal" (click)="ouvrirMatricule('inscription')">
-          <ion-icon name="pricetag-outline"></ion-icon> Réduction inscription
-        </button>
-      </div>
+      @if (peutGerer) {
+        <div class="boutons-entete">
+          <button type="button" class="me-bouton-secondaire" (click)="ouvrirMatricule('dette')">
+            <ion-icon name="alert-circle-outline"></ion-icon> Réduction dette
+          </button>
+          <button type="button" class="me-bouton-principal" (click)="ouvrirMatricule('inscription')">
+            <ion-icon name="pricetag-outline"></ion-icon> Réduction inscription
+          </button>
+        </div>
+      }
     </header>
 
     <!-- ================= Totaux ================= -->
@@ -83,16 +85,20 @@
               <span class="cellule" role="cell" data-libelle="Donneur d'ordre">{{ r.motif || '—' }}@if (r.accorde_par) {<small> · saisie {{ r.accorde_par }}</small>}</span>
               <span class="cellule actions" role="cell">
                 <button type="button" class="me-action" title="Voir l'élève" aria-label="Voir l'élève" (click)="voirEleve(r)"><ion-icon name="eye-outline"></ion-icon></button>
-                <button type="button" class="me-action danger" title="Supprimer" aria-label="Supprimer la réduction" [disabled]="suppression() === r.lot" (click)="supprimer(r)">
-                  @if (suppression() === r.lot) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="trash-outline"></ion-icon> }
-                </button>
+                @if (peutGerer) {
+                  <button type="button" class="me-action danger" title="Supprimer" aria-label="Supprimer la réduction" [disabled]="suppression() === r.lot" (click)="supprimer(r)">
+                    @if (suppression() === r.lot) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="trash-outline"></ion-icon> }
+                  </button>
+                }
               </span>
             </div>
           } @empty {
             <div class="me-etat-vide">
               <ion-icon name="pricetag-outline"></ion-icon>
               <strong>Aucune réduction{{ nombreFiltres() || recherche() ? ' pour ces critères' : ' cette année' }}</strong>
-              <button type="button" class="me-bouton-principal" (click)="ouvrirMatricule('inscription')"><ion-icon name="pricetag-outline"></ion-icon> Réduction inscription</button>
+              @if (peutGerer) {
+                <button type="button" class="me-bouton-principal" (click)="ouvrirMatricule('inscription')"><ion-icon name="pricetag-outline"></ion-icon> Réduction inscription</button>
+              }
             </div>
           }
         </div>

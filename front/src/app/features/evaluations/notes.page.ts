@@ -21,6 +21,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { GrilleNotes, OptionsEvaluations, PedagogieService } from '../../core/services/pedagogie.service';
 import { OptionSelecteur, SelecteurComponent } from '../../shared/selecteur.component';
 import { PaginationComponent, TAILLES_PAGE, paginer } from '../../shared/pagination.component';
+import { estEnAttente } from '../../core/interceptors/reseau.interceptor';
 
 /**
  * Saisie des notes (V1 Note/new_note) : periode, classe, matiere ; tableau
@@ -193,6 +194,11 @@ export class NotesPage {
         next: (r) => {
           this.enregistrement.set(false);
           this.modale.set(false);
+          // Sans reseau : notes gardees sur l'appareil, envoyees au retour du reseau.
+          if (estEnAttente(r)) {
+            this.notifier(r.message);
+            return;
+          }
           this.grille.set(r);
           this.notifier(`Évaluation n°${r.numero} enregistrée.`);
         },

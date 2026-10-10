@@ -12,6 +12,7 @@ use App\Models\Periode;
 use App\Models\Personnel;
 use App\Models\Reglement;
 use App\Models\User;
+use App\Support\PorteeFinances;
 use App\Support\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -35,7 +36,7 @@ class DashboardController extends Controller
 
         // Les montants ne sont communiques qu'aux profils qui ont le droit de
         // les consulter (un professeur n'a pas a voir la caisse).
-        $voitFinances = $user->can('reglements.voir') || $user->can('rapports.voir');
+        $voitFinances = PorteeFinances::voitMontants($request);
 
         [$classes, $portee, $totalClasses] = $this->classes($user, $annee);
 
@@ -93,7 +94,7 @@ class DashboardController extends Controller
 
         $classes = $query->get()
             // Ordre pedagogique (6EME avant TLE) puis alphabetique (6EME A avant 6EME B).
-            ->sortBy(fn (Classe $c) => sprintf('%03d-%s', $c->niveau?->ordre ?? 0, $c->libelle))
+            ->sortBy(fn (Classe $c) => sprintf('%03d-%s', $c->niveau?->ordre ?? 0, \App\Support\NomClasse::cleTri($c->libelle)))
             ->take(self::NB_CLASSES_AFFICHEES)
             ->map(fn (Classe $c) => [
                 'id' => $c->id,

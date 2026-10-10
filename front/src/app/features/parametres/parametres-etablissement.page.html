@@ -152,6 +152,21 @@
         <p class="me-aide-champ">Adresse et téléphone laissés vides : ceux de l'établissement (Coordonnées).</p>
       </section>
 
+      <!-- ================= Serveur de l'ecole (hors ligne) ================= -->
+      <section class="me-carte bloc">
+        <div class="bloc-entete">
+          <span class="me-pastille teinte-vert"><ion-icon name="server-outline"></ion-icon></span>
+          <div>
+            <h2>Serveur de l'école</h2>
+            <p>Quand internet manque, l'application se connecte à ce serveur du réseau de l'école (la copie en ligne reste utilisée dès qu'internet revient).</p>
+          </div>
+        </div>
+        <div class="me-grille">
+          <ng-container *ngTemplateOutlet="champ; context: { $implicit: 'serveur_local', libelle: 'Adresse du serveur local', exemple: 'https://local.monecole.ci' }"></ng-container>
+        </div>
+        <p class="me-aide-champ">Adresse en https (nom de domaine de l'école) pour que l'application installée puisse l'utiliser ; une adresse IP en http ne fonctionne que dans le navigateur, depuis le réseau de l'école.</p>
+      </section>
+
       <!-- ================= Abonnement (lecture seule) ================= -->
       <section class="me-carte bloc">
         <div class="bloc-entete">

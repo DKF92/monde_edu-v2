@@ -1,0 +1,117 @@
+<ion-content class="me-page-admin">
+  <div class="me-page etroite">
+    <header class="me-entete-page">
+      <div>
+        <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/parametres')">
+          <ion-icon name="chevron-back-outline"></ion-icon> Paramètres
+        </button>
+        <h1>Banques</h1>
+        <p>Comptes bancaires de l'établissement, choisis dans les dépenses payées par la banque.</p>
+      </div>
+      @if (peutGerer()) {
+        <button type="button" class="me-bouton-principal" (click)="nouvelle()">
+          <ion-icon name="add-outline"></ion-icon> Ajouter une banque
+        </button>
+      }
+    </header>
+
+    <p class="me-note">
+      <ion-icon name="information-circle-outline"></ion-icon>
+      <span>
+        Une dépense <strong>banque</strong> indique la banque et la personne qui a fait le retrait
+        (postes ayant le droit « Opérations bancaires »). Les dépenses <strong>caisse</strong> ne changent pas.
+        Les mêmes banques reçoivent les <strong>entrées banque</strong> (Finances › Entrées).
+        Une banque déjà utilisée ne se supprime pas : désactivez-la.
+      </span>
+    </p>
+
+    @if (chargement()) {
+      <section class="me-carte bloc"><ion-skeleton-text [animated]="true" style="width: 100%; height: 120px"></ion-skeleton-text></section>
+    } @else if (erreur()) {
+      <section class="me-carte">
+        <div class="me-etat-vide">
+          <ion-icon name="cloud-offline-outline"></ion-icon>
+          <strong>Impossible de charger les banques</strong>
+          <button type="button" class="me-lien" (click)="charger()">Réessayer</button>
+        </div>
+      </section>
+    } @else {
+      <section class="me-carte liste-banques">
+        <div class="titre-liste">
+          <h2>{{ banques().length }} banque{{ banques().length > 1 ? 's' : '' }}</h2>
+          <span>{{ actives() }} active{{ actives() > 1 ? 's' : '' }}</span>
+        </div>
+        @for (b of banques(); track b.id) {
+          <div class="banque" [class.inactive]="!b.is_active">
+            <span class="me-pastille teinte-bleu"><ion-icon name="card-outline"></ion-icon></span>
+            <div class="infos">
+              <strong>{{ b.nom }}{{ b.sigle ? ' (' + b.sigle + ')' : '' }}</strong>
+              <small>
+                {{ b.numero_compte ? 'Compte ' + b.numero_compte : 'Numéro de compte non renseigné' }}{{ b.agence ? ' · agence ' + b.agence : '' }}
+                · {{ b.depenses ? b.depenses + ' dépense' + (b.depenses > 1 ? 's' : '') : 'aucune dépense' }}
+              </small>
+            </div>
+            @if (!b.is_active) { <span class="me-badge">Désactivée</span> }
+            @if (peutGerer()) {
+              <span class="actions">
+                <button type="button" class="me-action" title="Modifier" aria-label="Modifier la banque" (click)="modifier(b)"><ion-icon name="create-outline"></ion-icon></button>
+                <button type="button" class="me-action" [title]="b.is_active ? 'Désactiver' : 'Réactiver'" [attr.aria-label]="b.is_active ? 'Désactiver la banque' : 'Réactiver la banque'" (click)="basculer(b)"><ion-icon [name]="b.is_active ? 'eye-off-outline' : 'eye-outline'"></ion-icon></button>
+                @if (!b.depenses) {
+                  <button type="button" class="me-action danger" title="Supprimer" aria-label="Supprimer la banque" (click)="supprimer(b)"><ion-icon name="trash-outline"></ion-icon></button>
+                }
+              </span>
+            }
+          </div>
+        } @empty {
+          <div class="me-etat-vide">
+            <ion-icon name="card-outline"></ion-icon>
+            <strong>Aucune banque enregistrée</strong>
+            <span>Ajoutez les banques de l'établissement pour saisir les dépenses payées par la banque.</span>
+          </div>
+        }
+      </section>
+    }
+  </div>
+</ion-content>
+
+<ion-modal class="me-modale-formulaire auto" [isOpen]="modale()" (didDismiss)="modale.set(false)">
+  <ng-template>
+    <div class="me-modale">
+      <header>
+        <span class="me-pastille teinte-bleu"><ion-icon name="card-outline"></ion-icon></span>
+        <div>
+          <h1>{{ edition() ? 'Modifier la banque' : 'Nouvelle banque' }}</h1>
+          <p>Proposée dans les dépenses banque.</p>
+        </div>
+        <button type="button" class="me-fermer" (click)="modale.set(false)" aria-label="Fermer"><ion-icon name="close-outline"></ion-icon></button>
+      </header>
+      <div class="corps">
+        <div class="me-champ">
+          <label for="bq-nom">Nom de la banque <span class="me-requis">*</span></label>
+          <input id="bq-nom" class="me-saisie" maxlength="100" placeholder="Ex : Société Générale Côte d'Ivoire" [value]="saisie().nom" [class.invalide]="erreurs()['nom']" (input)="maj('nom', $event)" />
+          @if (erreurs()['nom']) { <span class="me-erreur-champ">{{ erreurs()['nom'] }}</span> }
+        </div>
+        <div class="grille-champs">
+          <div class="me-champ">
+            <label for="bq-sigle">Sigle</label>
+            <input id="bq-sigle" class="me-saisie" maxlength="20" placeholder="Ex : SGCI" [value]="saisie().sigle ?? ''" (input)="maj('sigle', $event)" />
+          </div>
+          <div class="me-champ">
+            <label for="bq-compte">N° de compte</label>
+            <input id="bq-compte" class="me-saisie" maxlength="50" [value]="saisie().numero_compte ?? ''" (input)="maj('numero_compte', $event)" />
+          </div>
+        </div>
+        <div class="me-champ">
+          <label for="bq-agence">Agence</label>
+          <input id="bq-agence" class="me-saisie" maxlength="100" placeholder="Ex : Plateau" [value]="saisie().agence ?? ''" (input)="maj('agence', $event)" />
+        </div>
+      </div>
+      <footer>
+        <button type="button" class="me-bouton-texte" (click)="modale.set(false)">Annuler</button>
+        <button type="button" class="me-bouton-principal" (click)="enregistrer()" [disabled]="enregistrement()">
+          @if (enregistrement()) { <ion-spinner name="dots"></ion-spinner> } @else { Enregistrer }
+        </button>
+      </footer>
+    </div>
+  </ng-template>
+</ion-modal>

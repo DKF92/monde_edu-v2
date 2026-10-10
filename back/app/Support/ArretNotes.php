@@ -79,7 +79,7 @@ class ArretNotes
     public static function etat(int $anneeId, Periode $periode): array
     {
         $classes = Classe::where('classes.annee_scolaire_id', $anneeId)->with('niveau:id,libelle,ordre')->get()
-            ->sortBy(fn (Classe $c) => [$c->niveau?->ordre, $c->libelle])->values();
+            ->sortBy(fn (Classe $c) => [$c->niveau?->ordre, \App\Support\NomClasse::cleTri($c->libelle)])->values();
         $notees = DB::table('notes')->where('periode_id', $periode->id)
             ->groupBy('classe_id')->selectRaw('classe_id, COUNT(DISTINCT matiere_id) AS matieres, COUNT(*) AS notes')->get()->keyBy('classe_id');
         $arretees = DB::table('moyennes')->join('inscriptions', fn ($j) => $j->on('inscriptions.eleve_id', '=', 'moyennes.eleve_id')

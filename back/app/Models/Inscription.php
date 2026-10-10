@@ -26,7 +26,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'niveau_id', 'date_inscription', 'statut', 'redoublant', 'affecte', 'boursier',
     'langue_vivante_2', 'etablissement_origine', 'classe_origine', 'decision_origine',
     'moyenne_origine', 'decision_finale', 'moyenne_annuelle', 'niveau_a_suivre_id',
-    'inscrit_en_ligne', 'inscription_en_ligne', 'enregistre_par_id',
+    'inscrit_en_ligne', 'inscription_en_ligne', 'en_ligne_introuvable_le', 'enregistre_par_id',
 ])]
 class Inscription extends Model
 {
@@ -42,6 +42,14 @@ class Inscription extends Model
 
     public const STATUTS = [self::SANS_CLASSE, self::CLASSE_CHOISIE, self::PAIEMENT, self::SOLDE];
 
+    /** Libelles des statuts (memes que l'application). */
+    public const LIBELLES_STATUT = [
+        self::SANS_CLASSE => 'En attente de choix de classe',
+        self::CLASSE_CHOISIE => 'En attente du 1er versement',
+        self::PAIEMENT => 'En attente de solder',
+        self::SOLDE => 'Soldé',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -52,6 +60,7 @@ class Inscription extends Model
             'boursier' => 'boolean',
             'inscrit_en_ligne' => 'boolean',
             'inscription_en_ligne' => 'array',
+            'en_ligne_introuvable_le' => 'datetime',
             'moyenne_origine' => 'float',
             'moyenne_annuelle' => 'float',
         ];
@@ -64,15 +73,19 @@ class Inscription extends Model
      */
     public function scopeVisiblesEnClasse(Builder $query): Builder
     {
-        $statut = Etablissement::find(app(TenantContext::class)->id())?->parametre('statut_visible_classe');
-
         $query->whereNotNull($query->qualifyColumn('classe_id'));
 
-        return $query->where($query->qualifyColumn('statut'), '>=', match ($statut) {
+        return $query->where($query->qualifyColumn('statut'), '>=', self::statutVisibleEnClasse());
+    }
+
+    /** Statut minimum pour apparaitre dans les listes de classe (Parametres). */
+    public static function statutVisibleEnClasse(): int
+    {
+        return match (Etablissement::find(app(TenantContext::class)->id())?->parametre('statut_visible_classe')) {
             'classe_attribuee' => self::CLASSE_CHOISIE,
             'solde' => self::SOLDE,
             default => self::PAIEMENT,
-        });
+        };
     }
 
     public function eleve(): BelongsTo

@@ -130,7 +130,7 @@
     <table class="signatures">
       <tr>
         <td>Le professeur principal<br><strong>{{ $classe->professeurPrincipal?->user ? trim($classe->professeurPrincipal->user->name.' '.$classe->professeurPrincipal->user->prenoms) : '' }}</strong></td>
-        <td>Le chef d'établissement</td>
+        <td>Le directeur des études<br><strong>{{ $directeur_etudes ?? '' }}</strong></td>
       </tr>
     </table>
   </div>

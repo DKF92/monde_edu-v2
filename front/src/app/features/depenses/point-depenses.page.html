@@ -44,9 +44,12 @@
       <h2 class="titre-point" [class.attenue]="chargement()">{{ p.titre }}</h2>
       <section class="resume" [class.attenue]="chargement()">
         <div class="me-carte chiffre"><span class="me-pastille teinte-vert"><ion-icon name="trending-up-outline"></ion-icon></span><span><small>Encaissements</small><strong>{{ f(p.encaissements) }}</strong></span></div>
-        <div class="me-carte chiffre"><span class="me-pastille teinte-rose"><ion-icon name="trending-down-outline"></ion-icon></span><span><small>Dépenses</small><strong>{{ f(p.depenses) }}</strong></span></div>
+        <div class="me-carte chiffre"><span class="me-pastille teinte-rose"><ion-icon name="trending-down-outline"></ion-icon></span><span><small>Dépenses caisse</small><strong>{{ f(p.depenses) }}</strong></span></div>
         <div class="me-carte chiffre solde" [class.negatif]="p.solde < 0"><span class="me-pastille teinte-cyan"><ion-icon name="wallet-outline"></ion-icon></span><span><small>Solde de caisse</small><strong>{{ f(p.solde) }}</strong></span></div>
       </section>
+      @if (p.depenses_banque) {
+        <p class="me-note"><span>Dépenses payées par la banque sur la période : <strong>{{ f(p.depenses_banque) }}</strong> (elles ne sortent pas de la caisse et ne comptent pas dans le solde).</span></p>
+      }
 
       <div class="grille" [class.attenue]="chargement()">
         <section class="me-carte bloc">

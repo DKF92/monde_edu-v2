@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ToastController, IonContent, IonIcon, IonModal, IonSkeletonText, IonSpinner } from '@ionic/angular';
 import { addIcons } from 'ionicons';
@@ -21,6 +22,7 @@ import {
   layersOutline,
   peopleOutline,
   eyeOutline,
+  personOutline,
 } from 'ionicons/icons';
 import { CaisseService } from '../../core/services/caisse.service';
 import { ActionsCaisseService } from '../../core/services/actions-caisse.service';
@@ -38,7 +40,7 @@ type Colonne = 'affecte' | 'non_affecte' | 'total';
 @Component({
   selector: 'app-point-caisse',
   standalone: true,
-  imports: [IonContent, IonIcon, IonModal, IonSkeletonText, IonSpinner, SelecteurComponent],
+  imports: [NgTemplateOutlet, IonContent, IonIcon, IonModal, IonSkeletonText, IonSpinner, SelecteurComponent],
   templateUrl: './point-caisse.page.html',
   styleUrl: './point-caisse.page.scss',
 })
@@ -100,10 +102,21 @@ export class PointCaissePage {
   readonly valeurSexe = computed(() => (this.filtres().sexe === 'F' ? 1 : this.filtres().sexe === 'M' ? 2 : 0));
   readonly valeurRedoublant = computed(() => (this.filtres().redoublant === true ? 1 : this.filtres().redoublant === false ? 2 : 0));
   readonly valeurCycle = computed(() => this.cycles().findIndex((c) => c.valeur === this.filtres().cycle) + 1);
-  /** Nombre de criteres eleve actifs (badge du bouton Filtres). */
+  /** Filtre caissier : 0 = total general (defaut), -1 = tous (un bilan chacun), sinon un caissier. */
+  readonly optionsCaissier = computed<OptionSelecteur[]>(() => [
+    { valeur: 0, libelle: 'Total général' },
+    { valeur: -1, libelle: 'Tous (un bilan par caissier)' },
+    ...(this.bilan()?.caissiers ?? []).map((c) => ({ valeur: c.id, libelle: c.nom })),
+  ]);
+  readonly valeurCaissier = computed(() => {
+    const c = this.filtres().caissier;
+    return c === 'tous' ? -1 : c ?? 0;
+  });
+
+  /** Nombre de criteres actifs (badge du bouton Filtres). */
   readonly nombreCriteres = computed(() => {
     const f = this.filtres();
-    return [f.sexe, f.redoublant ?? null, f.cycle, f.niveau_id, f.classe_id].filter((v) => v !== null && v !== undefined && v !== '').length;
+    return [f.sexe, f.redoublant ?? null, f.cycle, f.niveau_id, f.classe_id, f.caissier].filter((v) => v !== null && v !== undefined && v !== '').length;
   });
 
   /** Groupes de lignes (intertitres du tableau). */
@@ -130,6 +143,7 @@ export class PointCaissePage {
       layersOutline,
       peopleOutline,
       eyeOutline,
+      personOutline,
     });
   }
 
@@ -218,32 +232,40 @@ export class PointCaissePage {
     this.majCriteres({ classe_id: id || null, cycle: null, niveau_id: null });
   }
 
+  choisirCaissier(v: number): void {
+    this.charger({ ...this.filtres(), caissier: v === -1 ? 'tous' : v || null });
+  }
+
   effacerCriteres(): void {
-    this.majCriteres({ sexe: null, redoublant: null, cycle: null, niveau_id: null, classe_id: null });
+    this.charger({ ...this.filtres(), sexe: null, redoublant: null, cycle: null, niveau_id: null, classe_id: null, caissier: null });
   }
 
   private majCriteres(changement: CriteresBilan): void {
     this.charger({ ...this.filtres(), ...changement });
   }
 
-  private criteres(): CriteresBilan {
-    const { sexe, redoublant, cycle, niveau_id, classe_id } = this.filtres();
-    return { sexe, redoublant, cycle, niveau_id, classe_id };
+  /** Criteres gardes quand la periode change (criteres eleve et caissier). */
+  private criteres(): Omit<FiltresBilan, 'periode'> {
+    const { sexe, redoublant, cycle, niveau_id, classe_id, caissier } = this.filtres();
+    return { sexe, redoublant, cycle, niveau_id, classe_id, caissier };
   }
 
   // ------------------------------------------------ Actions
 
   /** Liste des paiements de la periode (tous frais) ou d'une cellule du tableau. */
-  liste(ligne?: LigneBilan, colonne: Colonne = 'total'): void {
+  liste(ligne?: LigneBilan, colonne: Colonne = 'total', caissierId: number | null = null): void {
     const b = this.bilan();
     if (!b) {
       return;
     }
     const params: Record<string, string | number> = {
       periode: b.periode.periode === 'annee' ? 'annee' : 'dates',
-      moi: 1,
       titre: b.titre,
     };
+    // Caissier connecte : ses paiements ; sinon le caissier du tableau (tous par defaut).
+    const caissier = caissierId ?? b.caissier.id;
+    if (!b.filtre_caissier) params['moi'] = 1;
+    else if (caissier) params['caissier_id'] = caissier;
     if (b.periode.du) params['du'] = b.periode.du;
     if (b.periode.au) params['au'] = b.periode.au;
     const c = this.criteres();

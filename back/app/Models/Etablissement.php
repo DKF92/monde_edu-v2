@@ -49,7 +49,15 @@ class Etablissement extends Model
         // tout) et montant minimum d'un versement apres le premier (le premier
         // respecte le minimum d'inscription de la grille).
         'versements_max' => 6,
+        // Dettes prises en compte (caisse, reste a payer, liste des dettes...) :
+        // celles des N annees precedentes ; 1 = seulement le reste de n-1.
+        'dettes_annees' => 1,
         'versement_minimum' => 1000,
+        // Billet d'entree en classe (a la suite du recu), eleve non solde : valable
+        // jusqu'a la date d'echeance ; paiement a moins de 15 jours de l'echeance (ou
+        // apres, ou sans date) : paiement + N jours (V1 jour_expire_inscr). Solde : fin d'annee.
+        'date_validite_billet' => null,
+        'delai_validite_recu' => 30,
         // Numerotation des classes d'un niveau (V1 : numero, "6EME 1") : chiffres | lettres ("6EME A").
         'numerotation_classes' => 'chiffres',
         // En-tete des documents (a gauche) : ministere de tutelle, direction
@@ -58,6 +66,9 @@ class Etablissement extends Model
         'entete_direction' => null,
         'entete_adresse' => null,
         'entete_telephone' => null,
+        // Adresse du serveur de l'ecole (reseau local), proposee par l'application
+        // quand internet manque (ex : https://local.monecole.ci).
+        'serveur_local' => null,
     ];
 
     /** Lignes de gauche de l'en-tete des documents. */

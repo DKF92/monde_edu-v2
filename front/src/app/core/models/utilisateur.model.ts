@@ -59,8 +59,8 @@ export interface OptionsUtilisateurs {
 export interface UtilisateurSaisie {
   nom: string;
   prenoms: string | null;
-  email: string;
-  telephone: string | null;
+  email: string | null;
+  telephone: string;
   sexe: 'M' | 'F' | null;
   postes: number[];
   niveaux: number[];

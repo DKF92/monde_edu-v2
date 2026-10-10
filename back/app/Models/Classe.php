@@ -63,20 +63,33 @@ class Classe extends Model
      *
      * @return array{limite: ?int, source: ?string}
      */
+    /** @var array<int, array{niveaux: array<int, int>, general: mixed}> */
+    private static array $limites = [];
+
+    /** A appeler apres une modification des limites (Parametres > Classes). */
+    public static function oublierLimites(): void
+    {
+        self::$limites = [];
+    }
+
     public function effectifLimite(): array
     {
         if ($this->capacite) {
             return ['limite' => (int) $this->capacite, 'source' => 'classe'];
         }
 
-        $niveau = LimiteEffectifNiveau::where('etablissement_id', $this->etablissement_id)
-            ->where('niveau_id', $this->niveau_id)
-            ->value('effectif_max');
+        // Limites lues une fois par requete (listes de classes : une requete par classe sinon).
+        $cle = (int) $this->etablissement_id;
+        self::$limites[$cle] ??= [
+            'niveaux' => LimiteEffectifNiveau::where('etablissement_id', $cle)->pluck('effectif_max', 'niveau_id')->all(),
+            'general' => Etablissement::find($cle)?->parametre('effectif_max_classe'),
+        ];
+        $niveau = self::$limites[$cle]['niveaux'][$this->niveau_id] ?? null;
         if ($niveau) {
             return ['limite' => (int) $niveau, 'source' => 'niveau'];
         }
 
-        $general = Etablissement::find($this->etablissement_id)?->parametre('effectif_max_classe');
+        $general = self::$limites[$cle]['general'];
 
         return $general ? ['limite' => (int) $general, 'source' => 'etablissement'] : ['limite' => null, 'source' => null];
     }

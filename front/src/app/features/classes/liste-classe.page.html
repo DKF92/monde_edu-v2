@@ -57,8 +57,36 @@
               <ion-icon name="chevron-forward-outline" class="deplier"></ion-icon>
             </summary>
             <ul>
-              @for (m of ens.matieres; track m.id) {
+              @if (peutAffecter()) {
+                <li class="principal">
+                  <span class="aide-principal">
+                    <ion-icon name="radio-button-on-outline"></ion-icon>
+                    Cochez le professeur principal (suit la classe, signe les bulletins) :
+                    <strong>{{ nomProfesseur(choixPrincipal() || null) }}</strong>
+                    @if (choixPrincipal()) {
+                      <button type="button" class="me-bouton-texte" (click)="choixPrincipal.set(0)">Retirer</button>
+                    }
+                  </span>
+                </li>
+              } @else {
                 <li>
+                  <span class="matiere"><strong>Professeur principal</strong><small>suit la classe, signe les bulletins</small></span>
+                  <span class="prof">{{ nomPrincipal() }}</span>
+                </li>
+              }
+              @for (m of ens.matieres; track m.id) {
+                <li [class.avec-choix]="peutAffecter()">
+                  @if (peutAffecter()) {
+                    <input
+                      type="radio"
+                      name="prof-principal"
+                      [checked]="estPrincipal(m.id)"
+                      [disabled]="!choixEnseignants()[m.id]"
+                      (change)="choixPrincipal.set(choixEnseignants()[m.id])"
+                      [attr.aria-label]="'Professeur principal : professeur de ' + m.libelle"
+                      title="Professeur principal"
+                    />
+                  }
                   <span class="matiere"><strong>{{ m.libelle }}</strong><small>coef {{ m.coefficient }}</small></span>
                   @if (peutAffecter()) {
                     <app-selecteur [idChamp]="'prof-' + m.id" icone="person-outline" [options]="optionsProfesseurs(m.id)" [valeur]="choixEnseignants()[m.id]" (valeurChange)="choisirProfesseur(m.id, $event)"></app-selecteur>

@@ -266,13 +266,11 @@ $tableau: 760px;
 
   .me-action {
     border: 1px solid var(--me-bordure);
-    background: var(--me-surface);
   }
 
   @container (min-width: #{$tableau}) {
     .me-action {
       border: none;
-      background: none;
     }
   }
 }
@@ -344,4 +342,10 @@ $tableau: 760px;
   .me-aide-champ {
     margin: 0;
   }
+}
+
+.actions-entete {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }

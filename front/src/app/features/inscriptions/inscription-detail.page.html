@@ -28,25 +28,28 @@
           </p>
         </div>
         <div class="boutons-entete">
-          @if (d.modifiable_tarif) {
+          @if (d.modifiable_tarif && peutGerer()) {
             <button type="button" class="me-bouton-texte danger" (click)="annuler()" [disabled]="!!action()">
               <ion-icon name="close-circle-outline"></ion-icon> Annuler
             </button>
           }
-          @if (!d.inscrit_en_ligne && d.statut < 2) {
+          @if (!d.inscrit_en_ligne && d.statut < 2 && peutGerer()) {
             <button type="button" class="me-bouton-secondaire" (click)="ouvrirEnLigne()">
               <ion-icon name="globe-outline"></ion-icon> Mise à jour inscription en ligne
             </button>
           }
-          <button type="button" class="me-bouton-secondaire" (click)="modifier()">
-            <ion-icon name="create-outline"></ion-icon> Modifier
-          </button>
-          <button type="button" [class]="peutEncaisser() && d.classe ? 'me-bouton-secondaire' : 'me-bouton-principal'" (click)="imprimer()">
-            <ion-icon name="print-outline"></ion-icon> Imprimer la fiche
+          @if (peutGerer()) {
+            <button type="button" class="me-bouton-secondaire" (click)="modifier()">
+              <ion-icon name="create-outline"></ion-icon> {{ d.statut === 0 ? 'Terminer inscription' : 'Modifier' }}
+            </button>
+          }
+          <button type="button" [class]="peutEncaisser() && d.classe ? 'me-bouton-secondaire' : 'me-bouton-principal'" (click)="imprimer()" [disabled]="impressionFiche()">
+            @if (impressionFiche()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> Imprimer la fiche }
           </button>
           @if (peutEncaisser() && d.classe) {
             <button type="button" class="me-bouton-principal" (click)="router.navigate(['/tabs/paiements/encaisser'], { queryParams: { inscription: d.id } })">
-              <ion-icon name="cash-outline"></ion-icon> Encaisser
+              <!-- Soldé : plus rien à encaisser, même page pour consulter les paiements. -->
+              @if (d.statut === 3) { <ion-icon name="receipt-outline"></ion-icon> Paiements } @else { <ion-icon name="cash-outline"></ion-icon> Encaisser }
             </button>
           }
         </div>
@@ -75,14 +78,14 @@
         <div class="colonne">
           <section class="me-carte bloc">
             <div class="eleve">
-              <label class="photo" [class.chargement]="action() === 'photo'" title="Changer la photo">
+              <label class="photo" [class.chargement]="action() === 'photo'" [attr.title]="peutGerer() ? 'Changer la photo' : null">
                 @if (d.eleve.photo_url) {
                   <img [src]="d.eleve.photo_url" alt="Photo de l'élève" />
                 } @else {
                   <span class="initiales" [class.feminin]="d.eleve.sexe === 'F'">{{ initiales(d) }}</span>
                 }
-                <span class="changer"><ion-icon name="camera-outline"></ion-icon></span>
-                <input type="file" accept="image/*" capture="user" hidden (change)="choisirPhoto($event)" [disabled]="!!action()" />
+                @if (peutGerer()) { <span class="changer"><ion-icon name="camera-outline"></ion-icon></span> }
+                <input type="file" accept="image/*" capture="user" hidden (change)="choisirPhoto($event)" [disabled]="!!action() || !peutGerer()" />
               </label>
               <dl class="infos">
                 <div><dt>Sexe</dt><dd>{{ d.eleve.sexe === 'F' ? 'Féminin' : d.eleve.sexe === 'M' ? 'Masculin' : '—' }}</dd></div>
@@ -162,11 +165,11 @@
                     <div class="fourniture">
                       <span><strong>{{ f.libelle }}</strong><small>{{ f.quantite_due }} à apporter</small></span>
                       <div class="me-montant" [attr.data-unite]="'/ ' + f.quantite_due">
-                        <input class="me-saisie" type="number" min="0" [max]="f.quantite_due" [value]="quantite(f.id, f.quantite_remise)" (input)="majRemise(f.id, valeurNombre($event), f.quantite_due)" [attr.aria-label]="f.libelle + ' remis'" />
+                        <input class="me-saisie" type="number" min="0" [max]="f.quantite_due" [value]="quantite(f.id, f.quantite_remise)" (input)="majRemise(f.id, valeurNombre($event), f.quantite_due)" [attr.aria-label]="f.libelle + ' remis'" [disabled]="!peutGerer()" />
                       </div>
                     </div>
                   } @else {
-                    <button type="button" class="me-option" [class.choisi]="quantite(f.id, f.quantite_remise) >= 1" (click)="majRemise(f.id, quantite(f.id, f.quantite_remise) >= 1 ? 0 : 1, 1)">
+                    <button type="button" class="me-option" [class.choisi]="quantite(f.id, f.quantite_remise) >= 1" [disabled]="!peutGerer()" (click)="majRemise(f.id, quantite(f.id, f.quantite_remise) >= 1 ? 0 : 1, 1)">
                       <ion-icon [name]="quantite(f.id, f.quantite_remise) >= 1 ? 'checkmark-circle' : 'ellipse-outline'"></ion-icon>
                       <span><strong>{{ f.libelle }}</strong><small>{{ quantite(f.id, f.quantite_remise) >= 1 ? 'Remis(e)' : 'Pas encore remis(e)' }}</small></span>
                     </button>
@@ -190,9 +193,11 @@
           <section class="me-carte bloc">
             <div class="entete-bloc">
               <h2><ion-icon name="school-outline"></ion-icon> Classe</h2>
-              <button type="button" class="me-bouton-texte" (click)="ouvrirClasses()">
-                <ion-icon name="swap-horizontal-outline"></ion-icon> {{ d.classe ? 'Changer' : 'Placer' }}
-              </button>
+              @if (peutGerer()) {
+                <button type="button" class="me-bouton-texte" (click)="ouvrirClasses()">
+                  <ion-icon name="swap-horizontal-outline"></ion-icon> {{ d.classe ? 'Changer' : 'Placer' }}
+                </button>
+              }
             </div>
             @if (d.classe_detail; as c) {
               <div class="classe-actuelle">
@@ -219,6 +224,7 @@
               } @else if (d.etablissement_origine || d.classe_origine || d.decision_origine) {
                 <div class="large"><dt>Provenance</dt><dd>{{ provenance(d) }}</dd></div>
               }
+              <div class="large"><dt>Inscrit(e) le</dt><dd>{{ dateFr(d.date_inscription) }}{{ d.enregistre_par ? ' par ' + d.enregistre_par : '' }}</dd></div>
             </dl>
           </section>
 
@@ -263,8 +269,6 @@
               }
             </ul>
           </section>
-
-          <p class="trace">Inscrit(e) le {{ dateFr(d.date_inscription) }}{{ d.enregistre_par ? ' par ' + d.enregistre_par : '' }}</p>
         </div>
       </div>
     }

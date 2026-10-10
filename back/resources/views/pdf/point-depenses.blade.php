@@ -28,7 +28,7 @@
   <table class="resume">
     <tr>
       <td><small>Encaissements</small><strong>{{ $m($p['encaissements']) }} F</strong></td>
-      <td><small>Dépenses</small><strong>{{ $m($p['depenses']) }} F</strong></td>
+      <td><small>Dépenses caisse</small><strong>{{ $m($p['depenses']) }} F</strong></td>
       <td class="{{ $p['solde'] < 0 ? 'negatif' : 'positif' }}"><small>Solde de caisse</small><strong>{{ $m($p['solde']) }} F</strong></td>
     </tr>
   </table>
@@ -60,6 +60,6 @@
     @endforeach
     <tr class="total"><td>Total</td><td>{{ $m($p['depenses']) }}</td></tr>
   </table>
-  <p style="font-size: 7.5pt; color: #56607a; margin-top: 3mm;">Montants en F CFA. Encaissements : tous les paiements des élèves de la période.</p>
+  <p style="font-size: 7.5pt; color: #56607a; margin-top: 3mm;">Montants en F CFA. Encaissements : tous les paiements des élèves de la période. Dépenses : sorties de caisse ; les dépenses payées par la banque ({{ $m($p['depenses_banque'] ?? 0) }} F sur la période) ne sont pas dans le solde de caisse.</p>
 </body>
 </html>

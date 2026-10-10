@@ -136,4 +136,13 @@ export class PaiementDetailPage {
     const toast = await this.toasts.create({ message, duration: 3000, position: 'bottom', color: erreur ? 'danger' : 'dark' });
     await toast.present();
   }
+
+  /** Fiche d'inscription si le poste a le droit Inscriptions, sinon dossier de l'eleve (caissier). */
+  voirInscription(inscriptionId: number, eleveId: number | undefined): void {
+    if (this.auth.aPermission('inscriptions.gerer') || !eleveId) {
+      this.router.navigate(['/tabs/inscriptions', inscriptionId]);
+    } else {
+      this.router.navigate(['/tabs/eleves', eleveId]);
+    }
+  }
 }

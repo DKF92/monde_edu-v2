@@ -90,7 +90,7 @@ $tableau: 820px;
   }
 
   @media (min-width: 1400px) {
-    grid-template-columns: minmax(0, 1fr) repeat(4, minmax(0, 210px));
+    grid-template-columns: minmax(0, 1fr) repeat(6, minmax(0, 180px));
 
     .me-recherche {
       grid-column: auto;
@@ -182,7 +182,7 @@ $tableau: 820px;
   }
 
   @container (min-width: #{$tableau}) {
-    grid-template-columns: minmax(240px, 2.4fr) minmax(110px, 1fr) minmax(150px, 1.1fr) 110px 120px 120px;
+    grid-template-columns: minmax(240px, 2.4fr) 64px minmax(110px, 1fr) minmax(150px, 1.1fr) 120px 96px minmax(110px, 1fr) 120px;
     align-items: center;
     gap: 12px;
     border-radius: 10px;
@@ -324,7 +324,6 @@ $tableau: 820px;
 
   .me-action {
     border: 1px solid var(--me-bordure);
-    background: var(--me-surface);
   }
 
   @container (min-width: #{$tableau}) {
@@ -334,7 +333,6 @@ $tableau: 820px;
 
     .me-action {
       border-color: transparent;
-      background: none;
     }
   }
 }
@@ -432,4 +430,10 @@ $tableau: 820px;
       color: var(--me-texte-doux);
     }
   }
+}
+
+.texte-coupe {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

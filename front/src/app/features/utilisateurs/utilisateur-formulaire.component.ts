@@ -83,8 +83,8 @@ export class UtilisateurFormulaireComponent implements OnChanges {
   readonly formulaire = this.fb.group({
     nom: ['', [Validators.required, Validators.maxLength(80)]],
     prenoms: ['', [Validators.maxLength(180)]],
-    email: ['', [Validators.required, Validators.email, Validators.maxLength(150)]],
-    telephone: ['', [Validators.maxLength(20)]],
+    email: ['', [Validators.email, Validators.maxLength(150)]],
+    telephone: ['', [Validators.required, Validators.maxLength(20)]],
     sexe: [null as 'M' | 'F' | null],
     statut_contrat: [null as StatutContrat | null],
     diplome: ['', [Validators.maxLength(100)]],
@@ -220,7 +220,7 @@ export class UtilisateurFormulaireComponent implements OnChanges {
       return null;
     }
     if (controle.hasError('required')) {
-      return champ === 'email' ? "L'adresse e-mail sert d'identifiant de connexion : elle est obligatoire." : 'Champ obligatoire.';
+      return champ === 'telephone' ? "Le numéro de téléphone sert d'identifiant de connexion : il est obligatoire." : 'Champ obligatoire.';
     }
     if (controle.hasError('email')) {
       return "Cette adresse e-mail n'est pas valide.";
@@ -247,8 +247,8 @@ export class UtilisateurFormulaireComponent implements OnChanges {
     const saisie: UtilisateurSaisie = {
       nom: v.nom!.trim(),
       prenoms: vide(v.prenoms),
-      email: v.email!.trim(),
-      telephone: vide(v.telephone),
+      email: vide(v.email),
+      telephone: v.telephone!.trim(),
       sexe: v.sexe ?? null,
       postes: [...this.postesChoisis()],
       niveaux: this.afficherNiveaux() ? this.niveauxChoisis() : [],

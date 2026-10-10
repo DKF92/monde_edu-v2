@@ -79,15 +79,23 @@ $tableau: 880px;
   padding: 16px;
   border-bottom: 1px solid var(--me-bordure);
 
+  // Recherche reduite : la place restante va aux montants totaux.
   .me-recherche {
-    flex: 1 1 320px;
+    flex: 0 1 300px;
+    min-width: 200px;
   }
 }
 
 .totaux {
   display: flex;
+  flex: 1 1 auto;
+  justify-content: flex-end;
   flex-wrap: wrap;
   gap: 8px 22px;
+
+  strong {
+    white-space: nowrap;
+  }
 
   span {
     display: flex;
@@ -337,7 +345,6 @@ $tableau: 880px;
 
   .me-action {
     border: 1px solid var(--me-bordure);
-    background: var(--me-surface);
   }
 
   @container (min-width: #{$tableau}) {
@@ -347,7 +354,6 @@ $tableau: 880px;
 
     .me-action {
       border-color: transparent;
-      background: none;
     }
   }
 }

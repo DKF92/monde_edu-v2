@@ -1,9 +1,11 @@
 {
+  "id": "/",
   "name": "Monde Éducatif",
   "short_name": "Monde Éducatif",
   "description": "Gestion scolaire multi-établissements",
-  "theme_color": "#3b5bdb",
-  "background_color": "#fafafa",
+  "lang": "fr",
+  "theme_color": "#1b3a6b",
+  "background_color": "#1b3a6b",
   "display": "standalone",
   "scope": "./",
   "start_url": "./",

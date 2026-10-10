@@ -100,6 +100,8 @@ export interface InfosEtablissement {
   entete_direction: string | null;
   entete_adresse: string | null;
   entete_telephone: string | null;
+  /** Serveur de l'ecole (reseau local), utilise par l'application sans internet. */
+  serveur_local: string | null;
   logo_url: string | null;
   statut: string;
   date_expiration_abonnement: string | null;
@@ -178,4 +180,12 @@ export interface MessageSms {
   erreur: string | null;
   eleve: string | null;
   envoye_par: string | null;
+}
+
+/** Parametres > Dettes. */
+export interface ParametresDettes {
+  dettes_annees: number;
+  annee: string | null;
+  /** Annees dont la dette compte, de la plus recente a la plus ancienne. */
+  annees_prises_en_compte: string[];
 }

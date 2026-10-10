@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -23,9 +23,13 @@ import {
   personAddOutline,
   alertCircleOutline,
   walletOutline,
+  pricetagOutline,
+  receiptOutline,
+  enterOutline,
 } from 'ionicons/icons';
 import { ColonnePoint, EleveInscrit, FiltresPoint, LignePoint, ModePoint, Point, PointsService, SectionPoint } from '../../core/services/points.service';
 import { CriteresBilan } from '../../core/models/caisse.model';
+import { AuthService } from '../../core/services/auth.service';
 import { OptionSelecteur, SelecteurComponent } from '../../shared/selecteur.component';
 import { PaginationComponent, TAILLES_PAGE, paginer } from '../../shared/pagination.component';
 
@@ -40,6 +44,38 @@ const TEXTES: Record<ModePoint, { titre: string; description: string; icone: str
     description: 'Dettes des années précédentes encaissées sur la période et situation des dettes à ce jour.',
     icone: 'alert-circle-outline',
   },
+  reductions: {
+    titre: 'Point des réductions',
+    description: 'Réductions et cas sociaux accordés sur la période, par type ; élèves affectés et non affectés.',
+    icone: 'pricetag-outline',
+  },
+  depenses: {
+    titre: 'Point des dépenses',
+    description: 'Dépenses de la période par catégorie, payées par la caisse ou par la banque.',
+    icone: 'receipt-outline',
+  },
+  entrees: {
+    titre: 'Point des entrées',
+    description: 'Entrées de la période : paiements des élèves (caisse) et entrées banque.',
+    icone: 'enter-outline',
+  },
+};
+
+/** Liste detaillee de chaque point (bouton au-dessus des tableaux). */
+const LISTES: Partial<Record<ModePoint, { libelle: string; route: string }>> = {
+  dettes: { libelle: 'Liste des dettes', route: '/tabs/paiements/dettes' },
+  reductions: { libelle: 'Liste des réductions', route: '/tabs/reductions' },
+  depenses: { libelle: 'Liste des dépenses', route: '/tabs/depenses' },
+  entrees: { libelle: 'Liste des entrées', route: '/tabs/entrees' },
+};
+
+/** Periode : date prise en compte par chaque point (filtres). */
+const DATES: Record<ModePoint, string> = {
+  inscriptions: "date d'inscription",
+  dettes: 'date du paiement',
+  reductions: "date d'octroi",
+  depenses: 'date de la dépense',
+  entrees: "date du paiement ou de l'entrée",
 };
 
 /**
@@ -60,10 +96,20 @@ export class PointPage {
   private readonly toasts = inject(ToastController);
   private readonly route = inject(ActivatedRoute);
   readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
+  private readonly modaleListe = viewChild<IonModal>('modaleListe');
 
-  readonly mode: ModePoint = this.route.snapshot.data['mode'] === 'dettes' ? 'dettes' : 'inscriptions';
+  readonly mode: ModePoint = (Object.keys(TEXTES) as ModePoint[]).includes(this.route.snapshot.data['mode']) ? this.route.snapshot.data['mode'] : 'inscriptions';
   readonly textes = TEXTES[this.mode];
-  readonly colonnes: ColonnePoint[] = ['affecte', 'non_affecte', 'total'];
+  readonly listeDetail = LISTES[this.mode] ?? null;
+  readonly datePeriode = DATES[this.mode];
+  /** Depenses et entrees : pas de criteres eleve. */
+  readonly criteresEleve = this.mode !== 'depenses' && this.mode !== 'entrees';
+  /** Colonnes du point (affectes / non affectes / total ou caisse / banque / total). */
+  readonly colonnes = computed<ColonnePoint[]>(() => {
+    const c = this.point()?.colonnes;
+    return c ? (Object.keys(c) as ColonnePoint[]) : ['affecte', 'non_affecte', 'total'];
+  });
 
   readonly point = signal<Point | null>(null);
   readonly chargement = signal(true);
@@ -118,18 +164,30 @@ export class PointPage {
     ...(this.point()?.caissiers ?? []).map((c) => ({ valeur: c.id, libelle: c.nom })),
   ]);
 
+  /** Filtre educateur : 0 = total general (defaut), -1 = tous (un tableau chacun), sinon un educateur. */
+  readonly optionsAgent = computed<OptionSelecteur[]>(() => [
+    { valeur: 0, libelle: 'Total général' },
+    { valeur: -1, libelle: 'Tous (un tableau par éducateur)' },
+    ...(this.point()?.agents ?? []).map((a) => ({ valeur: a.id, libelle: a.nom })),
+  ]);
+  readonly valeurAgent = computed(() => {
+    const a = this.filtres().agent;
+    return a === 'tous' ? -1 : a ?? 0;
+  });
+
   readonly valeurSexe = computed(() => (this.filtres().sexe === 'F' ? 1 : this.filtres().sexe === 'M' ? 2 : 0));
   readonly valeurRedoublant = computed(() => (this.filtres().redoublant === true ? 1 : this.filtres().redoublant === false ? 2 : 0));
   readonly valeurCycle = computed(() => this.cycles().findIndex((c) => c.valeur === this.filtres().cycle) + 1);
   readonly nombreCriteres = computed(() => {
     const f = this.filtres();
-    return [f.sexe, f.redoublant ?? null, f.cycle, f.niveau_id, f.classe_id, f.caissier_id].filter((v) => v !== null && v !== undefined && v !== '').length;
+    return [f.sexe, f.redoublant ?? null, f.cycle, f.niveau_id, f.classe_id, f.caissier_id, f.agent].filter((v) => v !== null && v !== undefined && v !== '').length;
   });
 
   constructor() {
     addIcons({
       calendarOutline, schoolOutline, listOutline, printOutline, searchOutline, cloudOfflineOutline, optionsOutline, closeOutline, documentsOutline,
       maleFemaleOutline, repeatOutline, layersOutline, peopleOutline, eyeOutline, personOutline, personAddOutline, alertCircleOutline, walletOutline,
+      pricetagOutline, receiptOutline, enterOutline,
     });
   }
 
@@ -213,12 +271,16 @@ export class PointPage {
     this.majCriteres({ classe_id: id || null, cycle: null, niveau_id: null });
   }
 
+  choisirAgent(v: number): void {
+    this.charger({ ...this.filtres(), agent: v === -1 ? 'tous' : v || null });
+  }
+
   choisirCaissier(id: number): void {
     this.charger({ ...this.filtres(), caissier_id: id || null });
   }
 
   effacerCriteres(): void {
-    this.charger({ ...this.filtres(), sexe: null, redoublant: null, cycle: null, niveau_id: null, classe_id: null, caissier_id: null });
+    this.charger({ ...this.filtres(), sexe: null, redoublant: null, cycle: null, niveau_id: null, classe_id: null, caissier_id: null, agent: null });
   }
 
   private majCriteres(changement: CriteresBilan): void {
@@ -226,8 +288,8 @@ export class PointPage {
   }
 
   private criteres(): FiltresPoint {
-    const { sexe, redoublant, cycle, niveau_id, classe_id, caissier_id } = this.filtres();
-    return { periode: this.filtres().periode, sexe, redoublant, cycle, niveau_id, classe_id, caissier_id };
+    const { sexe, redoublant, cycle, niveau_id, classe_id, caissier_id, agent } = this.filtres();
+    return { periode: this.filtres().periode, sexe, redoublant, cycle, niveau_id, classe_id, caissier_id, agent };
   }
 
   // ------------------------------------------------ Actions
@@ -258,7 +320,12 @@ export class PointPage {
     }
     this.pageListe.set(1);
     const etat = l ? l.cle : null;
-    const filtres = { ...this.filtres(), ...(s.niveau_id ? { niveau_id: s.niveau_id, cycle: null, classe_id: null } : {}) };
+    const filtres: FiltresPoint = {
+      ...this.filtres(),
+      ...(s.niveau_id ? { niveau_id: s.niveau_id, cycle: null, classe_id: null } : {}),
+      // Tableau d'un educateur : ses inscrits ; total general en mode « Tous » : tout le monde.
+      ...(this.filtres().agent === 'tous' ? { agent: s.agent_id ?? null } : {}),
+    };
     this.liste.set({ titre: '…', etat, affecte, eleves: null });
     this.listeFiltres = filtres;
     this.service.eleves(filtres, etat, affecte).subscribe({
@@ -286,9 +353,20 @@ export class PointPage {
     this.impressionListe.set(false);
   }
 
-  ouvrirEleve(e: EleveInscrit): void {
+  /** Ferme la liste en fermant vraiment la modale (puis seulement l'etat). */
+  async fermerListe(): Promise<void> {
+    await this.modaleListe()?.dismiss();
     this.liste.set(null);
-    this.router.navigate(['/tabs/eleves', e.eleve_id]);
+  }
+
+  /** Eleve de la liste : son inscription de l'annee (dossier si le poste n'a pas les inscriptions). */
+  async ouvrirEleve(e: EleveInscrit): Promise<void> {
+    await this.fermerListe();
+    if (this.auth.aPermission('inscriptions.gerer')) {
+      this.router.navigate(['/tabs/inscriptions', e.inscription_id]);
+    } else {
+      this.router.navigate(['/tabs/eleves', e.eleve_id]);
+    }
   }
 
   async imprimer(general = false): Promise<void> {
@@ -302,7 +380,7 @@ export class PointPage {
   // ------------------------------------------------ Affichage
 
   v(p: Point, l: LignePoint, c: ColonnePoint): string {
-    const n = l[c].toLocaleString('fr-FR');
+    const n = (l[c] ?? 0).toLocaleString('fr-FR');
     return (l.unite ?? p.unite) === 'montant' ? n + ' F' : n;
   }
 
@@ -313,6 +391,7 @@ export class PointPage {
   /** L'oeil n'a de sens que pour les lignes d'eleves ou d'encaissements. */
   oeil(s: SectionPoint, l: LignePoint | null): boolean {
     if (this.mode === 'inscriptions') return true;
+    if (this.mode !== 'dettes') return false;
     if (s.cle === 'encaisse' || s.cle.startsWith('caissier-')) return l === null;
     return l === null;
   }

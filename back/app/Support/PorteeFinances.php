@@ -11,6 +11,18 @@ use Illuminate\Http\Request;
  */
 class PorteeFinances
 {
+    /**
+     * Montants de l'ecole (caisse, recettes, restes a payer) : reserves aux
+     * postes financiers, comme en V1 (le directeur des etudes, l'informaticien
+     * ou le correspondant fichier ont des rapports, mais sans les finances).
+     */
+    public static function voitMontants(Request $request): bool
+    {
+        $user = $request->user();
+
+        return $user->can('reglements.voir') || $user->can('depenses.voir');
+    }
+
     /** @return list<int>|null ids des eleves du parent connecte, null si le poste n'est pas "parent" */
     public static function elevesDuParent(Request $request): ?array
     {

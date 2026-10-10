@@ -177,7 +177,7 @@ export class AssistantComponent {
       liste = null;
     };
     for (const brute of lignes) {
-      const ligne = brute.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      const ligne = brute.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/(^|\s)_([^_\n]+)_(?=$|[\s.,;:!?])/g, '$1<em>$2</em>');
       const numero = ligne.match(/^\s*\d+[.)]\s+(.*)$/);
       const puce = ligne.match(/^\s*[-•*]\s+(.*)$/);
       if (numero) {

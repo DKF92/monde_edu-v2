@@ -25,6 +25,7 @@ import {
   cashOutline,
   callOutline,
   personOutline,
+  receiptOutline,
 } from 'ionicons/icons';
 import { InscriptionService } from '../../core/services/inscription.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -37,7 +38,6 @@ import {
   ResultatEnLigne,
   TONS_STATUT,
 } from '../../core/models/inscription.model';
-import { imprimerFicheInscription } from './fiche-inscription';
 import { OptionSelecteur, SelecteurComponent } from '../../shared/selecteur.component';
 import { RecuEnLigneComponent } from './recu-en-ligne.component';
 import { calculerEcarts } from './en-ligne';
@@ -58,6 +58,8 @@ export class InscriptionDetailPage implements OnInit {
   private readonly toasts = inject(ToastController);
   private readonly auth = inject(AuthService);
   readonly peutEncaisser = computed(() => this.auth.aPermission('reglements.encaisser'));
+  /** Sans ce droit (inscriptions.voir seul, comptable) : consultation seule. */
+  readonly peutGerer = computed(() => this.auth.aPermission('inscriptions.gerer'));
   readonly router = inject(Router);
 
   readonly libellesStatut = LIBELLES_STATUT;
@@ -72,6 +74,7 @@ export class InscriptionDetailPage implements OnInit {
   readonly action = signal<string | null>(null);
   /** Arrivee juste apres l'enregistrement d'une nouvelle inscription. */
   readonly nouvelle = signal(false);
+  readonly impressionFiche = signal(false);
 
   readonly modaleClasse = signal(false);
   readonly classeChoisie = signal<number | null>(null);
@@ -123,6 +126,7 @@ export class InscriptionDetailPage implements OnInit {
   constructor() {
     addIcons({
       chevronBackOutline,
+      receiptOutline,
       createOutline,
       printOutline,
       closeCircleOutline,
@@ -177,10 +181,10 @@ export class InscriptionDetailPage implements OnInit {
     this.router.navigate(['/tabs/inscriptions', this.detail()!.id, 'modifier']);
   }
 
-  imprimer(): void {
-    if (!imprimerFicheInscription(this.detail()!)) {
-      this.notifier('Autorisez les fenêtres (pop-up) pour imprimer la fiche.', true);
-    }
+  async imprimer(): Promise<void> {
+    this.impressionFiche.set(true);
+    await this.service.imprimerFiche(this.detail()!);
+    this.impressionFiche.set(false);
   }
 
   // ------------------------------------------------ Classe

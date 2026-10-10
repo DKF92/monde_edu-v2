@@ -5,16 +5,20 @@ use App\Http\Controllers\Api\ArretNoteController;
 use App\Http\Controllers\Api\AssistantController;
 use App\Http\Controllers\Api\AnneeScolaireGestionController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BanqueController;
 use App\Http\Controllers\Api\CaisseController;
 use App\Http\Controllers\Api\ClasseController;
 use App\Http\Controllers\Api\AbsenceController;
 use App\Http\Controllers\Api\MatiereController;
+use App\Http\Controllers\Api\MigrationV1Controller;
+use App\Http\Controllers\Api\MiseAJourEnLigneController;
 use App\Http\Controllers\Api\NoteController;
 use App\Http\Controllers\Api\RapportCompileController;
 use App\Http\Controllers\Api\RapportController;
 use App\Http\Controllers\Api\RapportPersonnaliseController;
 use App\Http\Controllers\Api\ResultatController;
 use App\Http\Controllers\Api\DepenseController;
+use App\Http\Controllers\Api\EntreeController;
 use App\Http\Controllers\Api\ResteAPayerController;
 use App\Http\Controllers\Api\ContexteController;
 use App\Http\Controllers\Api\DashboardController;
@@ -29,11 +33,25 @@ use App\Http\Controllers\Api\PointController;
 use App\Http\Controllers\Api\ReductionController;
 use App\Http\Controllers\Api\PosteController;
 use App\Http\Controllers\Api\SmsController;
+use App\Http\Controllers\Api\SyncController;
+use App\Http\Controllers\Api\SynchronisationController;
 use App\Http\Controllers\Api\UtilisateurController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/etablissements', [EtablissementController::class, 'index']);
+// Synchronisation (serveur en ligne, appele par l'ecole avec la cle partagee).
+Route::get('/sync/journal', [SyncController::class, 'journal']);
+Route::post('/sync/recevoir', [SyncController::class, 'recevoir']);
+Route::post('/sync/fichiers/verifier', [SyncController::class, 'verifierFichiers']);
+Route::post('/sync/fichier', [SyncController::class, 'recevoirFichier']);
+
+// Disponibilite et role du serveur (choix en ligne / local par l'application).
+Route::get('/ping', fn () => response()->json(['ok' => true, 'role' => config('serveur.role')]))->middleware('throttle:120,1');
 Route::post('/login', [AuthController::class, 'login']);
+
+// Suivi d'une migration V1 en cours (cle donnee au lancement : la session
+// peut disparaitre quand l'application bascule sur la nouvelle base).
+Route::get('/migration-v1/suivi/{cle}', [MigrationV1Controller::class, 'suivi'])->where('cle', '[A-Za-z0-9]{40}')->middleware('throttle:120,1');
 
 // Premiere connexion (mot de passe provisoire) ou changement volontaire.
 Route::post('/mot-de-passe', [AuthController::class, 'changerMotDePasse'])->middleware(['auth:sanctum', 'throttle:10,1']);
@@ -59,6 +77,7 @@ Route::middleware(['auth:sanctum', 'mot-de-passe-definitif', 'etablissement', 'p
     Route::get('/caisse/bilan/pdf', [CaisseController::class, 'bilanPdf']);
     Route::get('/caisse/bilan/general/pdf', [CaisseController::class, 'bilanGeneralPdf']);
     Route::get('/reglements', [CaisseController::class, 'journal']);
+    Route::get('/reglements/document', [CaisseController::class, 'journalDocument']);
     // Matieres et coefficients (matieres.gerer), professeurs des classes.
     Route::get('/matieres', [MatiereController::class, 'index']);
     Route::post('/matieres', [MatiereController::class, 'store']);
@@ -97,6 +116,18 @@ Route::middleware(['auth:sanctum', 'mot-de-passe-definitif', 'etablissement', 'p
 
     // Assistant de support (tous les postes, consultation seule).
     Route::get('/assistant', [AssistantController::class, 'etat']);
+
+    // Synchronisation : saisies refusees a l'ecole, etat, lancement (administrateur).
+    Route::get('/sync/rejets', [SynchronisationController::class, 'rejets']);
+    Route::patch('/sync/rejets/{id}/vu', [SynchronisationController::class, 'marquerVu'])->whereNumber('id');
+    Route::get('/sync/etat', [SynchronisationController::class, 'etat']);
+    Route::post('/sync/lancer', [SynchronisationController::class, 'lancer']);
+
+    // Migration V1 et base utilisee par l'application (Super admin).
+    Route::get('/migration-v1', [MigrationV1Controller::class, 'etat']);
+    Route::post('/migration-v1/lancer', [MigrationV1Controller::class, 'lancer']);
+    Route::post('/migration-v1/basculer', [MigrationV1Controller::class, 'basculer']);
+    Route::get('/migration-v1/fichiers/{nom}', [MigrationV1Controller::class, 'fichier']);
     Route::post('/assistant/messages', [AssistantController::class, 'repondre'])->middleware('throttle:30,1');
 
     // Rapports (rapports.voir).
@@ -112,6 +143,8 @@ Route::middleware(['auth:sanctum', 'mot-de-passe-definitif', 'etablissement', 'p
     Route::post('/rapports/personnalises', [RapportPersonnaliseController::class, 'store']);
     Route::put('/rapports/personnalises/{id}', [RapportPersonnaliseController::class, 'update']);
     Route::delete('/rapports/personnalises/{id}', [RapportPersonnaliseController::class, 'destroy']);
+    // Bilan financier general (menu Bilans) : toutes les sections a l'ecran.
+    Route::get('/bilan-financier', [RapportController::class, 'bilanFinancierComplet']);
     Route::get('/rapports/{code}', [RapportController::class, 'show'])->where('code', '[a-z_]+');
     Route::get('/rapports/{code}/document', [RapportController::class, 'document'])->where('code', '[a-z_]+');
 
@@ -127,6 +160,11 @@ Route::middleware(['auth:sanctum', 'mot-de-passe-definitif', 'etablissement', 'p
     Route::delete('/classes/{id}', [ClasseController::class, 'destroy'])->whereNumber('id');
 
     // Depenses (depenses.gerer / depenses.voir / depenses.modifier).
+    Route::get('/banques', [BanqueController::class, 'index']);
+    Route::post('/banques', [BanqueController::class, 'store']);
+    Route::put('/banques/{id}', [BanqueController::class, 'update'])->whereNumber('id');
+    Route::delete('/banques/{id}', [BanqueController::class, 'destroy'])->whereNumber('id');
+    Route::get('/depenses/options', [DepenseController::class, 'options']);
     Route::get('/depenses', [DepenseController::class, 'index']);
     Route::get('/depenses/document', [DepenseController::class, 'document']);
     Route::get('/depenses/point', [DepenseController::class, 'point']);
@@ -136,9 +174,18 @@ Route::middleware(['auth:sanctum', 'mot-de-passe-definitif', 'etablissement', 'p
     // POST (multipart) : un nouveau justificatif peut accompagner la modification.
     Route::post('/depenses/{id}', [DepenseController::class, 'update'])->whereNumber('id');
     Route::delete('/depenses/{id}', [DepenseController::class, 'destroy'])->whereNumber('id');
+    // Entrees (entrees.gerer / entrees.voir / entrees.modifier) : banque saisie, caisse = paiements.
+    Route::get('/entrees/options', [EntreeController::class, 'options']);
+    Route::get('/entrees', [EntreeController::class, 'index']);
+    Route::get('/entrees/document', [EntreeController::class, 'document']);
+    Route::post('/entrees', [EntreeController::class, 'store']);
+    Route::get('/entrees/{id}', [EntreeController::class, 'show'])->whereNumber('id');
+    // POST (multipart) : un nouveau justificatif peut accompagner la modification.
+    Route::post('/entrees/{id}', [EntreeController::class, 'update'])->whereNumber('id');
+    Route::delete('/entrees/{id}', [EntreeController::class, 'destroy'])->whereNumber('id');
     Route::get('/reste-a-payer', [ResteAPayerController::class, 'index']);
     Route::get('/reste-a-payer/document', [ResteAPayerController::class, 'document']);
-    // Reductions et cas sociaux (reductions.gerer).
+    // Reductions et cas sociaux (reductions.voir : consulter ; reductions.gerer : accorder).
     Route::get('/reductions', [ReductionController::class, 'index']);
     Route::get('/reductions/document', [ReductionController::class, 'document']);
     Route::get('/reductions/eleve', [ReductionController::class, 'eleve']);
@@ -151,6 +198,13 @@ Route::middleware(['auth:sanctum', 'mot-de-passe-definitif', 'etablissement', 'p
     Route::get('/points/inscriptions/eleves', [PointController::class, 'inscriptionsEleves']);
     Route::get('/points/dettes', [PointController::class, 'dettes']);
     Route::get('/points/dettes/document', [PointController::class, 'dettesDocument']);
+    // Points des reductions, des depenses et des entrees (menu Bilans).
+    Route::get('/points/reductions', [PointController::class, 'reductions']);
+    Route::get('/points/reductions/document', [PointController::class, 'reductionsDocument']);
+    Route::get('/points/depenses', [PointController::class, 'depenses']);
+    Route::get('/points/depenses/document', [PointController::class, 'depensesDocument']);
+    Route::get('/points/entrees', [PointController::class, 'entrees']);
+    Route::get('/points/entrees/document', [PointController::class, 'entreesDocument']);
     Route::get('/dettes', [ResteAPayerController::class, 'dettes']);
     Route::get('/dettes/document', [ResteAPayerController::class, 'documentDettes']);
     Route::get('/reglements/{id}', [CaisseController::class, 'show'])->whereNumber('id');
@@ -160,6 +214,13 @@ Route::middleware(['auth:sanctum', 'mot-de-passe-definitif', 'etablissement', 'p
 
     // Inscriptions (droit inscriptions.gerer).
     Route::get('/inscriptions', [InscriptionController::class, 'index']);
+    // Mises a jour depuis l'inscription en ligne (journal, elements en attente).
+    Route::get('/inscriptions/mises-a-jour', [MiseAJourEnLigneController::class, 'index']);
+    Route::post('/inscriptions/mises-a-jour/{id}/supprimer-paiements', [MiseAJourEnLigneController::class, 'supprimerPaiements'])->whereNumber('id');
+    // « Mettre a jour » en arriere-plan sur le serveur (continue hors de la page).
+    Route::post('/inscriptions/en-ligne/mise-a-jour/lancer', [MiseAJourEnLigneController::class, 'lancer']);
+    Route::get('/inscriptions/en-ligne/mise-a-jour/etat', [MiseAJourEnLigneController::class, 'etat']);
+    Route::post('/inscriptions/en-ligne/mise-a-jour/arreter', [MiseAJourEnLigneController::class, 'arreter']);
     Route::get('/inscriptions/options', [InscriptionController::class, 'options']);
     Route::get('/inscriptions/apercu-frais', [InscriptionController::class, 'apercuFrais']);
     Route::get('/inscriptions/matricule/{matricule}', [InscriptionController::class, 'rechercher']);
@@ -167,6 +228,7 @@ Route::middleware(['auth:sanctum', 'mot-de-passe-definitif', 'etablissement', 'p
     Route::post('/inscriptions/en-ligne/mise-a-jour', [InscriptionController::class, 'miseAJourEnLigne']);
     Route::post('/inscriptions', [InscriptionController::class, 'store']);
     Route::get('/inscriptions/{id}', [InscriptionController::class, 'show'])->whereNumber('id');
+    Route::get('/inscriptions/{id}/fiche', [InscriptionController::class, 'fiche'])->whereNumber('id');
     Route::put('/inscriptions/{id}', [InscriptionController::class, 'update'])->whereNumber('id');
     Route::patch('/inscriptions/{id}/classe', [InscriptionController::class, 'changerClasse'])->whereNumber('id');
     Route::patch('/inscriptions/{id}/fournitures', [InscriptionController::class, 'fournitures'])->whereNumber('id');
@@ -194,7 +256,11 @@ Route::middleware(['auth:sanctum', 'mot-de-passe-definitif', 'etablissement', 'p
     Route::put('/parametres/classes', [ParametreController::class, 'enregistrerClasses']);
     Route::get('/parametres/inscriptions', [ParametreController::class, 'inscriptions']);
     Route::put('/parametres/inscriptions', [ParametreController::class, 'enregistrerInscriptions']);
+    Route::get('/parametres/dettes', [ParametreController::class, 'dettes']);
+    Route::put('/parametres/dettes', [ParametreController::class, 'enregistrerDettes']);
     Route::get('/parametres/paiements/tarifs', [ParametrePaiementController::class, 'tarifs']);
+    Route::get('/parametres/paiements/recu', [ParametrePaiementController::class, 'recu']);
+    Route::put('/parametres/paiements/recu', [ParametrePaiementController::class, 'enregistrerRecu']);
     Route::put('/parametres/paiements/tarifs/{niveau}', [ParametrePaiementController::class, 'enregistrerTarif'])->whereNumber('niveau');
     Route::post('/parametres/paiements/types-frais', [ParametrePaiementController::class, 'creerTypeFrais']);
     Route::put('/parametres/paiements/types-frais/ordre', [ParametrePaiementController::class, 'ordonnerTypesFrais']);

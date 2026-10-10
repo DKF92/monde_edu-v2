@@ -1,0 +1,45 @@
+// Complete depenses.page.scss : bloc « Entrees caisse » (total par caissier).
+$tableau: 760px;
+
+.caisse-entrees {
+  margin-bottom: 16px;
+
+  .titre-tableau h2 {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+
+    ion-icon {
+      color: var(--me-vert);
+    }
+  }
+
+  .me-lien {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+.tableau-caisse .ligne {
+  @container (min-width: #{$tableau}) {
+    grid-template-columns: minmax(200px, 2fr) 100px 140px 120px 140px 56px;
+  }
+
+  .cellule.a-droite {
+    @container (min-width: #{$tableau}) {
+      justify-content: flex-end;
+    }
+  }
+}
+
+.tableau-caisse .ligne-total {
+  margin-top: 4px;
+  background: var(--me-survol);
+  font-weight: 700;
+
+  .cellule,
+  strong {
+    font-weight: 800;
+  }
+}

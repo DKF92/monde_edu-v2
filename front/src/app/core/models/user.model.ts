@@ -51,6 +51,8 @@ export interface Periode {
 export interface Poste {
   id: number;
   nom: string;
+  /** Code des postes standard (ex : super_admin), null pour un poste cree par l'ecole. */
+  code?: string | null;
   permissions: string[];
 }
 
@@ -59,6 +61,8 @@ export interface ContexteEtablissement {
   etablissement: Etablissement;
   annees: (AnneeScolaire & { periodes: Periode[] })[];
   postes: Poste[];
+  /** Serveur de l'ecole (reseau local), utilise sans internet. */
+  serveur_local?: string | null;
 }
 
 /** Droit (attribuable a n'importe quel poste) de choisir la periode

@@ -1,5 +1,6 @@
-{{-- Liste(s) de classe : une classe par page, en-tete officiel repete, effectifs au-dessus du tableau. --}}
-@php $statuts = [1 => 'Attente 1er vers.', 2 => 'Attente solde', 3 => 'Soldé']; @endphp
+{{-- Liste(s) de classe, A4 portrait : une classe par page, en-tete officiel repete,
+     effectifs au-dessus du tableau. Colonnes : matricule, nom et prenoms, sexe,
+     statut (affecte), redoublant, note / moyenne (a remplir). --}}
 <!doctype html>
 <html lang="fr">
 <head>
@@ -17,12 +18,16 @@
   .encadrement td { font-size: 8.5pt; color: #56607a; padding: 2pt 4pt; }
   .encadrement strong { color: #1d2433; }
   .liste { width: 100%; border-collapse: collapse; margin-top: 3mm; }
-  .liste th { background: #eef2fa; color: #1b2f5e; font-size: 7.2pt; text-transform: uppercase; padding: 4pt 3pt; text-align: center; border: 0.5pt solid #d9deea; }
+  .liste th { background: #eef2fa; color: #1b2f5e; font-size: 7.2pt; padding: 4pt 2pt; text-align: center; border: 0.5pt solid #d9deea; }
   .liste th.g, .liste td.g { text-align: left; }
-  .liste td { font-size: 8.5pt; padding: 3.5pt 3pt; border: 0.5pt solid #e3e7f0; text-align: center; }
+  .liste td { font-size: 7.2pt; padding: 3.5pt 2pt; border: 0.5pt solid #e3e7f0; text-align: center; }
   .liste tr { page-break-inside: avoid; }
   .liste tr:nth-child(even) td { background: #fafbfd; }
-  .liste .nw { white-space: nowrap; }
+  .liste .nw { white-space: nowrap; overflow: hidden; }
+  /* Largeurs sur les en-tetes (dompdf ignore <col>), hors padding de 1.4 mm : colonnes courtes au plus juste,
+     le reste (98 mm sur 186) pour le nom et les prenoms, toujours sur une ligne. */
+  .c-num { width: 5.6mm; } .c-mat { width: 15.6mm; } .c-sexe { width: 7.6mm; } .c-statut { width: 15.6mm; }
+  .c-red { width: 16.6mm; } .c-note { width: 18.6mm; }
 </style>
 </head>
 <body>
@@ -58,36 +63,28 @@
     <table class="liste">
       <thead>
         <tr>
-          <th>N°</th>
-          <th class="g">Matricule</th>
-          <th class="g">Nom</th>
-          <th class="g">Prénoms</th>
-          <th>Sexe</th>
-          <th>Né(e) le</th>
-          <th class="g">Lieu de naissance</th>
-          <th>Statut</th>
-          <th>Red.</th>
-          <th>LV2</th>
-          <th>Paiement</th>
+          <th class="c-num">N°</th>
+          <th class="g c-mat">Matricule</th>
+          <th class="g">Nom et prénoms</th>
+          <th class="c-sexe">Sexe</th>
+          <th class="c-statut">Statut</th>
+          <th class="c-red">Redoublant</th>
+          <th class="c-note">Note / Moyenne</th>
         </tr>
       </thead>
       <tbody>
         @forelse ($liste as $e)
           <tr>
             <td>{{ $loop->iteration }}</td>
-            <td class="g">{{ $e['matricule'] }}</td>
-            <td class="g"><strong>{{ $e['nom'] }}</strong></td>
-            <td class="g">{{ $e['prenoms'] }}</td>
+            <td class="g nw">{{ $e['matricule'] }}</td>
+            <td class="g nw"><strong>{{ $e['nom'] }}</strong> {{ \App\Support\Noms::ajuster((string) $e['nom'], $e['prenoms'], 96, 7.2, true) }}</td>
             <td>{{ $e['sexe'] === 'F' ? 'F' : 'G' }}</td>
-            <td>{{ $e['date_naissance'] ? \Illuminate\Support\Carbon::parse($e['date_naissance'])->format('d/m/Y') : '' }}</td>
-            <td class="g">{{ $e['lieu_naissance'] }}</td>
-            <td class="nw">{{ $e['affecte'] ? 'Affecté' : 'Non aff.' }}</td>
-            <td>{{ $e['redoublant'] ? 'Oui' : '' }}</td>
-            <td>{{ $e['langue_vivante_2'] }}</td>
-            <td class="nw">{{ $statuts[$e['statut']] ?? '' }}</td>
+            <td class="nw">{{ $e['affecte'] ? 'Affecté' : 'Non affecté' }}</td>
+            <td>{{ $e['redoublant'] ? 'Oui' : 'Non' }}</td>
+            <td></td>
           </tr>
         @empty
-          <tr><td colspan="11">Aucun élève.</td></tr>
+          <tr><td colspan="7">Aucun élève.</td></tr>
         @endforelse
       </tbody>
     </table>

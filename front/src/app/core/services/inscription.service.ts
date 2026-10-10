@@ -2,7 +2,11 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { DocumentService } from './document.service';
 import {
+  EtatScanEnLigne,
+  MiseAJourEnLigne,
+  PageMisesAJourEnLigne,
   ApercuFrais,
   DetailInscription,
   LotMiseAJourEnLigne,
@@ -24,12 +28,15 @@ export interface FiltresInscriptions {
   affecte?: boolean | null;
   redoublant?: boolean | null;
   en_ligne?: boolean | null;
+  sexe?: 'M' | 'F' | null;
+  photo?: boolean | null;
 }
 
 /** Inscriptions de l'annee de travail (droit inscriptions.gerer). */
 @Injectable({ providedIn: 'root' })
 export class InscriptionService {
   private readonly http = inject(HttpClient);
+  private readonly documents = inject(DocumentService);
   private readonly url = `${environment.apiUrl}/inscriptions`;
 
   lister(filtres: FiltresInscriptions): Observable<PageInscriptions> {
@@ -41,6 +48,8 @@ export class InscriptionService {
     if (filtres.affecte !== null && filtres.affecte !== undefined) params = params.set('affecte', filtres.affecte ? 1 : 0);
     if (filtres.redoublant !== null && filtres.redoublant !== undefined) params = params.set('redoublant', filtres.redoublant ? 1 : 0);
     if (filtres.en_ligne !== null && filtres.en_ligne !== undefined) params = params.set('en_ligne', filtres.en_ligne ? 1 : 0);
+    if (filtres.sexe) params = params.set('sexe', filtres.sexe);
+    if (filtres.photo !== null && filtres.photo !== undefined) params = params.set('photo', filtres.photo ? 1 : 0);
     return this.http.get<PageInscriptions>(this.url, { params });
   }
 
@@ -91,9 +100,43 @@ export class InscriptionService {
     return this.http.post<LotMiseAJourEnLigne>(`${this.url}/en-ligne/mise-a-jour`, { apres_id: apresId });
   }
 
+  /** Scan « Mettre a jour » en arriere-plan sur le serveur : lancement, etat, arret. */
+  lancerScanEnLigne(): Observable<EtatScanEnLigne> {
+    return this.http.post<{ data: EtatScanEnLigne }>(`${this.url}/en-ligne/mise-a-jour/lancer`, {}).pipe(map((r) => r.data));
+  }
+
+  etatScanEnLigne(): Observable<EtatScanEnLigne> {
+    return this.http.get<{ data: EtatScanEnLigne }>(`${this.url}/en-ligne/mise-a-jour/etat`).pipe(map((r) => r.data));
+  }
+
+  arreterScanEnLigne(): Observable<EtatScanEnLigne> {
+    return this.http.post<{ data: EtatScanEnLigne }>(`${this.url}/en-ligne/mise-a-jour/arreter`, {}).pipe(map((r) => r.data));
+  }
+
+  /** Journal des mises a jour en ligne (etat : a_traiter, introuvables ou toutes). */
+  misesAJour(filtres: { etat: 'a_traiter' | 'introuvables' | 'toutes'; recherche?: string; page?: number; par_page?: number }): Observable<PageMisesAJourEnLigne> {
+    let params = new HttpParams().set('etat', filtres.etat).set('page', filtres.page ?? 1).set('par_page', filtres.par_page ?? 20);
+    if (filtres.recherche?.trim()) params = params.set('recherche', filtres.recherche.trim());
+    return this.http.get<PageMisesAJourEnLigne>(`${this.url}/mises-a-jour`, { params });
+  }
+
+  /** Caissier : supprime les paiements d'une inscription en attente (statut > 1). */
+  supprimerPaiementsMiseAJour(id: number, motif: string): Observable<{ message: string; data: MiseAJourEnLigne }> {
+    return this.http.post<{ message: string; data: MiseAJourEnLigne }>(`${this.url}/mises-a-jour/${id}/supprimer-paiements`, { motif });
+  }
+
   envoyerPhoto(id: number, fichier: File): Observable<DetailInscription> {
     const donnees = new FormData();
     donnees.append('photo', fichier);
     return this.http.post<{ data: DetailInscription }>(`${this.url}/${id}/photo`, donnees).pipe(map((r) => r.data));
+  }
+
+  /** Fiche d'inscription (PDF genere par l'API, en-tete officiel) dans la visionneuse. */
+  imprimerFiche(d: DetailInscription): Promise<void> {
+    return this.documents.afficher({
+      titre: `Fiche d'inscription ${d.eleve.nom} ${d.eleve.prenoms}`,
+      chemin: `/inscriptions/${d.id}/fiche`,
+      nomFichier: `fiche-inscription-${d.eleve.matricule}`,
+    });
   }
 }

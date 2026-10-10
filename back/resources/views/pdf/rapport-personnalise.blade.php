@@ -11,6 +11,15 @@
   };
   $classe = fn ($c) => match ($c['type'] ?? 'texte') { 'moyenne', 'montant', 'nombre' => 'd', 'centre' => 'c', 'libre' => 'libre', default => 'g' };
   $nb = count($rapport['colonnes']);
+  // Colonne du nom : largeur fixe, derniers prenoms abreges s'ils debordent (paysage au-dela de 7 colonnes).
+  $largeurNom = min(70, max(38, (($nb > 7 ? 277 : 190) / max($nb, 1)) * 2));
+  $tailleTexte = $nb > 9 ? 7.4 : 8.6;
+  $estNom = fn ($c) => in_array($c['cle'], ['prenoms', 'nom_prenoms'], true);
+  $cellule = fn ($l, $c) => match ($c['cle']) {
+      'prenoms' => \App\Support\Noms::prenoms($l['prenoms'] ?? '', $largeurNom - 2.2, $tailleTexte),
+      'nom_prenoms' => \App\Support\Noms::complet($l['nom'] ?? '', $l['prenoms'] ?? '', $largeurNom - 2.2, $tailleTexte),
+      default => $valeur($l, $c),
+  };
 @endphp
 <!doctype html>
 <html lang="fr">
@@ -45,11 +54,11 @@
     <div class="effectif">Effectif : <strong>{{ $g['effectif'] }}</strong> · Filles : {{ $g['filles'] }} · Garçons : {{ $g['garcons'] }}</div>
     <table class="tab">
       <thead>
-        <tr>@foreach ($rapport['colonnes'] as $c)<th class="{{ $classe($c) === 'libre' ? 'c' : $classe($c) }}">{{ $c['libelle'] }}</th>@endforeach</tr>
+        <tr>@foreach ($rapport['colonnes'] as $c)<th class="{{ $classe($c) === 'libre' ? 'c' : $classe($c) }}" @if ($estNom($c)) style="width: {{ $largeurNom }}mm" @endif>{{ $c['libelle'] }}</th>@endforeach</tr>
       </thead>
       <tbody>
         @foreach ($g['lignes'] as $l)
-          <tr>@foreach ($rapport['colonnes'] as $c)<td class="{{ $classe($c) }}">{{ $valeur($l, $c) }}</td>@endforeach</tr>
+          <tr>@foreach ($rapport['colonnes'] as $c)<td class="{{ $classe($c) }}" @if ($estNom($c)) style="white-space: nowrap" @endif>{{ $cellule($l, $c) }}</td>@endforeach</tr>
         @endforeach
       </tbody>
     </table>

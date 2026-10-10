@@ -10,18 +10,26 @@
       <div>
         @if (peutEncaisser()) {
           <button type="button" class="me-retour" (click)="router.navigateByUrl('/tabs/paiements')">
-            <ion-icon name="chevron-back-outline"></ion-icon> Caisse
+            <ion-icon name="chevron-back-outline"></ion-icon> Point paiements
           </button>
         }
         <h1>{{ mesEncaissements() ? 'Mes encaissements' : 'Paiements' }}</h1>
         <p>Liste des paiements de l'année scolaire en cours : reçus, totaux par mode de paiement.</p>
       </div>
-      @if (peutEncaisser()) {
-        <button type="button" class="me-bouton-principal" (click)="encaisser()">
-          <ion-icon name="cash-outline"></ion-icon>
-          <span>Encaisser</span>
-        </button>
-      }
+      <div class="actions-entete">
+        @if (peutVoir()) {
+          <button type="button" class="me-bouton-secondaire" (click)="imprimerListe()" [disabled]="impression()">
+            @if (impression()) { <ion-spinner name="dots"></ion-spinner> } @else { <ion-icon name="print-outline"></ion-icon> }
+            <span>Imprimer</span>
+          </button>
+        }
+        @if (peutEncaisser()) {
+          <button type="button" class="me-bouton-principal" (click)="encaisser()">
+            <ion-icon name="cash-outline"></ion-icon>
+            <span>Encaisser</span>
+          </button>
+        }
+      </div>
     </header>
 
     @if (cellule() || titreBilan()) {

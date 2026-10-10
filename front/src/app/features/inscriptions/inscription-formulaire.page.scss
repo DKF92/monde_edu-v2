@@ -147,8 +147,20 @@
     min-width: 136px;
   }
 
+  // Telephone : champ et bouton l'un sous l'autre. Sans flex: none, le champ
+  // (flex: 1 en colonne) etait ecrase a ~20px de haut.
   @media (max-width: 479px) {
     flex-direction: column;
+
+    .me-saisie {
+      flex: none;
+      height: 58px;
+      font-size: 20px;
+    }
+
+    .me-bouton-principal {
+      height: 52px;
+    }
   }
 }
 

@@ -67,6 +67,73 @@
       </ion-list>
     }
 
+    @if (installation.disponible()) {
+      <ion-list inset="true">
+        <ion-item button (click)="installation.afficher()">
+          <ion-icon slot="start" name="download-outline"></ion-icon>
+          <ion-label color="primary">Installer l'application</ion-label>
+        </ion-item>
+      </ion-list>
+    }
+
+    <!-- Connexion au serveur (en ligne / reseau de l'ecole / hors ligne) -->
+    <section class="serveur">
+      <h3>Connexion au serveur</h3>
+      <div class="etat" [class.hors]="reseau.horsLigne()">
+        <ion-icon [name]="reseau.horsLigne() ? 'cloud-offline-outline' : reseau.etat() === 'local' ? 'server-outline' : 'cloud-done-outline'"></ion-icon>
+        <div>
+          <strong>{{ reseau.libelle() }}</strong>
+          <small>{{ reseau.horsLigne() ? 'Derniers éléments consultés ; notes, absences et conduite gardées sur l\'appareil.' : reseau.base() }}</small>
+        </div>
+        <button type="button" class="verifier" aria-label="Vérifier la connexion" (click)="reseau.verifier()"><ion-icon name="refresh-outline"></ion-icon></button>
+      </div>
+      <div class="me-segments" role="radiogroup" aria-label="Serveur">
+        @for (m of modes; track m.valeur) {
+          <button type="button" role="radio" [attr.aria-checked]="reseau.mode() === m.valeur" [class.actif]="reseau.mode() === m.valeur"
+            [disabled]="m.valeur === 'local' && !reseau.serveurLocal()" (click)="reseau.choisirMode(m.valeur)">{{ m.libelle }}</button>
+        }
+      </div>
+      @if (reseau.etat() === 'en_ligne') {
+        <p class="aide">Serveur en ligne : notes, absences, conduite, rapports et assistant. Inscriptions, paiements, classes et comptes se font depuis l'école.</p>
+      }
+      <p class="aide">{{ reseau.serveurLocal() ? 'Serveur de l\'école : ' + reseau.serveurLocal() : 'Aucun serveur d\'école enregistré (Paramètres › Établissement).' }}</p>
+
+      @if (synchro.rejets().length) {
+        <h4>Saisies refusées par l'école</h4>
+        <ul class="saisies">
+          @for (r of synchro.rejets(); track r.id) {
+            <li class="refus">
+              <div>
+                <strong>{{ r.libelle }}</strong>
+                <small>{{ dateHeure(r.date) }} · {{ r.motif }}</small>
+              </div>
+              <button type="button" class="compris" (click)="synchro.marquerVu(r.id).subscribe()">J'ai compris</button>
+            </li>
+          }
+        </ul>
+      }
+
+      @if (file.elements().length) {
+        <h4>Saisies hors ligne</h4>
+        <ul class="saisies">
+          @for (s of file.elements(); track s.id) {
+            <li [class.refus]="s.statut === 'rejetee'">
+              <div>
+                <strong>{{ s.libelle }}</strong>
+                <small>{{ dateHeure(s.date) }} · {{ s.statut === 'rejetee' ? 'refusée : ' + s.erreur : 'en attente d\'envoi' }}</small>
+              </div>
+              @if (s.statut === 'rejetee') {
+                <button type="button" aria-label="Retirer" (click)="file.retirer(s.id)"><ion-icon name="trash-outline"></ion-icon></button>
+              }
+            </li>
+          }
+        </ul>
+        @if (file.enAttente() && reseau.connecte()) {
+          <button type="button" class="me-bouton-secondaire envoyer" [disabled]="file.envoi()" (click)="file.envoyer()">Envoyer maintenant</button>
+        }
+      }
+    </section>
+
     <div class="deconnexion">
       <ion-button expand="block" fill="outline" color="danger" (click)="seDeconnecter()">
         <ion-icon slot="start" name="log-out-outline"></ion-icon>

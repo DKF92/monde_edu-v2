@@ -36,7 +36,7 @@ class ParametreController extends Controller
             ->with('niveau:id,libelle,ordre')
             ->withCount(['inscriptions as effectif' => fn ($q) => $q->visiblesEnClasse()])
             ->get()
-            ->sortBy(fn (Classe $c) => sprintf('%03d-%s', $c->niveau->ordre, $c->libelle));
+            ->sortBy(fn (Classe $c) => sprintf('%03d-%s', $c->niveau->ordre, \App\Support\NomClasse::cleTri($c->libelle)));
 
         $niveaux = $classes->groupBy('niveau_id')->map(function ($classesDuNiveau) use ($limitesNiveaux) {
             $niveau = $classesDuNiveau->first()->niveau;
@@ -104,6 +104,7 @@ class ParametreController extends Controller
                 Classe::whereKey($classe['id'])->update(['capacite' => $classe['capacite'] ?? null]);
             }
         });
+        Classe::oublierLimites();
 
         return $this->classes($request, $tenant);
     }
@@ -151,6 +152,35 @@ class ParametreController extends Controller
         Etablissement::findOrFail($tenant->id())->definirParametres($data);
 
         return $this->inscriptions($request, $tenant);
+    }
+
+    /** Dettes : sur combien d'annees en arriere une dette est prise en compte (1 = seulement n-1). */
+    public function dettes(Request $request, TenantContext $tenant)
+    {
+        abort_unless($request->user()->can('tarifs.gerer'), 403);
+
+        $etablissement = Etablissement::findOrFail($tenant->id());
+        $anneeId = $this->anneeId($tenant);
+        $annees = \App\Models\Dette::anneesPrisesEnCompte($anneeId) ?? [];
+
+        return response()->json([
+            'dettes_annees' => max(1, (int) $etablissement->parametre('dettes_annees')),
+            'annee' => AnneeScolaire::find($anneeId)?->libelle,
+            'annees_prises_en_compte' => AnneeScolaire::whereIn('id', $annees)->orderByDesc('libelle')->pluck('libelle'),
+        ]);
+    }
+
+    public function enregistrerDettes(Request $request, TenantContext $tenant)
+    {
+        abort_unless($request->user()->can('tarifs.gerer'), 403);
+
+        $data = $request->validate(['dettes_annees' => ['required', 'integer', 'min:1', 'max:20']], [
+            'dettes_annees.min' => 'Au moins 1 année (le reste de l\'année précédente).',
+            'dettes_annees.max' => '20 années au plus.',
+        ]);
+        Etablissement::findOrFail($tenant->id())->definirParametres($data);
+
+        return $this->dettes($request, $tenant);
     }
 
     private function anneeId(TenantContext $tenant): ?int

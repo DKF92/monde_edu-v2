@@ -50,8 +50,10 @@ class Outils
                 'type' => 'object', 'properties' => ['classe' => ['type' => 'string']], 'required' => ['classe']]],
             ['name' => 'etat_notes', 'description' => 'État de la saisie des notes d\'une période : pour chaque classe, matières notées, nombre de notes, matières arrêtées, et si la période est clôturée.', 'input_schema' => [
                 'type' => 'object', 'properties' => ['periode' => ['type' => 'string', 'description' => 'Libellé de la période (ex. 1er trimestre) ; vide : période active']]]],
-            ['name' => 'parametres_ecole', 'description' => 'Réglages de l\'établissement : année et périodes (dates, clôture), versements, ordre de paiement des frais, numérotation des classes.', 'input_schema' => $vide],
+            ['name' => 'parametres_ecole', 'description' => 'Réglages réels de l\'établissement : année et périodes (dates, clôture, découpage), règles des versements, ordre de paiement, types de frais actifs (nature, affectés / non affectés), tarifs par niveau et statut avec le minimum d\'inscription, types de réductions, formats du matricule, inscription en ligne, affichage des élèves en classe, effectifs maximums, numérotation des classes, banques. À utiliser pour toute question sur les montants ou les règles propres à l\'école.', 'input_schema' => $vide],
             ['name' => 'statistiques', 'description' => 'Chiffres clés de l\'année : élèves, filles, affectés, classes, notes, absences et, avec le droit de voir les paiements, encaissements du jour et du mois et reste à recouvrer.', 'input_schema' => $vide],
+            ['name' => 'consulter_savoir', 'description' => 'Connaissance métier détaillée sur un thème (système éducatif ivoirien, statuts, calcul des moyennes, seuils des distinctions, règles de caisse, réductions, dettes, bonnes pratiques…), avec exemples chiffrés et portée (règle nationale, règle de l\'application ou réglage de l\'établissement). À consulter AVANT de répondre à toute question « pourquoi », « c\'est quoi », « comment est calculé », « quelle est la règle ».', 'input_schema' => [
+                'type' => 'object', 'properties' => ['theme' => ['type' => 'string', 'enum' => array_keys(Savoir::THEMES)]], 'required' => ['theme']]],
             ['name' => 'consulter_guide', 'description' => 'Fiche d\'aide détaillée d\'une tâche de l\'application (menu, étapes, conseils, droit nécessaire).', 'input_schema' => [
                 'type' => 'object', 'properties' => ['fiche' => ['type' => 'string', 'enum' => array_keys(Guide::FICHES)]], 'required' => ['fiche']]],
             ['name' => 'montrer_demo', 'description' => 'Affiche à l\'utilisateur la vidéo de démonstration d\'une tâche. À utiliser quand l\'utilisateur ne trouve pas comment faire ou le demande.', 'input_schema' => [
@@ -70,6 +72,7 @@ class Outils
             'parametres_ecole' => 'Consultation des paramètres…',
             'statistiques' => 'Consultation des chiffres de l\'année…',
             'consulter_guide' => 'Lecture du guide…',
+            'consulter_savoir' => 'Recherche dans les connaissances métier…',
             'montrer_demo' => 'Préparation de la démonstration…',
             default => 'Consultation…',
         };
@@ -87,6 +90,7 @@ class Outils
                 'parametres_ecole' => $this->parametresEcole(),
                 'statistiques' => $this->statistiques(),
                 'consulter_guide' => Guide::fiche((string) ($entree['fiche'] ?? '')) ?? ['erreur' => 'Fiche inconnue.'],
+                'consulter_savoir' => Savoir::theme((string) ($entree['theme'] ?? '')) ?? ['erreur' => 'Thème inconnu.'],
                 'montrer_demo' => isset(Guide::DEMOS[$entree['demo'] ?? '']) ? ['affichee' => true, 'titre' => Guide::DEMOS[$entree['demo']][0]] : ['erreur' => 'Démonstration inconnue.'],
                 default => ['erreur' => 'Outil inconnu.'],
             };
@@ -162,7 +166,7 @@ class Outils
             $du = (int) $ligne->montant_total_du;
             $reduit = (int) $ligne->montant_total_reduit;
             $paye = (int) $ligne->montant_total_paye;
-            $dettes = Dette::where('eleve_id', $ligne->eleve_id)->where('is_annulee', false)->get();
+            $dettes = Dette::where('eleve_id', $ligne->eleve_id)->where('is_annulee', false)->prisesEnCompte()->get();
             $dossier['finances'] = [
                 'montant_du' => $du, 'reduction' => $reduit, 'paye' => $paye, 'reste' => max(0, $du - $reduit - $paye),
                 'dettes_reste' => (int) $dettes->sum(fn (Dette $d) => max(0, $d->montant - $d->montant_reduit - $d->montant_paye)),
@@ -223,17 +227,60 @@ class Outils
         $e = Etablissement::findOrFail($this->tenant->id());
         $annee = AnneeScolaire::find($this->anneeId);
 
+        $periodes = Periode::where('annee_scolaire_id', $this->anneeId)->orderBy('numero')->get();
+        $frais = TypeFrais::where('is_active', true)->orderBy('ordre')->get();
+        $natures = ['inscription' => 'frais principal (inscription)', 'scolarite' => 'frais principal (scolarité)', 'annexe' => 'frais annexe', 'en_nature' => 'à apporter (en nature)', 'dette' => 'dette'];
+        $visible = ['classe_attribuee' => 'dès que la classe est attribuée', 'premier_paiement' => 'à partir du 1er paiement', 'solde' => 'une fois soldé'];
+
         return [
             'annee' => ['libelle' => $annee?->libelle, 'cloturee' => (bool) $annee?->is_cloturee],
-            'periodes' => Periode::where('annee_scolaire_id', $this->anneeId)->orderBy('numero')->get()
-                ->map(fn (Periode $p) => ['libelle' => $p->libelle, 'debut' => $p->date_debut?->format('d/m/Y'), 'fin' => $p->date_fin?->format('d/m/Y'),
-                    'active' => (bool) $p->is_active, 'cloturee' => (bool) $p->is_cloturee])->all(),
-            'versements_max' => $e->parametre('versements_max'),
-            'versement_minimum' => $e->parametre('versement_minimum'),
-            'numerotation_classes' => $e->parametre('numerotation_classes'),
-            'effectif_max_classe' => $e->parametre('effectif_max_classe'),
-            'ordre_de_paiement' => TypeFrais::orderBy('ordre')->pluck('libelle')->all(),
+            'decoupage' => $periodes->first()?->type_decoupage === 'semestre' ? 'semestres' : 'trimestres',
+            'periodes' => $periodes->map(fn (Periode $p) => ['libelle' => $p->libelle, 'debut' => $p->date_debut?->format('d/m/Y'), 'fin' => $p->date_fin?->format('d/m/Y'),
+                'active' => (bool) $p->is_active, 'cloturee' => (bool) $p->is_cloturee])->all(),
+            'versements' => [
+                'nombre_maximum' => (int) $e->parametre('versements_max'),
+                'minimum_apres_le_premier' => (int) $e->parametre('versement_minimum'),
+                'premier_versement' => 'au moins le minimum d\'inscription du niveau (voir tarifs)',
+            ],
+            'ordre_de_paiement' => TypeFrais::where('is_active', true)->whereNotIn('nature', ['en_nature', 'dette'])->orderBy('ordre')->pluck('libelle')->all(),
+            'types_de_frais_actifs' => $frais->map(fn (TypeFrais $t) => [
+                'libelle' => $t->libelle, 'nature' => $natures[$t->nature] ?? $t->nature, 'obligatoire' => (bool) $t->is_obligatoire,
+                'concerne' => $t->applicable_affecte && $t->applicable_non_affecte ? 'tous les élèves' : ($t->applicable_affecte ? 'affectés seulement' : 'non affectés seulement'),
+            ])->values()->all(),
+            'tarifs' => $this->tarifs($frais),
+            'types_de_reductions' => DB::table('types_reductions')->where('etablissement_id', $this->tenant->id())->where('is_active', true)->get()
+                ->map(fn ($r) => ['libelle' => $r->libelle, 'porte_sur' => $r->base === 'total' ? 'jusqu\'à la totalité des frais' : 'les frais principaux (inscription, scolarité)',
+                    'minimum' => (int) $r->montant_minimum, 'plafond_pourcentage' => $r->plafond_pourcentage])->values()->all(),
+            'inscriptions' => [
+                'formats_matricule' => $e->parametre('formats_matricule'),
+                'verification_inscription_en_ligne' => (bool) $e->parametre('verification_en_ligne'),
+                'eleve_visible_dans_sa_classe' => $visible[$e->parametre('statut_visible_classe')] ?? $e->parametre('statut_visible_classe'),
+            ],
+            'classes' => [
+                'numerotation' => $e->parametre('numerotation_classes') === 'lettres' ? 'lettres (6EME A)' : 'chiffres (6EME 1)',
+                'effectif_maximum_general' => $e->parametre('effectif_max_classe') ?: 'aucune limite générale',
+            ],
+            'banques' => $this->peut('depenses.gerer') || $this->peut('depenses.voir') || $this->peut('etablissement.gerer')
+                ? DB::table('banques')->where('etablissement_id', $this->tenant->id())->where('is_active', true)->orderBy('nom')->pluck('nom')->all()
+                : 'non communiqué pour votre poste',
+            'devise' => 'F CFA',
         ];
+    }
+
+    /** Tarifs de l'annee par niveau : total et minimum d'inscription, affectes / non affectes, detail par frais. */
+    private function tarifs($frais): array
+    {
+        $libelles = $frais->pluck('libelle', 'id');
+        $grilles = DB::table('grilles_tarifaires as g')->join('niveaux as n', 'n.id', '=', 'g.niveau_id')
+            ->where('g.etablissement_id', $this->tenant->id())->where('g.annee_scolaire_id', $this->anneeId)
+            ->orderBy('n.ordre')->get(['g.id', 'g.affecte', 'g.montant_minimum_inscription', 'n.libelle as niveau']);
+        $lignes = DB::table('grille_tarifaire_lignes')->whereIn('grille_tarifaire_id', $grilles->pluck('id'))->where('montant', '>', 0)->get()->groupBy('grille_tarifaire_id');
+
+        return $grilles->groupBy('niveau')->map(fn ($g) => $g->mapWithKeys(fn ($x) => [($x->affecte ? 'affecte' : 'non_affecte') => [
+            'total' => (int) ($lignes[$x->id] ?? collect())->sum('montant'),
+            'minimum_inscription' => (int) $x->montant_minimum_inscription,
+            'detail' => ($lignes[$x->id] ?? collect())->mapWithKeys(fn ($l) => [$libelles[$l->type_frais_id] ?? 'frais' => (int) $l->montant])->all(),
+        ]]))->all() ?: ['message' => 'Aucun tarif saisi pour cette année (Paramètres › Paramètres paiements).'];
     }
 
     private function statistiques(): array

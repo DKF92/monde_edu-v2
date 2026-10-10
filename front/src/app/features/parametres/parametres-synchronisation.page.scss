@@ -1,0 +1,54 @@
+.compteurs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+
+  .compteur {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+
+    > span:last-child {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    strong { font-size: 16px; }
+    small { color: var(--me-texte-doux); font-size: 12px; }
+  }
+}
+
+.erreur-synchro {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0 0 14px;
+}
+
+.rejets {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid var(--me-bordure);
+
+    div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    small { color: var(--me-texte-doux); font-size: 12px; }
+    &.vu { opacity: 0.65; }
+  }
+}
+
+.texte-doux { color: var(--me-texte-doux); margin: 8px 0 0; }
+
+.me-carte.bloc h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}

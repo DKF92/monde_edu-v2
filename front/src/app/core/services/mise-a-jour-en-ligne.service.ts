@@ -1,82 +1,97 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
-import { Subscription } from 'rxjs';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { InscriptionService } from './inscription.service';
-import { LigneMiseAJourEnLigne } from '../models/inscription.model';
+import { AuthService } from './auth.service';
+import { EtatScanEnLigne } from '../models/inscription.model';
 
 /**
- * "Mettre a jour" (liste des inscriptions) : toutes les inscriptions de
- * l'annee sans verification en ligne sont consultees sur le site de l'Etat,
- * lot par lot, en arriere-plan (le traitement continue si on change de page).
- * L'API met la base a jour directement quand le recu existe.
+ * "Mettre a jour" (liste des inscriptions) : le scan des inscriptions sur le
+ * site de l'Etat tourne sur le serveur (commande en arriere-plan). Il continue
+ * si l'on change de page, recharge ou ferme l'application ; ce service suit
+ * son etat (toutes les 2 s pendant qu'il tourne) pour l'indicateur affiche sur
+ * toutes les pages et le bilan de la liste des inscriptions.
  */
 @Injectable({ providedIn: 'root' })
 export class MiseAJourEnLigneService {
   private readonly inscriptions = inject(InscriptionService);
+  private readonly auth = inject(AuthService);
 
-  readonly enCours = signal(false);
-  /** Nombre d'inscriptions a verifier au lancement. */
-  readonly total = signal(0);
-  readonly traitees = signal<LigneMiseAJourEnLigne[]>([]);
-  readonly erreur = signal<string | null>(null);
-  readonly termine = signal(false);
-  /** Incremente a chaque lot qui a modifie des inscriptions : la liste se recharge. */
+  readonly etat = signal<EtatScanEnLigne | null>(null);
+  /** Bilan ferme par l'utilisateur (jusqu'au prochain lancement). */
+  private readonly bilanFerme = signal(false);
+  /** Incremente quand un scan se termine apres avoir trouve des recus : la liste se recharge. */
   readonly version = signal(0);
 
-  readonly trouvees = computed(() => this.traitees().filter((t) => t.trouve).length);
-  readonly avecRemarques = computed(() => this.traitees().filter((t) => t.remarques.length));
-  readonly progression = computed(() => (this.total() ? Math.min(100, Math.round((this.traitees().length / this.total()) * 100)) : 0));
+  readonly enCours = computed(() => !!this.etat()?.en_cours);
+  readonly termine = computed(() => !!this.etat() && !this.etat()!.en_cours && !!this.etat()!.debut && !this.bilanFerme());
+  readonly total = computed(() => this.etat()?.total ?? 0);
+  readonly nbTraitees = computed(() => this.etat()?.traitees ?? 0);
+  readonly trouvees = computed(() => this.etat()?.trouvees ?? 0);
+  readonly introuvables = computed(() => this.etat()?.introuvables ?? 0);
+  readonly erreur = computed(() => this.etat()?.erreur ?? null);
+  readonly avecRemarques = computed(() => (this.etat()?.dernieres ?? []).filter((t) => t.remarques.length && !t.introuvable));
+  readonly progression = computed(() => (this.total() ? Math.min(100, Math.round((this.nbTraitees() / this.total()) * 100)) : 0));
 
-  private abonnement?: Subscription;
+  private minuterie: ReturnType<typeof setTimeout> | null = null;
+  private dernierEtatEnCours = false;
 
-  demarrer(total: number): void {
-    if (this.enCours()) {
-      return;
-    }
-    this.total.set(total);
-    this.traitees.set([]);
-    this.erreur.set(null);
-    this.termine.set(false);
-    this.enCours.set(true);
-    this.lot(0);
+  constructor() {
+    // Connexion / changement d'etablissement : un scan peut deja tourner.
+    effect(() => {
+      if (this.auth.contexteComplet() && this.peutSuivre()) {
+        this.lire();
+      } else {
+        this.arreterSuivi();
+        this.etat.set(null);
+      }
+    }, { allowSignalWrites: true });
+  }
+
+  /** Postes qui voient les inscriptions ou les mises a jour. */
+  peutSuivre(): boolean {
+    return ['inscriptions.gerer', 'inscriptions.voir', 'reglements.voir', 'reglements.modifier'].some((p) => this.auth.aPermission(p));
+  }
+
+  demarrer(): void {
+    if (this.enCours()) return;
+    this.bilanFerme.set(false);
+    this.inscriptions.lancerScanEnLigne().subscribe({
+      next: (e) => this.recevoir(e),
+      error: () => this.etat.update((e) => ({ ...(e ?? ({} as EtatScanEnLigne)), en_cours: false, erreur: 'Lancement impossible. Vérifiez votre connexion puis relancez.' })),
+    });
   }
 
   arreter(): void {
-    this.abonnement?.unsubscribe();
-    this.enCours.set(false);
-    this.termine.set(true);
+    this.inscriptions.arreterScanEnLigne().subscribe({ next: (e) => this.recevoir(e), error: () => undefined });
   }
 
   /** Ferme le bilan affiche apres la fin. */
   effacer(): void {
-    if (!this.enCours()) {
-      this.termine.set(false);
-      this.traitees.set([]);
-      this.erreur.set(null);
+    if (!this.enCours()) this.bilanFerme.set(true);
+  }
+
+  private lire(): void {
+    this.inscriptions.etatScanEnLigne().subscribe({ next: (e) => this.recevoir(e), error: () => this.planifier() });
+  }
+
+  private recevoir(e: EtatScanEnLigne): void {
+    const finVientDArriver = this.dernierEtatEnCours && !e.en_cours;
+    this.dernierEtatEnCours = e.en_cours;
+    this.etat.set(e);
+    if (finVientDArriver && e.trouvees > 0) {
+      this.version.update((v) => v + 1);
+    }
+    this.planifier();
+  }
+
+  private planifier(): void {
+    this.arreterSuivi();
+    if (this.enCours()) {
+      this.minuterie = setTimeout(() => this.lire(), 2000);
     }
   }
 
-  private lot(apresId: number): void {
-    this.abonnement = this.inscriptions.miseAJourEnLigne(apresId).subscribe({
-      next: (r) => {
-        this.traitees.update((t) => [...t, ...r.traitees]);
-        if (r.traitees.some((t) => t.trouve)) {
-          this.version.update((v) => v + 1);
-        }
-        if (r.site_indisponible) {
-          this.erreur.set(r.site_indisponible);
-          this.arreter();
-        } else if (r.restantes > 0 && this.enCours()) {
-          // Le total peut bouger (inscriptions ajoutees entre-temps).
-          this.total.set(Math.max(this.total(), this.traitees().length + r.restantes));
-          this.lot(r.dernier_id);
-        } else {
-          this.arreter();
-        }
-      },
-      error: () => {
-        this.erreur.set('Mise à jour interrompue. Vérifiez votre connexion puis relancez.');
-        this.arreter();
-      },
-    });
+  private arreterSuivi(): void {
+    if (this.minuterie) clearTimeout(this.minuterie);
+    this.minuterie = null;
   }
 }

@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\AnneeScolaire;
+use App\Models\Etablissement;
 use App\Models\GrilleTarifaire;
 use App\Models\Niveau;
 use App\Models\TypeFrais;
 use App\Models\TypeReduction;
+use App\Support\RecuPaiement;
 use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -201,6 +203,38 @@ class ParametrePaiementController extends Controller
 
     // ------------------------------------------------------------ Outils
 
+    /** Recu et billet d'entree : date d'echeance du billet et nombre de jours (echeance proche). */
+    public function recu(Request $request, TenantContext $tenant)
+    {
+        $this->autoriser($request);
+        $etablissement = Etablissement::findOrFail($tenant->id());
+
+        return response()->json([
+            'date_validite_billet' => $etablissement->parametre('date_validite_billet'),
+            'delai_validite_recu' => (int) $etablissement->parametre('delai_validite_recu'),
+            'seuil_jours' => RecuPaiement::SEUIL_ECHEANCE_PROCHE,
+        ]);
+    }
+
+    public function enregistrerRecu(Request $request, TenantContext $tenant)
+    {
+        $this->autoriser($request);
+        $data = $request->validate([
+            'date_validite_billet' => ['nullable', 'date'],
+            'delai_validite_recu' => ['required', 'integer', 'min:1', 'max:366'],
+        ], [
+            'date_validite_billet.date' => 'Date invalide.',
+            'delai_validite_recu.min' => 'Au moins 1 jour.',
+            'delai_validite_recu.max' => '366 jours au plus.',
+        ]);
+        Etablissement::findOrFail($tenant->id())->definirParametres([
+            'date_validite_billet' => ($data['date_validite_billet'] ?? null) ? substr($data['date_validite_billet'], 0, 10) : null,
+            'delai_validite_recu' => (int) $data['delai_validite_recu'],
+        ]);
+
+        return $this->recu($request, $tenant);
+    }
+
     private function autoriser(Request $request): void
     {
         abort_unless($request->user()->can('tarifs.gerer'), 403);
@@ -234,13 +268,15 @@ class ParametrePaiementController extends Controller
     /** Niveaux qui ont au moins une classe cette annee, sinon tous. */
     private function niveauxOuverts(TenantContext $tenant, ?int $anneeId): Collection
     {
-        $ouverts = Niveau::whereHas('classes', fn (Builder $q) => $q
+        $avecClasse = fn (Builder $q) => $q
             ->where('classes.etablissement_id', $tenant->id())
-            ->where('classes.annee_scolaire_id', $anneeId))
+            ->where('classes.annee_scolaire_id', $anneeId);
+        // Grilles de tarifs : niveau GENERAL (TLE), ouvert si une de ses series a une classe.
+        $ouverts = Niveau::generaux()->where(fn (Builder $q) => $q->whereHas('classes', $avecClasse)->orWhereHas('series.classes', $avecClasse))
             ->orderBy('ordre')
             ->get();
 
-        return $ouverts->isNotEmpty() ? $ouverts : Niveau::orderBy('ordre')->get();
+        return $ouverts->isNotEmpty() ? $ouverts : Niveau::generaux()->orderBy('ordre')->get();
     }
 
     private function presenterTypeFrais(TypeFrais $type): array

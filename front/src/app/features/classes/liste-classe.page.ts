@@ -21,6 +21,7 @@ import {
   bookOutline,
   repeatOutline,
   arrowForwardCircleOutline,
+  radioButtonOnOutline,
 } from 'ionicons/icons';
 import { AuthService } from '../../core/services/auth.service';
 import { ClasseService, EleveClasse, LIBELLES_CYCLE, ListeDeClasse } from '../../core/services/classe.service';
@@ -62,7 +63,23 @@ export class ListeClassePage {
   readonly enseignants = signal<EnseignantsClasse | null>(null);
   readonly choixEnseignants = signal<Record<number, number>>({});
   readonly enregistrementEnseignants = signal(false);
-  readonly enseignantsModifies = computed(() => (this.enseignants()?.matieres ?? []).some((m) => (this.choixEnseignants()[m.id] ?? 0) !== (m.personnel_id ?? 0)));
+  /** Professeur principal choisi (0 = aucun). */
+  readonly choixPrincipal = signal(0);
+  readonly enseignantsModifies = computed(
+    () =>
+      (this.enseignants()?.matieres ?? []).some((m) => (this.choixEnseignants()[m.id] ?? 0) !== (m.personnel_id ?? 0)) ||
+      this.choixPrincipal() !== (this.enseignants()?.professeur_principal_id ?? 0),
+  );
+  /**
+   * Radio du professeur principal coche sur la 1re matiere de ce professeur
+   * (un professeur peut avoir plusieurs matieres : un seul radio coche).
+   */
+  estPrincipal(matiereId: number): boolean {
+    const principal = this.choixPrincipal();
+    if (!principal) return false;
+    const premiere = (this.enseignants()?.matieres ?? []).find((m) => this.choixEnseignants()[m.id] === principal);
+    return premiere?.id === matiereId;
+  }
 
   readonly donnees = signal<ListeDeClasse | null>(null);
   readonly chargement = signal(true);
@@ -133,6 +150,7 @@ export class ListeClassePage {
       bookOutline,
       repeatOutline,
       arrowForwardCircleOutline,
+      radioButtonOnOutline,
     });
   }
 
@@ -213,14 +231,25 @@ export class ListeClassePage {
     this.impression.set(false);
   }
 
-  /** Professeurs proposes pour une matiere : ceux qui l'enseignent d'abord. */
+  /** Professeurs proposes pour une matiere : seulement ceux qui l'enseignent (et celui deja choisi). */
   optionsProfesseurs(matiereId: number): OptionSelecteur[] {
-    const p = [...(this.enseignants()?.personnels ?? [])].sort((a, b) => Number(b.matieres.includes(matiereId)) - Number(a.matieres.includes(matiereId)) || a.nom.localeCompare(b.nom));
+    const choisi = this.choixEnseignants()[matiereId] ?? 0;
+    const p = (this.enseignants()?.personnels ?? []).filter((x) => x.matieres.includes(matiereId) || x.id === choisi).sort((a, b) => a.nom.localeCompare(b.nom));
     return [{ valeur: 0, libelle: 'Non désigné' }, ...p.map((x) => ({ valeur: x.id, libelle: x.nom + (x.matieres.includes(matiereId) ? '' : ' (autre matière)') }))];
   }
 
+  nomPrincipal(): string {
+    return this.nomProfesseur(this.enseignants()?.professeur_principal_id ?? null);
+  }
+
   choisirProfesseur(matiereId: number, personnelId: number): void {
+    const avant = this.choixEnseignants()[matiereId] ?? 0;
     this.choixEnseignants.update((c) => ({ ...c, [matiereId]: personnelId }));
+    // Matiere du professeur principal changee : le radio suit le nouveau professeur
+    // (sauf si l'ancien garde une autre matiere de la classe).
+    if (avant && avant === this.choixPrincipal() && !Object.values(this.choixEnseignants()).includes(avant)) {
+      this.choixPrincipal.set(personnelId || 0);
+    }
   }
 
   enregistrerEnseignants(): void {
@@ -228,10 +257,11 @@ export class ListeClassePage {
     const e = this.enseignants();
     if (!d || !e) return;
     this.enregistrementEnseignants.set(true);
-    this.pedagogie.enregistrerEnseignants(d.classe.id, e.matieres.map((m) => ({ matiere_id: m.id, personnel_id: this.choixEnseignants()[m.id] || null }))).subscribe({
+    this.pedagogie.enregistrerEnseignants(d.classe.id, e.matieres.map((m) => ({ matiere_id: m.id, personnel_id: this.choixEnseignants()[m.id] || null })), this.choixPrincipal() || null).subscribe({
       next: (r) => {
         this.enregistrementEnseignants.set(false);
         this.appliquerEnseignants(r);
+        this.charger();
         this.notifier('Professeurs de la classe enregistrés.');
       },
       error: (err: HttpErrorResponse) => {
@@ -253,6 +283,7 @@ export class ListeClassePage {
   private appliquerEnseignants(e: EnseignantsClasse): void {
     this.enseignants.set(e);
     this.choixEnseignants.set(Object.fromEntries(e.matieres.map((m) => [m.id, m.personnel_id ?? 0])));
+    this.choixPrincipal.set(e.professeur_principal_id ?? 0);
   }
 
   private async notifier(message: string, erreur = false): Promise<void> {

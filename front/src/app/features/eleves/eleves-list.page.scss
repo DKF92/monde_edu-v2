@@ -308,7 +308,6 @@ $tableau: 820px;
 
   .me-action {
     border: 1px solid var(--me-bordure);
-    background: var(--me-surface);
   }
 
   @container (min-width: #{$tableau}) {
@@ -318,7 +317,6 @@ $tableau: 820px;
 
     .me-action {
       border-color: transparent;
-      background: none;
     }
   }
 }

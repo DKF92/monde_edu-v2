@@ -135,7 +135,14 @@ export interface BilanCaisse {
     niveaux: { id: number; libelle: string; cycle: string }[];
     classes: { id: number; libelle: string; niveau_id: number }[];
   };
-  caissier: { id: number; nom: string };
+  /** Caissier du bilan (id null : tous les caissiers). */
+  caissier: { id: number | null; nom: string };
+  /** Filtre caissier propose (pas pour un caissier connecte). */
+  filtre_caissier?: boolean;
+  caissier_choisi?: 'tous' | number | null;
+  caissiers?: { id: number; nom: string }[];
+  /** Filtre « Tous » : un bilan par caissier sous le total general. */
+  par_caissier?: (Pick<BilanCaisse, 'lignes' | 'totaux' | 'nombre_paiements'> & { caissier: { id: number; nom: string } })[];
   genere_le: string;
   lignes: LigneBilan[];
   totaux: { affecte: number; non_affecte: number; total: number };
@@ -156,6 +163,8 @@ export interface FiltresBilan extends CriteresBilan {
   du?: string | null;
   au?: string | null;
   mois?: string | null;
+  /** Point de caisse : null = total general, 'tous' = un bilan par caissier, id = un caissier. */
+  caissier?: 'tous' | number | null;
 }
 
 /** Correction d'un paiement (historique). */
